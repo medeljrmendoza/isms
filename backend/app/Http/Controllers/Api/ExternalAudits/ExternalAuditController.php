@@ -17,7 +17,10 @@ use Illuminate\Pagination\LengthAwarePaginator;
  * visibility, and the legacy S3-file-sync side effects that
  * publish/approve triggered (delete+reinsert of every linked
  * Nonconformity/Observation purely to poke a vessel-side sync watcher —
- * no equivalent system exists here).
+ * no equivalent system exists here). The real (non-S3) half of that same
+ * delete+reinsert — force-syncing is_published/is_approved onto every
+ * linked Nonconformity row — IS ported, in
+ * ExternalAuditReportRepository::publish()/approve().
  *
  * There's deliberately no reopen endpoint — External Audits has no
  * closing-date concept in legacy at all.

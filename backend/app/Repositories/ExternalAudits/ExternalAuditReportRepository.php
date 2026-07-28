@@ -185,7 +185,18 @@ class ExternalAuditReportRepository
         return $report;
     }
 
-    /** Ported from publish_external_report(): toggles is_published, always sets is_approved true. */
+    /**
+     * Ported from publish_external_report(): toggles is_published,
+     * always sets is_approved true. Also cascades onto every currently-
+     * linked Nonconformity row (matched by source_of_nc_ref_no, no
+     * is_inactive filter — legacy's own SELECT has none): publishing/
+     * unpublishing the parent report force-syncs each NC's is_published
+     * to match and force-approves it. This is a real legacy behavior
+     * (the nc_data resave inside publish_external_report()), not just
+     * the S3-file-sync side effect it's bundled with — see
+     * FlagStateReportRepository::publish() for the same cascade, ported
+     * there first.
+     */
     public function publish(ExternalAuditReport $report): ExternalAuditReport
     {
         $report->update([
@@ -193,13 +204,24 @@ class ExternalAuditReportRepository
             'is_approved' => true,
         ]);
 
+        Nonconformity::where('source_of_nc_ref_no', $report->ref_no)
+            ->update(['is_published' => $report->is_published, 'is_approved' => true]);
+
         return $report;
     }
 
-    /** Ported from approve_external_report(). */
+    /**
+     * Ported from approve_external_report(): sets is_approved true, and —
+     * same as publish() above — force-approves every currently linked
+     * Nonconformity row (is_published on those rows is left untouched,
+     * matching legacy's `"is_published" => $key->is_published`).
+     */
     public function approve(ExternalAuditReport $report): ExternalAuditReport
     {
         $report->update(['is_approved' => true]);
+
+        Nonconformity::where('source_of_nc_ref_no', $report->ref_no)
+            ->update(['is_approved' => true]);
 
         return $report;
     }
