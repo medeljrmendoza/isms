@@ -1,6 +1,6 @@
 import { Outlet } from "react-router-dom";
-import { NavBar } from "../dashboard/NavBar";
-import { NotificationBar } from "../dashboard/NotificationBar";
+import { NavBar } from "./NavBar";
+import { NotificationBar } from "./NotificationBar";
 
 export function AppLayout() {
   return (

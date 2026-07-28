@@ -2,12 +2,12 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { AppLayout } from "./components/layout/AppLayout";
-import { LoginPage } from "./pages/LoginPage";
-import { DashboardPage } from "./pages/DashboardPage";
-import { NonconformitiesPage } from "./pages/NonconformitiesPage";
-import { IncidentReportsPage } from "./pages/IncidentReportsPage";
-import { PscReportsPage } from "./pages/PscReportsPage";
-import { CompanyInspectionsPage } from "./pages/CompanyInspectionsPage";
+import { LoginPage } from "./features/auth/LoginPage";
+import { DashboardPage } from "./features/dashboard/DashboardPage";
+import { NonconformitiesPage } from "./features/nonconformities/NonconformitiesPage";
+import { IncidentReportsPage } from "./features/incidentReports/IncidentReportsPage";
+import { PscReportsPage } from "./features/pscReports/PscReportsPage";
+import { CompanyInspectionsPage } from "./features/companyInspections/CompanyInspectionsPage";
 import { ComingSoonPage } from "./pages/ComingSoonPage";
 
 // Placeholder — swap in the real page once the change-password module is migrated.

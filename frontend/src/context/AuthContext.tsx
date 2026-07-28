@@ -8,9 +8,9 @@ import {
   type ReactNode,
 } from "react";
 import axios from "axios";
-import { authService } from "../api/authService";
-import type { User } from "../types/auth";
-import type { LoginFormValues } from "../schemas/loginSchema";
+import { authService } from "../features/auth/authService";
+import type { User } from "../features/auth/auth";
+import type { LoginFormValues } from "../features/auth/loginSchema";
 
 interface AuthContextValue {
   user: User | null;
