@@ -2,12 +2,12 @@
 
 namespace Database\Seeders;
 
-use App\Models\IncidentLocation;
-use App\Models\IncidentOperation;
-use App\Models\LocationOfInjury;
-use App\Models\RootCause;
-use App\Models\RootCauseCategory;
-use App\Models\TypeOfInjury;
+use App\Models\IncidentReports\IncidentLocation;
+use App\Models\IncidentReports\IncidentOperation;
+use App\Models\IncidentReports\LocationOfInjury;
+use App\Models\IncidentReports\RootCause;
+use App\Models\IncidentReports\RootCauseCategory;
+use App\Models\IncidentReports\TypeOfInjury;
 use Illuminate\Database\Seeder;
 
 class IncidentReportLookupSeeder extends Seeder

@@ -2,11 +2,11 @@
 
 namespace Database\Seeders;
 
-use App\Models\CommitteeMeeting;
-use App\Models\CommitteeMeetingType;
-use App\Models\CompanyDocument;
-use App\Models\CompanyDocumentationRecord;
-use App\Models\CompanyDocumentExpirySetting;
+use App\Models\CommitteeMeetings\CommitteeMeeting;
+use App\Models\CommitteeMeetings\CommitteeMeetingType;
+use App\Models\CompanyDocumentation\CompanyDocument;
+use App\Models\CompanyDocumentation\CompanyDocumentationRecord;
+use App\Models\CompanyDocumentation\CompanyDocumentExpirySetting;
 use App\Models\Vessel;
 use Illuminate\Database\Seeder;
 

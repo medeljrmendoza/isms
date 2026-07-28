@@ -2,12 +2,12 @@
 
 namespace Database\Seeders;
 
-use App\Models\ManualChapter;
-use App\Models\ManualDocument;
-use App\Models\ManualForm;
+use App\Models\ManualPublish\ManualChapter;
+use App\Models\ManualPublish\ManualDocument;
+use App\Models\ManualPublish\ManualForm;
 use App\Models\Vessel;
-use App\Models\VesselFormSync;
-use App\Models\VesselManualSync;
+use App\Models\ManualPublish\VesselFormSync;
+use App\Models\ManualPublish\VesselManualSync;
 use Illuminate\Database\Seeder;
 
 class SmsVersionMonitoringSeeder extends Seeder

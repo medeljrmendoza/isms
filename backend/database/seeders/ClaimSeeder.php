@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Models\Claim;
+use App\Models\Claims\Claim;
 use App\Models\Vessel;
 use Illuminate\Database\Seeder;
 

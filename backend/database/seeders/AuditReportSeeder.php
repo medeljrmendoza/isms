@@ -2,9 +2,9 @@
 
 namespace Database\Seeders;
 
-use App\Models\AuditReport;
-use App\Models\InternalAuditReport;
-use App\Models\Nonconformity;
+use App\Models\CompanyInspections\AuditReport;
+use App\Models\InternalAudits\InternalAuditReport;
+use App\Models\Nonconformities\Nonconformity;
 use App\Models\Vessel;
 use Illuminate\Database\Seeder;
 

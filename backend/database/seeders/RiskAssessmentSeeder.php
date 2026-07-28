@@ -2,10 +2,10 @@
 
 namespace Database\Seeders;
 
-use App\Models\RiskAssessment;
-use App\Models\RiskCategory;
-use App\Models\RiskOperation;
-use App\Models\SireReport;
+use App\Models\RiskAssessment\RiskAssessment;
+use App\Models\RiskAssessment\RiskCategory;
+use App\Models\RiskAssessment\RiskOperation;
+use App\Models\Sire\SireReport;
 use App\Models\Vessel;
 use Illuminate\Database\Seeder;
 

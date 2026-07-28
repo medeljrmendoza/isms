@@ -2,8 +2,8 @@
 
 namespace Database\Seeders;
 
-use App\Models\DrillList;
-use App\Models\DrillReport;
+use App\Models\Drills\DrillList;
+use App\Models\Drills\DrillReport;
 use App\Models\Vessel;
 use Illuminate\Database\Seeder;
 

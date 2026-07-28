@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Models\Nonconformity;
+use App\Models\Nonconformities\Nonconformity;
 use App\Models\Vessel;
 use Illuminate\Database\Seeder;
 

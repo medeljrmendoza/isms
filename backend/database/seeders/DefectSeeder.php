@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Models\Defect;
+use App\Models\Defects\Defect;
 use App\Models\Vessel;
 use Illuminate\Database\Seeder;
 

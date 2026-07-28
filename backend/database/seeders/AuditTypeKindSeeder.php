@@ -2,8 +2,8 @@
 
 namespace Database\Seeders;
 
-use App\Models\AuditKind;
-use App\Models\AuditType;
+use App\Models\CompanyInspections\AuditKind;
+use App\Models\CompanyInspections\AuditType;
 use Illuminate\Database\Seeder;
 
 /**

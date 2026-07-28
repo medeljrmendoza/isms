@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Models\ExposureHoursRecord;
+use App\Models\ExposureHours\ExposureHoursRecord;
 use App\Models\Vessel;
 use Illuminate\Database\Seeder;
 

@@ -1,11 +1,11 @@
 <?php
 
-use App\Http\Controllers\Api\AuthController;
-use App\Http\Controllers\Api\CompanyInspectionController;
+use App\Http\Controllers\Api\Auth\AuthController;
+use App\Http\Controllers\Api\CompanyInspections\CompanyInspectionController;
 use App\Http\Controllers\Api\DashboardController;
-use App\Http\Controllers\Api\IncidentReportController;
-use App\Http\Controllers\Api\NonconformityController;
-use App\Http\Controllers\Api\PscReportController;
+use App\Http\Controllers\Api\IncidentReports\IncidentReportController;
+use App\Http\Controllers\Api\Nonconformities\NonconformityController;
+use App\Http\Controllers\Api\PscReports\PscReportController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/login', [AuthController::class, 'login']);

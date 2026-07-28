@@ -2,9 +2,9 @@
 
 namespace Database\Seeders;
 
-use App\Models\AuditKind;
-use App\Models\AuditReport;
-use App\Models\AuditType;
+use App\Models\CompanyInspections\AuditKind;
+use App\Models\CompanyInspections\AuditReport;
+use App\Models\CompanyInspections\AuditType;
 use App\Models\Vessel;
 use Illuminate\Database\Seeder;
 

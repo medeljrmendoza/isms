@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Models\PmsActivity;
+use App\Models\Pms\PmsActivity;
 use App\Models\Vessel;
 use Illuminate\Database\Seeder;
 

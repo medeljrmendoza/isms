@@ -3,10 +3,10 @@
 namespace Database\Seeders;
 
 use App\Models\Vessel;
-use App\Models\VesselDocument;
-use App\Models\VesselDocumentExpirySetting;
-use App\Models\VesselDocumentRecord;
-use App\Models\VesselDocumentType;
+use App\Models\VesselDocumentation\VesselDocument;
+use App\Models\VesselDocumentation\VesselDocumentExpirySetting;
+use App\Models\VesselDocumentation\VesselDocumentRecord;
+use App\Models\VesselDocumentation\VesselDocumentType;
 use Illuminate\Database\Seeder;
 
 class VesselDocumentationSeeder extends Seeder

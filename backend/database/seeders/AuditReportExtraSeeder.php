@@ -2,9 +2,9 @@
 
 namespace Database\Seeders;
 
-use App\Models\ExternalAuditReport;
-use App\Models\Nonconformity;
-use App\Models\PscReport;
+use App\Models\ExternalAudits\ExternalAuditReport;
+use App\Models\Nonconformities\Nonconformity;
+use App\Models\PscReports\PscReport;
 use App\Models\Vessel;
 use Illuminate\Database\Seeder;
 

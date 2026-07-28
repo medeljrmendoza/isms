@@ -2,9 +2,9 @@
 
 namespace Database\Seeders;
 
-use App\Models\IspsReview;
-use App\Models\ManualChapter;
-use App\Models\ManualDocument;
+use App\Models\IspsReview\IspsReview;
+use App\Models\ManualPublish\ManualChapter;
+use App\Models\ManualPublish\ManualDocument;
 use App\Models\Vessel;
 use Illuminate\Database\Seeder;
 

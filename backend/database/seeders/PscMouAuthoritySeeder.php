@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Models\PscMouAuthority;
+use App\Models\PscReports\PscMouAuthority;
 use Illuminate\Database\Seeder;
 
 class PscMouAuthoritySeeder extends Seeder

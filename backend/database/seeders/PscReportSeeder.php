@@ -2,8 +2,8 @@
 
 namespace Database\Seeders;
 
-use App\Models\PscMouAuthority;
-use App\Models\PscReport;
+use App\Models\PscReports\PscMouAuthority;
+use App\Models\PscReports\PscReport;
 use App\Models\Vessel;
 use Illuminate\Database\Seeder;
 

@@ -2,15 +2,15 @@
 
 namespace Database\Seeders;
 
-use App\Models\IncidentLocation;
-use App\Models\IncidentOperation;
-use App\Models\IncidentPersonParticipated;
-use App\Models\IncidentReport;
-use App\Models\IncidentRootCause;
-use App\Models\LocationOfInjury;
-use App\Models\NatureOfIncident;
-use App\Models\RootCause;
-use App\Models\TypeOfInjury;
+use App\Models\IncidentReports\IncidentLocation;
+use App\Models\IncidentReports\IncidentOperation;
+use App\Models\IncidentReports\IncidentPersonParticipated;
+use App\Models\IncidentReports\IncidentReport;
+use App\Models\IncidentReports\IncidentRootCause;
+use App\Models\IncidentReports\LocationOfInjury;
+use App\Models\IncidentReports\NatureOfIncident;
+use App\Models\IncidentReports\RootCause;
+use App\Models\IncidentReports\TypeOfInjury;
 use App\Models\Vessel;
 use Illuminate\Database\Seeder;
 

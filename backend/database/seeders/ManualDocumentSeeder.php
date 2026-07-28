@@ -2,8 +2,8 @@
 
 namespace Database\Seeders;
 
-use App\Models\ManualChapter;
-use App\Models\ManualDocument;
+use App\Models\ManualPublish\ManualChapter;
+use App\Models\ManualPublish\ManualDocument;
 use Illuminate\Database\Seeder;
 
 class ManualDocumentSeeder extends Seeder
