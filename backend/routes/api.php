@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\Auth\AuthController;
 use App\Http\Controllers\Api\CompanyInspections\CompanyInspectionController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\ExternalAudits\ExternalAuditController;
+use App\Http\Controllers\Api\FlagState\FlagStateReportController;
 use App\Http\Controllers\Api\IncidentReports\IncidentReportController;
 use App\Http\Controllers\Api\InternalAudits\InternalAuditController;
 use App\Http\Controllers\Api\Nonconformities\NonconformityController;
@@ -111,4 +112,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/non-sire-reports/{nonSireReport}', [NonSireReportController::class, 'destroy']);
     Route::post('/non-sire-reports/{nonSireReport}/publish', [NonSireReportController::class, 'publish']);
     Route::post('/non-sire-reports/{nonSireReport}/approve', [NonSireReportController::class, 'approve']);
+
+    Route::get('/flag-state-reports/options', [FlagStateReportController::class, 'options']);
+    Route::get('/flag-state-reports', [FlagStateReportController::class, 'index']);
+    Route::post('/flag-state-reports', [FlagStateReportController::class, 'store']);
+    Route::get('/flag-state-reports/{flagStateReport}', [FlagStateReportController::class, 'show']);
+    Route::put('/flag-state-reports/{flagStateReport}', [FlagStateReportController::class, 'update']);
+    Route::delete('/flag-state-reports/{flagStateReport}', [FlagStateReportController::class, 'destroy']);
+    Route::post('/flag-state-reports/{flagStateReport}/publish', [FlagStateReportController::class, 'publish']);
+    Route::post('/flag-state-reports/{flagStateReport}/approve', [FlagStateReportController::class, 'approve']);
 });

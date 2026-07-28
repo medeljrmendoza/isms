@@ -17,6 +17,11 @@ class FlagStateReport extends Model
         'vessel_id',
         'dateof_inspection',
         'added_by',
+        'placeof_inspection',
+        'inspector',
+        'flag_cost',
+        'shore_remarks',
+        'vessel_remarks',
         'is_published',
         'is_approved',
         'is_deleted',
@@ -26,6 +31,7 @@ class FlagStateReport extends Model
     {
         return [
             'dateof_inspection' => 'date',
+            'flag_cost' => 'decimal:2',
             'is_published' => 'boolean',
             'is_approved' => 'boolean',
             'is_deleted' => 'boolean',
