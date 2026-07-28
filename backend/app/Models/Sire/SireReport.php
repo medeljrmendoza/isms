@@ -11,8 +11,15 @@ class SireReport extends Model
 {
     protected $fillable = [
         'vessel_id',
+        'added_by',
         'dateof_inspection',
         'placeof_inspection',
+        'company_name',
+        'inspector_name',
+        'sire_cost',
+        'pass_fail',
+        'shore_remarks',
+        'vessel_remarks',
         'is_published',
         'is_approved',
         'is_deleted',
@@ -22,6 +29,7 @@ class SireReport extends Model
     {
         return [
             'dateof_inspection' => 'date',
+            'sire_cost' => 'decimal:2',
             'is_published' => 'boolean',
             'is_approved' => 'boolean',
             'is_deleted' => 'boolean',

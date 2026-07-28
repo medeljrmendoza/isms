@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\IncidentReports\IncidentReportController;
 use App\Http\Controllers\Api\InternalAudits\InternalAuditController;
 use App\Http\Controllers\Api\Nonconformities\NonconformityController;
 use App\Http\Controllers\Api\PscReports\PscReportController;
+use App\Http\Controllers\Api\Sire\SireReportController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/login', [AuthController::class, 'login']);
@@ -91,4 +92,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/external-audits/{externalAuditReport}', [ExternalAuditController::class, 'destroy']);
     Route::post('/external-audits/{externalAuditReport}/publish', [ExternalAuditController::class, 'publish']);
     Route::post('/external-audits/{externalAuditReport}/approve', [ExternalAuditController::class, 'approve']);
+
+    Route::get('/sire-reports/options', [SireReportController::class, 'options']);
+    Route::get('/sire-reports', [SireReportController::class, 'index']);
+    Route::post('/sire-reports', [SireReportController::class, 'store']);
+    Route::get('/sire-reports/{sireReport}', [SireReportController::class, 'show']);
+    Route::put('/sire-reports/{sireReport}', [SireReportController::class, 'update']);
+    Route::delete('/sire-reports/{sireReport}', [SireReportController::class, 'destroy']);
+    Route::post('/sire-reports/{sireReport}/publish', [SireReportController::class, 'publish']);
+    Route::post('/sire-reports/{sireReport}/approve', [SireReportController::class, 'approve']);
 });
