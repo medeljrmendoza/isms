@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\Auth\AuthController;
+use App\Http\Controllers\Api\CommitteeMeetings\CommitteeMeetingController;
 use App\Http\Controllers\Api\CompanyInspections\CompanyInspectionController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\ExternalAudits\ExternalAuditController;
@@ -121,4 +122,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/flag-state-reports/{flagStateReport}', [FlagStateReportController::class, 'destroy']);
     Route::post('/flag-state-reports/{flagStateReport}/publish', [FlagStateReportController::class, 'publish']);
     Route::post('/flag-state-reports/{flagStateReport}/approve', [FlagStateReportController::class, 'approve']);
+
+    Route::get('/committee-meetings/options', [CommitteeMeetingController::class, 'options']);
+    Route::get('/committee-meetings', [CommitteeMeetingController::class, 'index']);
+    Route::post('/committee-meetings', [CommitteeMeetingController::class, 'store']);
+    Route::get('/committee-meetings/{committeeMeeting}', [CommitteeMeetingController::class, 'show']);
+    Route::put('/committee-meetings/{committeeMeeting}', [CommitteeMeetingController::class, 'update']);
+    Route::delete('/committee-meetings/{committeeMeeting}', [CommitteeMeetingController::class, 'destroy']);
+    Route::post('/committee-meetings/{committeeMeeting}/publish', [CommitteeMeetingController::class, 'publish']);
+    Route::post('/committee-meetings/{committeeMeeting}/approve', [CommitteeMeetingController::class, 'approve']);
 });
