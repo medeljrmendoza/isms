@@ -11,6 +11,7 @@ import { CompanyInspectionsPage } from "./features/companyInspections/CompanyIns
 import { InternalAuditsPage } from "./features/internalAudits/InternalAuditsPage";
 import { ExternalAuditsPage } from "./features/externalAudits/ExternalAuditsPage";
 import { SireReportsPage } from "./features/sire/SireReportsPage";
+import { NonSireReportsPage } from "./features/nonSire/NonSireReportsPage";
 import { ComingSoonPage } from "./pages/ComingSoonPage";
 
 // Placeholder — swap in the real page once the change-password module is migrated.
@@ -36,6 +37,7 @@ export default function App() {
               <Route path="/internal" element={<InternalAuditsPage />} />
               <Route path="/external" element={<ExternalAuditsPage />} />
               <Route path="/sire" element={<SireReportsPage />} />
+              <Route path="/non_sire" element={<NonSireReportsPage />} />
               <Route path="/change-password" element={<ChangePasswordPage />} />
               {/* Every other nav link points at a real legacy route that
                   isn't migrated yet — see src/data/navigation.ts */}

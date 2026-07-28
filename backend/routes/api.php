@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\ExternalAudits\ExternalAuditController;
 use App\Http\Controllers\Api\IncidentReports\IncidentReportController;
 use App\Http\Controllers\Api\InternalAudits\InternalAuditController;
 use App\Http\Controllers\Api\Nonconformities\NonconformityController;
+use App\Http\Controllers\Api\NonSire\NonSireReportController;
 use App\Http\Controllers\Api\PscReports\PscReportController;
 use App\Http\Controllers\Api\Sire\SireReportController;
 use Illuminate\Support\Facades\Route;
@@ -101,4 +102,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/sire-reports/{sireReport}', [SireReportController::class, 'destroy']);
     Route::post('/sire-reports/{sireReport}/publish', [SireReportController::class, 'publish']);
     Route::post('/sire-reports/{sireReport}/approve', [SireReportController::class, 'approve']);
+
+    Route::get('/non-sire-reports/options', [NonSireReportController::class, 'options']);
+    Route::get('/non-sire-reports', [NonSireReportController::class, 'index']);
+    Route::post('/non-sire-reports', [NonSireReportController::class, 'store']);
+    Route::get('/non-sire-reports/{nonSireReport}', [NonSireReportController::class, 'show']);
+    Route::put('/non-sire-reports/{nonSireReport}', [NonSireReportController::class, 'update']);
+    Route::delete('/non-sire-reports/{nonSireReport}', [NonSireReportController::class, 'destroy']);
+    Route::post('/non-sire-reports/{nonSireReport}/publish', [NonSireReportController::class, 'publish']);
+    Route::post('/non-sire-reports/{nonSireReport}/approve', [NonSireReportController::class, 'approve']);
 });
