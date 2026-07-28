@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\Auth\AuthController;
 use App\Http\Controllers\Api\CompanyInspections\CompanyInspectionController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\IncidentReports\IncidentReportController;
+use App\Http\Controllers\Api\InternalAudits\InternalAuditController;
 use App\Http\Controllers\Api\Nonconformities\NonconformityController;
 use App\Http\Controllers\Api\PscReports\PscReportController;
 use Illuminate\Support\Facades\Route;
@@ -73,4 +74,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/company-inspections/{auditReport}', [CompanyInspectionController::class, 'show']);
     Route::put('/company-inspections/{auditReport}', [CompanyInspectionController::class, 'update']);
     Route::delete('/company-inspections/{auditReport}', [CompanyInspectionController::class, 'destroy']);
+
+    Route::get('/internal-audits/options', [InternalAuditController::class, 'options']);
+    Route::get('/internal-audits', [InternalAuditController::class, 'index']);
+    Route::post('/internal-audits', [InternalAuditController::class, 'store']);
+    Route::get('/internal-audits/{internalAuditReport}', [InternalAuditController::class, 'show']);
+    Route::put('/internal-audits/{internalAuditReport}', [InternalAuditController::class, 'update']);
+    Route::delete('/internal-audits/{internalAuditReport}', [InternalAuditController::class, 'destroy']);
 });

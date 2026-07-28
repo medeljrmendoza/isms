@@ -8,6 +8,7 @@ import { NonconformitiesPage } from "./features/nonconformities/NonconformitiesP
 import { IncidentReportsPage } from "./features/incidentReports/IncidentReportsPage";
 import { PscReportsPage } from "./features/pscReports/PscReportsPage";
 import { CompanyInspectionsPage } from "./features/companyInspections/CompanyInspectionsPage";
+import { InternalAuditsPage } from "./features/internalAudits/InternalAuditsPage";
 import { ComingSoonPage } from "./pages/ComingSoonPage";
 
 // Placeholder — swap in the real page once the change-password module is migrated.
@@ -30,6 +31,7 @@ export default function App() {
               <Route path="/incident" element={<IncidentReportsPage />} />
               <Route path="/psc" element={<PscReportsPage />} />
               <Route path="/company" element={<CompanyInspectionsPage />} />
+              <Route path="/internal" element={<InternalAuditsPage />} />
               <Route path="/change-password" element={<ChangePasswordPage />} />
               {/* Every other nav link points at a real legacy route that
                   isn't migrated yet — see src/data/navigation.ts */}

@@ -15,7 +15,14 @@ class InternalAuditReport extends Model
     protected $fillable = [
         'audit_ref',
         'vessel_id',
+        'department',
         'this_date',
+        'placeof_audit',
+        'typeof_audit',
+        'master_name',
+        'chief_engineer',
+        'auditor_name',
+        'remarks',
         'is_deleted',
     ];
 
