@@ -1,0 +1,10 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class VesselManualSync extends Model
+{
+    protected $fillable = ['vessel_id', 'manual_document_id', 'file_hash'];
+}
