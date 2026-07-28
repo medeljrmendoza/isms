@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\Auth\AuthController;
 use App\Http\Controllers\Api\CompanyInspections\CompanyInspectionController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\ExternalAudits\ExternalAuditController;
 use App\Http\Controllers\Api\IncidentReports\IncidentReportController;
 use App\Http\Controllers\Api\InternalAudits\InternalAuditController;
 use App\Http\Controllers\Api\Nonconformities\NonconformityController;
@@ -81,4 +82,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/internal-audits/{internalAuditReport}', [InternalAuditController::class, 'show']);
     Route::put('/internal-audits/{internalAuditReport}', [InternalAuditController::class, 'update']);
     Route::delete('/internal-audits/{internalAuditReport}', [InternalAuditController::class, 'destroy']);
+
+    Route::get('/external-audits/options', [ExternalAuditController::class, 'options']);
+    Route::get('/external-audits', [ExternalAuditController::class, 'index']);
+    Route::post('/external-audits', [ExternalAuditController::class, 'store']);
+    Route::get('/external-audits/{externalAuditReport}', [ExternalAuditController::class, 'show']);
+    Route::put('/external-audits/{externalAuditReport}', [ExternalAuditController::class, 'update']);
+    Route::delete('/external-audits/{externalAuditReport}', [ExternalAuditController::class, 'destroy']);
+    Route::post('/external-audits/{externalAuditReport}/publish', [ExternalAuditController::class, 'publish']);
+    Route::post('/external-audits/{externalAuditReport}/approve', [ExternalAuditController::class, 'approve']);
 });
