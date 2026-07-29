@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\Auth\AuthController;
 use App\Http\Controllers\Api\CommitteeMeetings\CommitteeMeetingController;
 use App\Http\Controllers\Api\CompanyInspections\CompanyInspectionController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\Drills\DrillReportController;
 use App\Http\Controllers\Api\ExternalAudits\ExternalAuditController;
 use App\Http\Controllers\Api\FlagState\FlagStateReportController;
 use App\Http\Controllers\Api\IncidentReports\IncidentReportController;
@@ -131,4 +132,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/committee-meetings/{committeeMeeting}', [CommitteeMeetingController::class, 'destroy']);
     Route::post('/committee-meetings/{committeeMeeting}/publish', [CommitteeMeetingController::class, 'publish']);
     Route::post('/committee-meetings/{committeeMeeting}/approve', [CommitteeMeetingController::class, 'approve']);
+
+    Route::get('/drill-lists/options', [DrillReportController::class, 'options']);
+    Route::get('/drill-lists/calendar', [DrillReportController::class, 'calendar']);
+    Route::get('/drill-reports', [DrillReportController::class, 'cell']);
+    Route::get('/drill-reports/{drillReport}', [DrillReportController::class, 'show']);
+    Route::put('/drill-reports/{drillReport}', [DrillReportController::class, 'update']);
 });

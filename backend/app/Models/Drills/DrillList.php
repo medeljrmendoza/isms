@@ -12,6 +12,7 @@ class DrillList extends Model
 {
     protected $fillable = [
         'name',
+        'drill_type',
         'frequency_type',
         'frequency_count',
         'applies_to_all_vessels',

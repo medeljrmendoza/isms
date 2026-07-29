@@ -3,20 +3,24 @@
 namespace App\Repositories\Drills;
 
 use App\Models\Drills\DrillList;
+use App\Models\Drills\DrillReport;
+use App\Models\Drills\DrillReportCrew;
 use App\Models\Vessel;
 use App\Support\TableQuery;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
 /**
- * Ported from Controllers/Dashboard_drill.php. Legacy renders one row
- * per vessel with two AJAX-loaded counts (upcoming/overdue), each
- * linking out to a separate summary page — this migrates that into a
- * single table (one row per vessel, computed columns), consistent with
- * every other dashlet now being a real DataTable. The drill-down
- * summary pages themselves aren't ported (read-only dashlets, same as
- * everywhere else).
+ * Ported from Controllers/Dashboard_drill.php (the summaries()/table()
+ * dashlet methods) and Controllers/Drill.php (everything else). Unlike
+ * every other module, there's no create or delete here — legacy's
+ * add_record() only ever edits a drill_report row that already exists
+ * (drill reports originate solely from the unmigrated vessel-side app,
+ * against a scheduled drill_list slot), and delete_record() doesn't
+ * exist in the controller at all despite a delete button being rendered
+ * for it in view_calendar_reports() — dead UI in legacy, not ported.
  */
 class DrillRepository
 {
@@ -25,6 +29,8 @@ class DrillRepository
         ['key' => 'upcoming', 'label' => 'UPCOMING', 'sortable' => true],
         ['key' => 'overdue', 'label' => 'OVERDUE', 'sortable' => true],
     ];
+
+    private const MONTHS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
     public static function columns(): array
     {
@@ -57,14 +63,7 @@ class DrillRepository
                     continue;
                 }
 
-                $nextDrill = Carbon::parse($lastDrillDate)->add(
-                    match ($drillList->frequency_type) {
-                        'D' => "{$drillList->frequency_count} days",
-                        'W' => "{$drillList->frequency_count} weeks",
-                        'M' => "{$drillList->frequency_count} months",
-                        'Y' => "{$drillList->frequency_count} years",
-                    },
-                );
+                $nextDrill = $this->nextDrillDate($lastDrillDate, $drillList->frequency_type, $drillList->frequency_count);
 
                 if ($nextDrill->lt($today)) {
                     $overdue++;
@@ -105,5 +104,150 @@ class DrillRepository
             $query->page,
             ['path' => LengthAwarePaginator::resolveCurrentPath()],
         );
+    }
+
+    /** @return array<int, array{id:int,label:string}> */
+    public function vesselOptions(): array
+    {
+        return Vessel::query()->orderBy('name')->get()
+            ->map(fn (Vessel $v) => ['id' => $v->id, 'label' => $v->display_name])
+            ->all();
+    }
+
+    /**
+     * Ported from get_drill_report_year(): distinct years with at least
+     * one report, plus the current year so a vessel with no history yet
+     * still has something selectable.
+     */
+    public function yearOptions(): array
+    {
+        $years = DrillReport::query()
+            ->selectRaw("DISTINCT strftime('%Y', drill_date) as year")
+            ->pluck('year')
+            ->filter()
+            ->map(fn ($y) => (int) $y);
+
+        return $years->push((int) now()->year)->unique()->sortDesc()->values()->all();
+    }
+
+    /**
+     * Ported from Controllers/Drill.php's loadCalendarData(). One row
+     * per active drill_list applicable to the vessel (all-vessels or
+     * explicitly assigned), each carrying last/next/status plus a
+     * per-month bucket of that year's reports. Legacy shows nothing at
+     * all without a vessel selected (`WHERE tb_drill_list.drillListID
+     * = ""` when vesID is blank) — same here, vesselId is required.
+     */
+    public function calendarGrid(int $vesselId, int $year): Collection
+    {
+        $today = Carbon::today();
+
+        return DrillList::query()
+            ->where('is_active', true)
+            ->where(function (Builder $q) use ($vesselId) {
+                $q->where('applies_to_all_vessels', true)
+                    ->orWhereHas('vessels', fn (Builder $v) => $v->where('vessels.id', $vesselId));
+            })
+            ->with(['reports' => fn ($q) => $q->where('vessel_id', $vesselId)->orderBy('drill_date')])
+            ->orderBy('drill_type')
+            ->orderBy('name')
+            ->get()
+            ->map(function (DrillList $drillList) use ($year, $today) {
+                $reports = $drillList->reports;
+                $lastDrillDate = $reports->max('drill_date');
+                $nextDrill = $lastDrillDate
+                    ? $this->nextDrillDate($lastDrillDate, $drillList->frequency_type, $drillList->frequency_count)
+                    : null;
+
+                $status = null;
+                if ($nextDrill) {
+                    if ($nextDrill->lt($today)) {
+                        $status = 'overdue';
+                    } elseif ($nextDrill->copy()->subDays(30)->lte($today)) {
+                        $status = 'upcoming';
+                    }
+                }
+
+                $yearReports = $reports->filter(fn (DrillReport $r) => $r->drill_date->year === $year);
+                $months = [];
+                foreach (self::MONTHS as $month) {
+                    $months[$month] = $yearReports->filter(fn (DrillReport $r) => $r->drill_date->month === $month)
+                        ->map(fn (DrillReport $r) => ['id' => $r->id, 'day' => $r->drill_date->day])
+                        ->values()->all();
+                }
+
+                return [
+                    'id' => $drillList->id,
+                    'drill_type' => $drillList->drill_type,
+                    'name' => $drillList->name,
+                    'frequency' => $this->frequencyLabel($drillList->frequency_type, $drillList->frequency_count),
+                    'last_drill' => $lastDrillDate?->format('Y-m-d'),
+                    'next_drill' => $nextDrill?->toDateString(),
+                    'status' => $status,
+                    'months' => $months,
+                ];
+            });
+    }
+
+    /**
+     * Ported from view_calendar_reports(): the flat list of reports
+     * behind one calendar cell (one drill list, one vessel, one month).
+     */
+    public function reportsForCell(int $drillListId, int $vesselId, int $year, int $month): Collection
+    {
+        return DrillReport::query()
+            ->where('drill_list_id', $drillListId)
+            ->where('vessel_id', $vesselId)
+            ->whereYear('drill_date', $year)
+            ->whereMonth('drill_date', $month)
+            ->orderBy('drill_date')
+            ->get();
+    }
+
+    /**
+     * Ported from add_record(): edit-only — vessel, drill_list, and
+     * drill_date's report origin are all frozen (legacy always re-reads
+     * vesID/drillListID from the existing row and never lets shore set
+     * them). Crew rows are fully replaced on every save, same
+     * delete-then-recreate pattern as every other sub-table in this app.
+     *
+     * @param array<int, array{crew_name:string}> $crew
+     */
+    public function update(DrillReport $report, array $data, array $crew): DrillReport
+    {
+        $report->update($data);
+
+        $report->crew()->delete();
+        foreach (array_values($crew) as $index => $row) {
+            DrillReportCrew::create([
+                'drill_report_id' => $report->id,
+                'crew_name' => $row['crew_name'],
+                'arrangement' => $index,
+            ]);
+        }
+
+        return $report;
+    }
+
+    private function nextDrillDate(string $lastDrillDate, string $frequencyType, int $frequencyCount): Carbon
+    {
+        return Carbon::parse($lastDrillDate)->add(match ($frequencyType) {
+            'D' => "{$frequencyCount} days",
+            'W' => "{$frequencyCount} weeks",
+            'M' => "{$frequencyCount} months",
+            'Y' => "{$frequencyCount} years",
+        });
+    }
+
+    private function frequencyLabel(string $frequencyType, int $frequencyCount): string
+    {
+        $unit = match ($frequencyType) {
+            'D' => 'Day',
+            'W' => 'Week',
+            'M' => 'Month',
+            'Y' => 'Year',
+        };
+
+        return "{$frequencyCount} {$unit}(s)";
     }
 }
