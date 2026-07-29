@@ -3,9 +3,9 @@
 namespace App\Models\Nonconformities;
 
 use App\Models\ManualPublish\ManualChapter;
-use App\Repositories\Nonconformities\NonconformityRepository;
+use App\Models\PscReports\PscReport;
 use App\Models\Vessel;
-
+use App\Repositories\Nonconformities\NonconformityRepository;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -94,6 +94,12 @@ class Nonconformity extends Model
     public function vessel(): BelongsTo
     {
         return $this->belongsTo(Vessel::class);
+    }
+
+    /** Loose string-key relation, the inverse of PscReport::nonconformities(). */
+    public function pscReport(): BelongsTo
+    {
+        return $this->belongsTo(PscReport::class, 'source_of_nc_ref_no', 'ref_no');
     }
 
     public function manualChapter(): BelongsTo

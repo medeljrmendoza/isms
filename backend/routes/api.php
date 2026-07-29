@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\IncidentReports\IncidentReportController;
 use App\Http\Controllers\Api\InternalAudits\InternalAuditController;
 use App\Http\Controllers\Api\Nonconformities\NonconformityController;
 use App\Http\Controllers\Api\NonSire\NonSireReportController;
+use App\Http\Controllers\Api\PscReports\KpiPscInspectionsController;
 use App\Http\Controllers\Api\PscReports\PscReportController;
 use App\Http\Controllers\Api\RiskAssessment\RiskAssessmentController;
 use App\Http\Controllers\Api\RiskAssessment\RiskAssessmentShoreController;
@@ -163,4 +164,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/risk-assessments-shore/{riskAssessmentShore}', [RiskAssessmentShoreController::class, 'update']);
     Route::delete('/risk-assessments-shore/{riskAssessmentShore}', [RiskAssessmentShoreController::class, 'destroy']);
     Route::post('/risk-assessments-shore/{riskAssessmentShore}/reopen', [RiskAssessmentShoreController::class, 'reopen']);
+
+    Route::get('/kpi/psc-inspections/options', [KpiPscInspectionsController::class, 'options']);
+    Route::get('/kpi/psc-inspections/summary', [KpiPscInspectionsController::class, 'summary']);
+    Route::get('/kpi/psc-inspections/reports-by-vessel', [KpiPscInspectionsController::class, 'reportsByVessel']);
+    Route::get('/kpi/psc-inspections/reports-by-mou', [KpiPscInspectionsController::class, 'reportsByMou']);
+    Route::get('/kpi/psc-inspections/nonconformities-by-vessel', [KpiPscInspectionsController::class, 'nonConformitiesByVessel']);
 });
