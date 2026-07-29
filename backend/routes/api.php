@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\Auth\AuthController;
+use App\Http\Controllers\Api\Claims\KpiClaimsController;
 use App\Http\Controllers\Api\CommitteeMeetings\CommitteeMeetingController;
 use App\Http\Controllers\Api\CompanyInspections\CompanyInspectionController;
 use App\Http\Controllers\Api\CompanyInspections\KpiCompanyInspectionsController;
@@ -201,4 +202,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/kpi/internal-audits/summary', [KpiInternalAuditsController::class, 'summary']);
     Route::get('/kpi/internal-audits/reports-by-vessel', [KpiInternalAuditsController::class, 'reportsByVessel']);
     Route::get('/kpi/internal-audits/nonconformities-by-vessel', [KpiInternalAuditsController::class, 'nonConformitiesByVessel']);
+
+    Route::get('/kpi/claims/options', [KpiClaimsController::class, 'options']);
+    Route::get('/kpi/claims/summary', [KpiClaimsController::class, 'summary']);
+    Route::get('/kpi/claims/by-vessel', [KpiClaimsController::class, 'byVessel']);
+    Route::get('/kpi/claims/by-category', [KpiClaimsController::class, 'byCategory']);
 });

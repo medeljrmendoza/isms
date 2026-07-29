@@ -3,7 +3,6 @@
 namespace App\Models\Claims;
 
 use App\Models\Vessel;
-
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -15,12 +14,15 @@ class Claim extends Model
         'vessel_id',
         'report_date',
         'status',
+        'nature_diagnosis',
+        'amount_usd',
     ];
 
     protected function casts(): array
     {
         return [
             'report_date' => 'date',
+            'amount_usd' => 'decimal:2',
         ];
     }
 
