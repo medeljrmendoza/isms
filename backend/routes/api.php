@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\InternalAudits\InternalAuditController;
 use App\Http\Controllers\Api\Nonconformities\NonconformityController;
 use App\Http\Controllers\Api\NonSire\NonSireReportController;
 use App\Http\Controllers\Api\PscReports\PscReportController;
+use App\Http\Controllers\Api\RiskAssessment\RiskAssessmentController;
 use App\Http\Controllers\Api\Sire\SireReportController;
 use Illuminate\Support\Facades\Route;
 
@@ -147,4 +148,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/exposure-hours-records/{exposureHoursRecord}', [ExposureHoursController::class, 'show']);
     Route::put('/exposure-hours-records/{exposureHoursRecord}', [ExposureHoursController::class, 'update']);
     Route::delete('/exposure-hours-records/{exposureHoursRecord}', [ExposureHoursController::class, 'destroy']);
+
+    Route::get('/risk-assessments/options', [RiskAssessmentController::class, 'options']);
+    Route::get('/risk-assessments', [RiskAssessmentController::class, 'index']);
+    Route::get('/risk-assessments/{riskAssessment}', [RiskAssessmentController::class, 'show']);
+    Route::post('/risk-assessments/{riskAssessment}/approve-shore', [RiskAssessmentController::class, 'approveShore']);
+    Route::post('/risk-assessments/{riskAssessment}/approve-marine', [RiskAssessmentController::class, 'approveMarine']);
 });
