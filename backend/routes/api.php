@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\Auth\AuthController;
 use App\Http\Controllers\Api\CommitteeMeetings\CommitteeMeetingController;
 use App\Http\Controllers\Api\CompanyInspections\CompanyInspectionController;
+use App\Http\Controllers\Api\CompanyInspections\KpiCompanyInspectionsController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\Drills\DrillReportController;
 use App\Http\Controllers\Api\ExposureHours\ExposureHoursController;
@@ -187,4 +188,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/kpi/non-sire/summary', [KpiNonSireController::class, 'summary']);
     Route::get('/kpi/non-sire/reports-by-vessel', [KpiNonSireController::class, 'reportsByVessel']);
     Route::get('/kpi/non-sire/reports-by-inspection-type', [KpiNonSireController::class, 'reportsByInspectionType']);
+
+    Route::get('/kpi/company-inspections/options', [KpiCompanyInspectionsController::class, 'options']);
+    Route::get('/kpi/company-inspections/summary', [KpiCompanyInspectionsController::class, 'summary']);
+    Route::get('/kpi/company-inspections/reports-by-vessel', [KpiCompanyInspectionsController::class, 'reportsByVessel']);
+    Route::get('/kpi/company-inspections/reports-by-company', [KpiCompanyInspectionsController::class, 'reportsByCompany']);
+    Route::get('/kpi/company-inspections/nonconformities-by-vessel', [KpiCompanyInspectionsController::class, 'nonConformitiesByVessel']);
+    Route::get('/kpi/company-inspections/nonconformities-by-company', [KpiCompanyInspectionsController::class, 'nonConformitiesByCompany']);
 });
