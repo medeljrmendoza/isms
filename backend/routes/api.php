@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\FlagState\FlagStateReportController;
 use App\Http\Controllers\Api\FlagState\KpiFlagStateController;
 use App\Http\Controllers\Api\IncidentReports\IncidentReportController;
 use App\Http\Controllers\Api\InternalAudits\InternalAuditController;
+use App\Http\Controllers\Api\InternalAudits\KpiInternalAuditsController;
 use App\Http\Controllers\Api\Nonconformities\NonconformityController;
 use App\Http\Controllers\Api\NonSire\KpiNonSireController;
 use App\Http\Controllers\Api\NonSire\NonSireReportController;
@@ -195,4 +196,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/kpi/company-inspections/reports-by-company', [KpiCompanyInspectionsController::class, 'reportsByCompany']);
     Route::get('/kpi/company-inspections/nonconformities-by-vessel', [KpiCompanyInspectionsController::class, 'nonConformitiesByVessel']);
     Route::get('/kpi/company-inspections/nonconformities-by-company', [KpiCompanyInspectionsController::class, 'nonConformitiesByCompany']);
+
+    Route::get('/kpi/internal-audits/options', [KpiInternalAuditsController::class, 'options']);
+    Route::get('/kpi/internal-audits/summary', [KpiInternalAuditsController::class, 'summary']);
+    Route::get('/kpi/internal-audits/reports-by-vessel', [KpiInternalAuditsController::class, 'reportsByVessel']);
+    Route::get('/kpi/internal-audits/nonconformities-by-vessel', [KpiInternalAuditsController::class, 'nonConformitiesByVessel']);
 });

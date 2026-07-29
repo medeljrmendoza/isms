@@ -4,6 +4,7 @@ namespace App\Models\Nonconformities;
 
 use App\Models\CompanyInspections\AuditReport;
 use App\Models\FlagState\FlagStateReport;
+use App\Models\InternalAudits\InternalAuditReport;
 use App\Models\ManualPublish\ManualChapter;
 use App\Models\PscReports\PscReport;
 use App\Models\Vessel;
@@ -114,6 +115,12 @@ class Nonconformity extends Model
     public function auditReport(): BelongsTo
     {
         return $this->belongsTo(AuditReport::class, 'source_of_nc_ref_no', 'audit_ref');
+    }
+
+    /** Loose string-key relation, the inverse of InternalAuditReport::nonconformities(). */
+    public function internalAuditReport(): BelongsTo
+    {
+        return $this->belongsTo(InternalAuditReport::class, 'source_of_nc_ref_no', 'audit_ref');
     }
 
     public function manualChapter(): BelongsTo
