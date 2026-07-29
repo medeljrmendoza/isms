@@ -20,6 +20,15 @@ export function KpiDrillDownModal({ title, from, to, fetcher, onClose }: KpiDril
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // `title` uniquely identifies the drill-down target in every caller
+  // (it's built from the clicked bar's label) — reset to page 1 whenever
+  // it changes so switching targets while the modal stays mounted (e.g.
+  // two bars in the same KpiGroupedBarChart) doesn't keep showing the
+  // previous target's page number.
+  useEffect(() => {
+    setPage(1);
+  }, [title]);
+
   useEffect(() => {
     let isMounted = true;
     setLoading(true);
@@ -39,7 +48,7 @@ export function KpiDrillDownModal({ title, from, to, fetcher, onClose }: KpiDril
       isMounted = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page]);
+  }, [page, title]);
 
   return (
     <Modal title={title} onClose={onClose}>
