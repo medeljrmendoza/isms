@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\ExposureHours\ExposureHoursRecord;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Vessel extends Model
 {
-    protected $fillable = ['prefix', 'name'];
+    protected $fillable = ['prefix', 'name', 'max_crew'];
 
     public function getDisplayNameAttribute(): string
     {

@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\CommitteeMeetings\CommitteeMeetingController;
 use App\Http\Controllers\Api\CompanyInspections\CompanyInspectionController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\Drills\DrillReportController;
+use App\Http\Controllers\Api\ExposureHours\ExposureHoursController;
 use App\Http\Controllers\Api\ExternalAudits\ExternalAuditController;
 use App\Http\Controllers\Api\FlagState\FlagStateReportController;
 use App\Http\Controllers\Api\IncidentReports\IncidentReportController;
@@ -138,4 +139,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/drill-reports', [DrillReportController::class, 'cell']);
     Route::get('/drill-reports/{drillReport}', [DrillReportController::class, 'show']);
     Route::put('/drill-reports/{drillReport}', [DrillReportController::class, 'update']);
+
+    Route::get('/exposure-hours/options', [ExposureHoursController::class, 'options']);
+    Route::get('/exposure-hours/summary', [ExposureHoursController::class, 'summary']);
+    Route::get('/exposure-hours-records', [ExposureHoursController::class, 'index']);
+    Route::post('/exposure-hours-records', [ExposureHoursController::class, 'store']);
+    Route::get('/exposure-hours-records/{exposureHoursRecord}', [ExposureHoursController::class, 'show']);
+    Route::put('/exposure-hours-records/{exposureHoursRecord}', [ExposureHoursController::class, 'update']);
+    Route::delete('/exposure-hours-records/{exposureHoursRecord}', [ExposureHoursController::class, 'destroy']);
 });

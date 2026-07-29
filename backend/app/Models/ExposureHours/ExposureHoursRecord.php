@@ -11,6 +11,7 @@ class ExposureHoursRecord extends Model
 {
     protected $fillable = [
         'vessel_id',
+        'added_by',
         'date_from',
         'date_to',
         'no_of_crew',
@@ -21,6 +22,8 @@ class ExposureHoursRecord extends Model
         'no_of_rwc',
         'no_of_mtc',
         'total_hours',
+        'vessel_remarks',
+        'shore_remarks',
     ];
 
     protected function casts(): array
