@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\PscReports\KpiPscInspectionsController;
 use App\Http\Controllers\Api\PscReports\PscReportController;
 use App\Http\Controllers\Api\RiskAssessment\RiskAssessmentController;
 use App\Http\Controllers\Api\RiskAssessment\RiskAssessmentShoreController;
+use App\Http\Controllers\Api\Sire\KpiSireController;
 use App\Http\Controllers\Api\Sire\SireReportController;
 use Illuminate\Support\Facades\Route;
 
@@ -176,4 +177,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/kpi/flag-state/summary', [KpiFlagStateController::class, 'summary']);
     Route::get('/kpi/flag-state/reports-by-vessel', [KpiFlagStateController::class, 'reportsByVessel']);
     Route::get('/kpi/flag-state/nonconformities-by-vessel', [KpiFlagStateController::class, 'nonConformitiesByVessel']);
+
+    Route::get('/kpi/sire/options', [KpiSireController::class, 'options']);
+    Route::get('/kpi/sire/summary', [KpiSireController::class, 'summary']);
+    Route::get('/kpi/sire/reports-by-vessel', [KpiSireController::class, 'reportsByVessel']);
 });

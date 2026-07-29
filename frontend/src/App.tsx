@@ -21,6 +21,7 @@ import { RiskAssessmentListPage } from "./features/riskAssessment/RiskAssessment
 import { RiskAssessmentShoreListPage } from "./features/riskAssessmentShore/RiskAssessmentShoreListPage";
 import { KpiPscInspectionsPage } from "./features/kpiPscInspections/KpiPscInspectionsPage";
 import { KpiFlagStatePage } from "./features/kpiFlagState/KpiFlagStatePage";
+import { KpiSirePage } from "./features/kpiSire/KpiSirePage";
 import { ComingSoonPage } from "./pages/ComingSoonPage";
 
 // Placeholder — swap in the real page once the change-password module is migrated.
@@ -56,6 +57,7 @@ export default function App() {
               <Route path="/risk_assessment_shore" element={<RiskAssessmentShoreListPage />} />
               <Route path="/kpi_psc_inspections" element={<KpiPscInspectionsPage />} />
               <Route path="/kpi_flag_state" element={<KpiFlagStatePage />} />
+              <Route path="/kpi_sire" element={<KpiSirePage />} />
               <Route path="/change-password" element={<ChangePasswordPage />} />
               {/* Every other nav link points at a real legacy route that
                   isn't migrated yet — see src/data/navigation.ts */}
