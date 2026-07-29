@@ -1,18 +1,7 @@
 import { axiosClient } from "../../api/axiosClient";
 import type { ApiResource } from "../auth/auth";
-import type { KpiListResponse, KpiPscFilter, KpiPscOptions, KpiSummaryRow } from "./kpiPscInspections";
-
-export interface DateRangeParams {
-  from?: string;
-  to?: string;
-}
-
-export interface DrillDownParams extends DateRangeParams {
-  page: number;
-  per_page: number;
-  sort?: string;
-  direction?: "asc" | "desc";
-}
+import type { DateRangeParams, DrillDownParams, KpiListResponse, KpiSummaryRow } from "../kpi/kpi";
+import type { KpiPscFilter, KpiPscOptions } from "./kpiPscInspections";
 
 export const kpiPscInspectionsService = {
   async options(): Promise<KpiPscOptions> {

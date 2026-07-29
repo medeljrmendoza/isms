@@ -1,10 +1,12 @@
-import type { KpiSummaryRow } from "./kpiPscInspections";
+import type { KpiSummaryRow } from "./kpi";
 
 /**
- * Ported from kpi_psc_inspections_v.php's Highcharts column charts.
- * No chart library exists in this project, so this is a small
- * hand-rolled bar chart: same interaction (click a bar to drill down),
- * same shape (vertical bars, count label on top, category below).
+ * Ported from the KPI charts' shared Highcharts column-chart config
+ * (kpi_psc_inspections_v.php, kpi_flag_state_v.php, and siblings). No
+ * chart library exists in this project, so this is a small hand-rolled
+ * bar chart: same interaction (click a bar to drill down), same shape
+ * (vertical bars, count label on top, category below). Shared across
+ * every KPI submodule rather than duplicated per module.
  */
 export function KpiBarChart({
   title,

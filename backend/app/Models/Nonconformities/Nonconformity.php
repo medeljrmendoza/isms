@@ -2,6 +2,7 @@
 
 namespace App\Models\Nonconformities;
 
+use App\Models\FlagState\FlagStateReport;
 use App\Models\ManualPublish\ManualChapter;
 use App\Models\PscReports\PscReport;
 use App\Models\Vessel;
@@ -100,6 +101,12 @@ class Nonconformity extends Model
     public function pscReport(): BelongsTo
     {
         return $this->belongsTo(PscReport::class, 'source_of_nc_ref_no', 'ref_no');
+    }
+
+    /** Loose string-key relation, the inverse of FlagStateReport::nonconformities(). */
+    public function flagStateReport(): BelongsTo
+    {
+        return $this->belongsTo(FlagStateReport::class, 'source_of_nc_ref_no', 'ref_no');
     }
 
     public function manualChapter(): BelongsTo

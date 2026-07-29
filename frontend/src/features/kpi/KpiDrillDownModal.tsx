@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import type { DrillDownParams } from "./kpiPscInspectionsService";
-import type { KpiListResponse } from "./kpiPscInspections";
+import type { DrillDownParams, KpiListResponse } from "./kpi";
 import { Modal } from "../../components/ui/Modal";
 import { Button } from "../../components/ui/Button";
 
@@ -14,7 +13,7 @@ interface KpiDrillDownModalProps {
   onClose: () => void;
 }
 
-/** Shared drill-down table for all three KPI charts — ported from the three view_kpi_psc_*.php modals. */
+/** Shared drill-down table for every KPI chart — ported from the view_kpi_*.php modals. */
 export function KpiDrillDownModal({ title, from, to, fetcher, onClose }: KpiDrillDownModalProps) {
   const [data, setData] = useState<KpiListResponse | null>(null);
   const [page, setPage] = useState(1);

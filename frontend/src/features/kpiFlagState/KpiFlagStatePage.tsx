@@ -1,14 +1,13 @@
 import { useEffect, useState } from "react";
-import { kpiPscInspectionsService } from "./kpiPscInspectionsService";
-import type { KpiPscFilter, KpiPscOptions } from "./kpiPscInspections";
+import { kpiFlagStateService } from "./kpiFlagStateService";
+import type { KpiFlagStateFilter, KpiFlagStateOptions } from "./kpiFlagState";
 import type { KpiOption, KpiSummaryRow } from "../kpi/kpi";
 import { KpiBarChart } from "../kpi/KpiBarChart";
 import { KpiDrillDownModal } from "../kpi/KpiDrillDownModal";
 import { Button } from "../../components/ui/Button";
 
-const FILTER_LABELS: Record<KpiPscFilter, string> = {
+const FILTER_LABELS: Record<KpiFlagStateFilter, string> = {
   vessel: "Reports per Vessel",
-  mou: "Reports per MoU",
   nonconformities: "Non Conformities per Vessel",
 };
 
@@ -17,10 +16,10 @@ interface DrillDown {
   fetcher: Parameters<typeof KpiDrillDownModal>[0]["fetcher"];
 }
 
-/** Ported from admin/kpi_psc_inspections/kpi_psc_inspections_v.php. */
-export function KpiPscInspectionsPage() {
-  const [options, setOptions] = useState<KpiPscOptions>({ vessels: [], mous: [] });
-  const [filter, setFilter] = useState<KpiPscFilter>("vessel");
+/** Ported from admin/kpi_flag_state/kpi_flag_state_v.php. */
+export function KpiFlagStatePage() {
+  const [options, setOptions] = useState<KpiFlagStateOptions>({ vessels: [] });
+  const [filter, setFilter] = useState<KpiFlagStateFilter>("vessel");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [appliedFrom, setAppliedFrom] = useState<string | undefined>(undefined);
@@ -34,12 +33,12 @@ export function KpiPscInspectionsPage() {
   const [drillDown, setDrillDown] = useState<DrillDown | null>(null);
 
   useEffect(() => {
-    kpiPscInspectionsService.options().then(setOptions);
+    kpiFlagStateService.options().then(setOptions);
   }, []);
 
   useEffect(() => {
     setLoading(true);
-    kpiPscInspectionsService
+    kpiFlagStateService
       .summary(filter, { from: appliedFrom, to: appliedTo })
       .then((data) => {
         setRows(data);
@@ -62,26 +61,18 @@ export function KpiPscInspectionsPage() {
   const findOption = (list: KpiOption[], label: string) => list.find((o) => o.label === label);
 
   const onBarClick = (row: KpiSummaryRow) => {
+    const vessel = findOption(options.vessels, row.label);
+    if (!vessel) return;
+
     if (filter === "vessel") {
-      const vessel = findOption(options.vessels, row.label);
-      if (!vessel) return;
       setDrillDown({
-        title: `PSC Reports — ${vessel.label}`,
-        fetcher: (params) => kpiPscInspectionsService.reportsByVessel(vessel.id, params),
-      });
-    } else if (filter === "mou") {
-      const mou = findOption(options.mous, row.label);
-      if (!mou) return;
-      setDrillDown({
-        title: `PSC Reports — ${mou.label}`,
-        fetcher: (params) => kpiPscInspectionsService.reportsByMou(mou.id, params),
+        title: `Flag State Reports — ${vessel.label}`,
+        fetcher: (params) => kpiFlagStateService.reportsByVessel(vessel.id, params),
       });
     } else {
-      const vessel = findOption(options.vessels, row.label);
-      if (!vessel) return;
       setDrillDown({
         title: `Non Conformities — ${vessel.label}`,
-        fetcher: (params) => kpiPscInspectionsService.nonConformitiesByVessel(vessel.id, params),
+        fetcher: (params) => kpiFlagStateService.nonConformitiesByVessel(vessel.id, params),
       });
     }
   };
@@ -90,7 +81,7 @@ export function KpiPscInspectionsPage() {
     <div className="p-6">
       <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-100 px-4 py-3">
-          <h1 className="text-base font-semibold text-slate-800">KPI — PSC Inspections</h1>
+          <h1 className="text-base font-semibold text-slate-800">KPI — Flag State</h1>
         </div>
 
         <div className="flex flex-wrap items-end gap-3 border-b border-slate-100 px-4 py-3">
@@ -98,7 +89,7 @@ export function KpiPscInspectionsPage() {
             <label className="text-xs font-medium text-slate-500">Report</label>
             <select
               value={filter}
-              onChange={(e) => setFilter(e.target.value as KpiPscFilter)}
+              onChange={(e) => setFilter(e.target.value as KpiFlagStateFilter)}
               className="rounded-md border border-slate-300 px-2 py-1.5 text-sm"
             >
               {Object.entries(FILTER_LABELS).map(([value, label]) => (
@@ -132,7 +123,7 @@ export function KpiPscInspectionsPage() {
           {error && <p className="text-sm text-red-600">{error}</p>}
           {!loading && !error && (
             <KpiBarChart
-              title={`PSC Inspections ${appliedFrom || appliedTo ? `(${appliedFrom ?? "…"} – ${appliedTo ?? "…"})` : `- ${new Date().getFullYear()}`}`}
+              title={`Flag State ${appliedFrom || appliedTo ? `(${appliedFrom ?? "…"} – ${appliedTo ?? "…"})` : `- ${new Date().getFullYear()}`}`}
               yAxisLabel={filter === "nonconformities" ? "Non Conformities" : "Reports"}
               rows={rows}
               onBarClick={onBarClick}

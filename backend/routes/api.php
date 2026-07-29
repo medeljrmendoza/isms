@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\Drills\DrillReportController;
 use App\Http\Controllers\Api\ExposureHours\ExposureHoursController;
 use App\Http\Controllers\Api\ExternalAudits\ExternalAuditController;
 use App\Http\Controllers\Api\FlagState\FlagStateReportController;
+use App\Http\Controllers\Api\FlagState\KpiFlagStateController;
 use App\Http\Controllers\Api\IncidentReports\IncidentReportController;
 use App\Http\Controllers\Api\InternalAudits\InternalAuditController;
 use App\Http\Controllers\Api\Nonconformities\NonconformityController;
@@ -170,4 +171,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/kpi/psc-inspections/reports-by-vessel', [KpiPscInspectionsController::class, 'reportsByVessel']);
     Route::get('/kpi/psc-inspections/reports-by-mou', [KpiPscInspectionsController::class, 'reportsByMou']);
     Route::get('/kpi/psc-inspections/nonconformities-by-vessel', [KpiPscInspectionsController::class, 'nonConformitiesByVessel']);
+
+    Route::get('/kpi/flag-state/options', [KpiFlagStateController::class, 'options']);
+    Route::get('/kpi/flag-state/summary', [KpiFlagStateController::class, 'summary']);
+    Route::get('/kpi/flag-state/reports-by-vessel', [KpiFlagStateController::class, 'reportsByVessel']);
+    Route::get('/kpi/flag-state/nonconformities-by-vessel', [KpiFlagStateController::class, 'nonConformitiesByVessel']);
 });
