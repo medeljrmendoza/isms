@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\FlagState\KpiFlagStateController;
 use App\Http\Controllers\Api\IncidentReports\IncidentReportController;
 use App\Http\Controllers\Api\InternalAudits\InternalAuditController;
 use App\Http\Controllers\Api\Nonconformities\NonconformityController;
+use App\Http\Controllers\Api\NonSire\KpiNonSireController;
 use App\Http\Controllers\Api\NonSire\NonSireReportController;
 use App\Http\Controllers\Api\PscReports\KpiPscInspectionsController;
 use App\Http\Controllers\Api\PscReports\PscReportController;
@@ -181,4 +182,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/kpi/sire/options', [KpiSireController::class, 'options']);
     Route::get('/kpi/sire/summary', [KpiSireController::class, 'summary']);
     Route::get('/kpi/sire/reports-by-vessel', [KpiSireController::class, 'reportsByVessel']);
+
+    Route::get('/kpi/non-sire/options', [KpiNonSireController::class, 'options']);
+    Route::get('/kpi/non-sire/summary', [KpiNonSireController::class, 'summary']);
+    Route::get('/kpi/non-sire/reports-by-vessel', [KpiNonSireController::class, 'reportsByVessel']);
+    Route::get('/kpi/non-sire/reports-by-inspection-type', [KpiNonSireController::class, 'reportsByInspectionType']);
 });
