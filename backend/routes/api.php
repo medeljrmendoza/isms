@@ -23,6 +23,7 @@ use App\Http\Controllers\Api\RiskAssessment\RiskAssessmentController;
 use App\Http\Controllers\Api\RiskAssessment\RiskAssessmentShoreController;
 use App\Http\Controllers\Api\Sire\KpiSireController;
 use App\Http\Controllers\Api\Sire\SireReportController;
+use App\Http\Controllers\Api\VesselDocumentation\VesselDocumentationController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/login', [AuthController::class, 'login']);
@@ -207,4 +208,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/kpi/claims/summary', [KpiClaimsController::class, 'summary']);
     Route::get('/kpi/claims/by-vessel', [KpiClaimsController::class, 'byVessel']);
     Route::get('/kpi/claims/by-category', [KpiClaimsController::class, 'byCategory']);
+
+    Route::get('/vessel-documentation/options', [VesselDocumentationController::class, 'options']);
+    Route::get('/vessel-documentation/type-options', [VesselDocumentationController::class, 'typeOptions']);
+    Route::get('/vessel-documentation/document-options', [VesselDocumentationController::class, 'documentOptions']);
+    Route::get('/vessel-documentation', [VesselDocumentationController::class, 'index']);
+    Route::post('/vessel-documentation', [VesselDocumentationController::class, 'store']);
+    Route::get('/vessel-documentation/{vesselDocumentRecord}', [VesselDocumentationController::class, 'show']);
+    Route::put('/vessel-documentation/{vesselDocumentRecord}', [VesselDocumentationController::class, 'update']);
+    Route::post('/vessel-documentation/{vesselDocumentRecord}/toggle-status', [VesselDocumentationController::class, 'toggleStatus']);
+    Route::delete('/vessel-documentation/{vesselDocumentRecord}', [VesselDocumentationController::class, 'destroy']);
 });

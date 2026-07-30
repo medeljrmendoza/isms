@@ -4,6 +4,7 @@ namespace App\Models\VesselDocumentation;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class VesselDocument extends Model
 {
@@ -20,5 +21,10 @@ class VesselDocument extends Model
     public function vesselDocumentType(): BelongsTo
     {
         return $this->belongsTo(VesselDocumentType::class);
+    }
+
+    public function records(): HasMany
+    {
+        return $this->hasMany(VesselDocumentRecord::class);
     }
 }
