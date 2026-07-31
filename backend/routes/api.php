@@ -23,6 +23,7 @@ use App\Http\Controllers\Api\Nonconformities\NonconformityController;
 use App\Http\Controllers\Api\NonSire\KpiNonSireController;
 use App\Http\Controllers\Api\NonSire\NonSireReportController;
 use App\Http\Controllers\Api\Pms\PmsActivitiesController;
+use App\Http\Controllers\Api\Pms\PmsAdhocController;
 use App\Http\Controllers\Api\Pms\PmsRunningHoursController;
 use App\Http\Controllers\Api\PscReports\KpiPscInspectionsController;
 use App\Http\Controllers\Api\PscReports\PscReportController;
@@ -261,6 +262,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/pms-activities/{activity}', [PmsActivitiesController::class, 'show']);
     Route::post('/pms-activities/{activity}/mark-done', [PmsActivitiesController::class, 'markDone']);
     Route::post('/pms-activities/{activity}/postpone', [PmsActivitiesController::class, 'postpone']);
+
+    Route::get('/pms-work-plan/options', [PmsAdhocController::class, 'options']);
+    Route::get('/pms-work-plan/parts', [PmsAdhocController::class, 'parts']);
+    Route::get('/pms-work-plan/search-parts', [PmsAdhocController::class, 'searchParts']);
+    Route::get('/pms-work-plan', [PmsAdhocController::class, 'index']);
+    Route::post('/pms-work-plan', [PmsAdhocController::class, 'store']);
+    Route::get('/pms-work-plan/{adhoc}', [PmsAdhocController::class, 'show']);
+    Route::put('/pms-work-plan/{adhoc}', [PmsAdhocController::class, 'update']);
+    Route::delete('/pms-work-plan/{adhoc}', [PmsAdhocController::class, 'destroy']);
 
     Route::get('/manuals/options', [ManualBrowserController::class, 'options']);
     Route::get('/manuals/tree', [ManualBrowserController::class, 'tree']);
