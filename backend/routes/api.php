@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\NonSire\KpiNonSireController;
 use App\Http\Controllers\Api\NonSire\NonSireReportController;
 use App\Http\Controllers\Api\PscReports\KpiPscInspectionsController;
 use App\Http\Controllers\Api\PscReports\PscReportController;
+use App\Http\Controllers\Api\RevisionHistory\RevisionHistoryController;
 use App\Http\Controllers\Api\RiskAssessment\RiskAssessmentController;
 use App\Http\Controllers\Api\RiskAssessment\RiskAssessmentShoreController;
 use App\Http\Controllers\Api\Sire\KpiSireController;
@@ -243,4 +244,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/master-review/{masterReview}/under-review', [MasterReviewController::class, 'underReview']);
     Route::post('/master-review/{masterReview}/reopen', [MasterReviewController::class, 'reopen']);
     Route::delete('/master-review/{masterReview}', [MasterReviewController::class, 'destroy']);
+
+    Route::get('/revision-history/options', [RevisionHistoryController::class, 'options']);
+    Route::get('/revision-history/document-options', [RevisionHistoryController::class, 'documentOptions']);
+    Route::get('/revision-history', [RevisionHistoryController::class, 'index']);
+    Route::post('/revision-history', [RevisionHistoryController::class, 'store']);
+    Route::get('/revision-history/{manualRevision}', [RevisionHistoryController::class, 'show']);
+    Route::put('/revision-history/{manualRevision}', [RevisionHistoryController::class, 'update']);
+    Route::delete('/revision-history/{manualRevision}', [RevisionHistoryController::class, 'destroy']);
 });
