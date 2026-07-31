@@ -3,10 +3,10 @@
 namespace App\Models\ManualPublish;
 
 use App\Models\Vessel;
-
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ManualDocument extends Model
 {
@@ -36,5 +36,10 @@ class ManualDocument extends Model
     public function vessels(): BelongsToMany
     {
         return $this->belongsToMany(Vessel::class, 'manual_document_vessel');
+    }
+
+    public function forms(): HasMany
+    {
+        return $this->hasMany(ManualForm::class);
     }
 }

@@ -3,13 +3,14 @@
 namespace App\Models\ManualPublish;
 
 use App\Models\Vessel;
-
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class ManualForm extends Model
 {
     protected $fillable = [
+        'manual_document_id',
         'reference_no',
         'file_name',
         'is_active',
@@ -29,5 +30,10 @@ class ManualForm extends Model
     public function vessels(): BelongsToMany
     {
         return $this->belongsToMany(Vessel::class, 'manual_form_vessel');
+    }
+
+    public function manualDocument(): BelongsTo
+    {
+        return $this->belongsTo(ManualDocument::class);
     }
 }

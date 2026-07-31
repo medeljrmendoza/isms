@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\IncidentReports\IncidentReportController;
 use App\Http\Controllers\Api\InternalAudits\InternalAuditController;
 use App\Http\Controllers\Api\InternalAudits\KpiInternalAuditsController;
 use App\Http\Controllers\Api\IspsReview\IspsReviewController;
+use App\Http\Controllers\Api\ManualBrowser\ManualBrowserController;
 use App\Http\Controllers\Api\MasterReview\MasterReviewController;
 use App\Http\Controllers\Api\Nonconformities\NonconformityController;
 use App\Http\Controllers\Api\NonSire\KpiNonSireController;
@@ -245,6 +246,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/master-review/{masterReview}/under-review', [MasterReviewController::class, 'underReview']);
     Route::post('/master-review/{masterReview}/reopen', [MasterReviewController::class, 'reopen']);
     Route::delete('/master-review/{masterReview}', [MasterReviewController::class, 'destroy']);
+
+    Route::get('/manuals/options', [ManualBrowserController::class, 'options']);
+    Route::get('/manuals/tree', [ManualBrowserController::class, 'tree']);
+    Route::get('/manuals/search', [ManualBrowserController::class, 'search']);
 
     Route::get('/isps-review/options', [IspsReviewController::class, 'options']);
     Route::get('/isps-review/document-options', [IspsReviewController::class, 'documentOptions']);
