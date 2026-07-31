@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\CompanyDocumentation\CompanyDocumentationController
 use App\Http\Controllers\Api\CompanyInspections\CompanyInspectionController;
 use App\Http\Controllers\Api\CompanyInspections\KpiCompanyInspectionsController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\Defects\DefectController;
 use App\Http\Controllers\Api\Drills\DrillReportController;
 use App\Http\Controllers\Api\ExposureHours\ExposureHoursController;
 use App\Http\Controllers\Api\ExternalAudits\ExternalAuditController;
@@ -277,4 +278,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/revision-history/{manualRevision}', [RevisionHistoryController::class, 'show']);
     Route::put('/revision-history/{manualRevision}', [RevisionHistoryController::class, 'update']);
     Route::delete('/revision-history/{manualRevision}', [RevisionHistoryController::class, 'destroy']);
+
+    Route::get('/defects/options', [DefectController::class, 'options']);
+    Route::get('/defects', [DefectController::class, 'index']);
+    Route::post('/defects', [DefectController::class, 'store']);
+    Route::get('/defects/{defect}', [DefectController::class, 'show']);
+    Route::put('/defects/{defect}', [DefectController::class, 'update']);
+    Route::delete('/defects/{defect}', [DefectController::class, 'destroy']);
 });

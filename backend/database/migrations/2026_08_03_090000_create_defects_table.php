@@ -13,8 +13,8 @@ return new class extends Migration
             $table->foreignId('vessel_id')->constrained();
             $table->string('sl_no');
             $table->date('defect_date');
-            $table->string('priority');
-            $table->string('category');
+            $table->string('priority')->nullable();
+            $table->string('category')->nullable();
             $table->string('compl_code');
             $table->text('description')->default('');
             $table->timestamps();
