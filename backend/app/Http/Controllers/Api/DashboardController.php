@@ -3,29 +3,29 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\CompanyInspections\AuditReport;
 use App\Models\Claims\Claim;
 use App\Models\CommitteeMeetings\CommitteeMeeting;
 use App\Models\CompanyDocumentation\CompanyDocumentationRecord;
+use App\Models\CompanyInspections\AuditReport;
 use App\Models\Defects\Defect;
 use App\Models\ExternalAudits\ExternalAuditReport;
-use App\Models\IspsReview\IspsReview;
-use App\Models\ManualPublish\ManualDocument;
-use App\Models\MasterReview\MasterReview;
 use App\Models\FlagState\FlagStateReport;
 use App\Models\IncidentReports\IncidentReport;
 use App\Models\InternalAudits\InternalAuditReport;
-use App\Models\NonSire\NonSireReport;
+use App\Models\IspsReview\IspsReview;
+use App\Models\ManualPublish\ManualDocument;
+use App\Models\MasterReview\MasterReview;
 use App\Models\Nonconformities\Nonconformity;
+use App\Models\NonSire\NonSireReport;
 use App\Models\PscReports\PscReport;
 use App\Models\RiskAssessment\RiskAssessment;
 use App\Models\Sire\SireReport;
 use App\Models\Tasks\Task;
 use App\Models\Vessel;
-use App\Repositories\CompanyInspections\AuditReportRepository;
 use App\Repositories\Claims\ClaimRepository;
 use App\Repositories\CommitteeMeetings\CommitteeMeetingRepository;
 use App\Repositories\CompanyDocumentation\CompanyDocumentationRepository;
+use App\Repositories\CompanyInspections\AuditReportRepository;
 use App\Repositories\Defects\DefectRepository;
 use App\Repositories\Drills\DrillRepository;
 use App\Repositories\ExposureHours\ExposureHoursRepository;
@@ -35,6 +35,7 @@ use App\Repositories\IncidentReports\IncidentReportRepository;
 use App\Repositories\InternalAudits\InternalAuditReportRepository;
 use App\Repositories\IspsReview\IspsReviewRepository;
 use App\Repositories\ManualPublish\ManualDocumentPublishRepository;
+use App\Repositories\ManualPublish\SmsVersionMonitoringRepository;
 use App\Repositories\MasterReview\MasterReviewRepository;
 use App\Repositories\Nonconformities\NonconformityRepository;
 use App\Repositories\NonSire\NonSireReportRepository;
@@ -42,7 +43,6 @@ use App\Repositories\Pms\PmsRepository;
 use App\Repositories\PscReports\PscReportRepository;
 use App\Repositories\RiskAssessment\RiskAssessmentRepository;
 use App\Repositories\Sire\SireReportRepository;
-use App\Repositories\ManualPublish\SmsVersionMonitoringRepository;
 use App\Repositories\Tasks\TaskRepository;
 use App\Repositories\VesselDocumentation\VesselDocumentationRepository;
 use App\Services\DashboardService;
@@ -78,8 +78,7 @@ class DashboardController extends Controller
         private readonly PmsRepository $pms,
         private readonly SmsVersionMonitoringRepository $smsVersionMonitoring,
         private readonly VesselDocumentationRepository $vesselDocumentation,
-    ) {
-    }
+    ) {}
 
     /**
      * GET /api/dashboard
@@ -427,13 +426,18 @@ class DashboardController extends Controller
         $paginator = $this->masterReviews->table(TableQuery::fromRequest($request));
 
         return $this->tableResponse($paginator, MasterReviewRepository::columns(), function (MasterReview $review) {
+            // manual_document_id is nullable — a review can target a whole
+            // chapter with no specific procedure (see the full Master
+            // Review module's docblocks).
+            $reference = $review->manualDocument?->reference_no ?? $review->manualChapter?->reference_no ?? '';
+
             return [
                 'vessel' => $review->vessel?->display_name ?? '',
                 'review_date' => $review->review_date->format('Y-m-d'),
                 'added_by' => $review->added_by,
                 'review_quarter' => $review->review_quarter,
                 'review_year' => $review->review_year,
-                'sms' => "{$review->manualDocument->reference_no} ({$review->manual_section})",
+                'sms' => trim("{$reference} ({$review->manual_section})"),
             ];
         });
     }

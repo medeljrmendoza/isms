@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\FlagState\KpiFlagStateController;
 use App\Http\Controllers\Api\IncidentReports\IncidentReportController;
 use App\Http\Controllers\Api\InternalAudits\InternalAuditController;
 use App\Http\Controllers\Api\InternalAudits\KpiInternalAuditsController;
+use App\Http\Controllers\Api\MasterReview\MasterReviewController;
 use App\Http\Controllers\Api\Nonconformities\NonconformityController;
 use App\Http\Controllers\Api\NonSire\KpiNonSireController;
 use App\Http\Controllers\Api\NonSire\NonSireReportController;
@@ -228,4 +229,18 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/company-documentation/{companyDocumentationRecord}', [CompanyDocumentationController::class, 'update']);
     Route::post('/company-documentation/{companyDocumentationRecord}/toggle-status', [CompanyDocumentationController::class, 'toggleStatus']);
     Route::delete('/company-documentation/{companyDocumentationRecord}', [CompanyDocumentationController::class, 'destroy']);
+
+    Route::get('/master-review/options', [MasterReviewController::class, 'options']);
+    Route::get('/master-review/document-options', [MasterReviewController::class, 'documentOptions']);
+    Route::get('/master-review', [MasterReviewController::class, 'index']);
+    Route::post('/master-review', [MasterReviewController::class, 'store']);
+    Route::get('/master-review/{masterReview}', [MasterReviewController::class, 'show']);
+    Route::put('/master-review/{masterReview}', [MasterReviewController::class, 'update']);
+    Route::post('/master-review/{masterReview}/approve', [MasterReviewController::class, 'approve']);
+    Route::post('/master-review/{masterReview}/disapprove', [MasterReviewController::class, 'disapprove']);
+    Route::post('/master-review/{masterReview}/disregard', [MasterReviewController::class, 'disregard']);
+    Route::post('/master-review/{masterReview}/recommend-approval', [MasterReviewController::class, 'recommendApproval']);
+    Route::post('/master-review/{masterReview}/under-review', [MasterReviewController::class, 'underReview']);
+    Route::post('/master-review/{masterReview}/reopen', [MasterReviewController::class, 'reopen']);
+    Route::delete('/master-review/{masterReview}', [MasterReviewController::class, 'destroy']);
 });

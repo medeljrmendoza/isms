@@ -2,22 +2,31 @@
 
 namespace App\Models\MasterReview;
 
+use App\Models\ManualPublish\ManualChapter;
 use App\Models\ManualPublish\ManualDocument;
 use App\Models\Vessel;
-
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class MasterReview extends Model
 {
     protected $fillable = [
         'vessel_id',
+        'manual_chapter_id',
         'manual_document_id',
         'manual_section',
         'review_date',
         'added_by',
         'review_quarter',
         'review_year',
+        'review_description',
+        'review_recommendation',
+        'shore_reviewed_by',
+        'shore_remarks',
+        'vessel_reviewed_by',
+        'vessel_reviewed_position',
+        'vessel_remarks',
         'is_deleted',
         'is_vessel_approved',
         'shore_status',
@@ -37,8 +46,18 @@ class MasterReview extends Model
         return $this->belongsTo(Vessel::class);
     }
 
+    public function manualChapter(): BelongsTo
+    {
+        return $this->belongsTo(ManualChapter::class);
+    }
+
     public function manualDocument(): BelongsTo
     {
         return $this->belongsTo(ManualDocument::class);
+    }
+
+    public function present(): HasMany
+    {
+        return $this->hasMany(MasterReviewPresent::class)->orderBy('arrangement');
     }
 }
