@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\Auth\AuthController;
 use App\Http\Controllers\Api\Claims\KpiClaimsController;
 use App\Http\Controllers\Api\CommitteeMeetings\CommitteeMeetingController;
+use App\Http\Controllers\Api\CompanyDocumentation\CompanyDocumentationController;
 use App\Http\Controllers\Api\CompanyInspections\CompanyInspectionController;
 use App\Http\Controllers\Api\CompanyInspections\KpiCompanyInspectionsController;
 use App\Http\Controllers\Api\DashboardController;
@@ -218,4 +219,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/vessel-documentation/{vesselDocumentRecord}', [VesselDocumentationController::class, 'update']);
     Route::post('/vessel-documentation/{vesselDocumentRecord}/toggle-status', [VesselDocumentationController::class, 'toggleStatus']);
     Route::delete('/vessel-documentation/{vesselDocumentRecord}', [VesselDocumentationController::class, 'destroy']);
+
+    Route::get('/company-documentation/type-options', [CompanyDocumentationController::class, 'typeOptions']);
+    Route::get('/company-documentation/document-options', [CompanyDocumentationController::class, 'documentOptions']);
+    Route::get('/company-documentation', [CompanyDocumentationController::class, 'index']);
+    Route::post('/company-documentation', [CompanyDocumentationController::class, 'store']);
+    Route::get('/company-documentation/{companyDocumentationRecord}', [CompanyDocumentationController::class, 'show']);
+    Route::put('/company-documentation/{companyDocumentationRecord}', [CompanyDocumentationController::class, 'update']);
+    Route::post('/company-documentation/{companyDocumentationRecord}/toggle-status', [CompanyDocumentationController::class, 'toggleStatus']);
+    Route::delete('/company-documentation/{companyDocumentationRecord}', [CompanyDocumentationController::class, 'destroy']);
 });

@@ -2,11 +2,13 @@
 
 namespace App\Repositories\CompanyDocumentation;
 
-use App\Repositories\ExposureHours\ExposureHoursRepository;
-
+use App\Models\CompanyDocumentation\CompanyDocument;
 use App\Models\CompanyDocumentation\CompanyDocumentationRecord;
 use App\Models\CompanyDocumentation\CompanyDocumentExpirySetting;
+use App\Models\CompanyDocumentation\CompanyDocumentType;
+use App\Repositories\ExposureHours\ExposureHoursRepository;
 use App\Support\TableQuery;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -20,9 +22,34 @@ class CompanyDocumentationRepository
         ['key' => 'warning', 'label' => 'WARNING', 'sortable' => true],
     ];
 
+    /**
+     * The full module list's column set — see
+     * Controllers/Company_documentation.php's loadData(). Not ported:
+     * Page No./ID (print-layout fields) and ATTACHMENT/ARCHIVED (depend
+     * on S3 upload + history-archive infra this migration doesn't
+     * model) — same reasoning as VesselDocumentationRepository's
+     * MODULE_COLUMNS.
+     */
+    private const MODULE_COLUMNS = [
+        ['key' => 'document_type', 'label' => 'TYPE', 'sortable' => false],
+        ['key' => 'document', 'label' => 'DOCUMENT', 'sortable' => false],
+        ['key' => 'doc_number', 'label' => 'DOCUMENT NO.', 'sortable' => true],
+        ['key' => 'issuing_body', 'label' => 'ISSUING BODY', 'sortable' => true],
+        ['key' => 'date_issued', 'label' => 'ISSUED', 'sortable' => true],
+        ['key' => 'date_expired', 'label' => 'EXPIRED', 'sortable' => true],
+        ['key' => 'is_printer_friendly', 'label' => 'PF', 'sortable' => false],
+        ['key' => 'warning_status', 'label' => 'WARNING', 'sortable' => false],
+        ['key' => 'is_active', 'label' => 'STATUS', 'sortable' => true],
+    ];
+
     public static function columns(): array
     {
         return self::COLUMNS;
+    }
+
+    public static function moduleColumns(): array
+    {
+        return self::MODULE_COLUMNS;
     }
 
     /**
@@ -86,6 +113,115 @@ class CompanyDocumentationRepository
             $query->page,
             ['path' => LengthAwarePaginator::resolveCurrentPath()],
         );
+    }
+
+    /** @return array<int, array{id:int,label:string}> */
+    public function typeOptions(): array
+    {
+        return CompanyDocumentType::query()
+            ->where('is_active', true)
+            ->where('is_deleted', false)
+            ->orderBy('name')
+            ->get()
+            ->map(fn (CompanyDocumentType $t) => ['id' => $t->id, 'label' => $t->name])
+            ->all();
+    }
+
+    /**
+     * Active, non-deleted catalog documents — the Add form's Document
+     * dropdown. Unlike VesselDocumentationRepository::catalogOptionsForVessel(),
+     * this doesn't exclude documents that already have a record: company
+     * documents naturally get reissued/renewed over time, and the
+     * existing dashlet seed data already has multiple records per
+     * catalog document (see CommitteeMeetingCompanyDocsSeeder), so
+     * there's no 1-record-per-document invariant to enforce here.
+     */
+    public function catalogOptions(): array
+    {
+        return CompanyDocument::query()
+            ->with('companyDocumentType')
+            ->where('is_active', true)
+            ->where('is_deleted', false)
+            ->get()
+            ->sortBy(fn (CompanyDocument $d) => $d->companyDocumentType->name.' — '.$d->name)
+            ->map(fn (CompanyDocument $d) => ['id' => $d->id, 'label' => $d->companyDocumentType->name.' — '.$d->name])
+            ->values()
+            ->all();
+    }
+
+    /** Ported from loadData(). */
+    public function fullTable(?int $typeId, TableQuery $query): LengthAwarePaginator
+    {
+        $numMonths = CompanyDocumentExpirySetting::query()->value('num_month') ?? 3;
+
+        $builder = CompanyDocumentationRecord::query()
+            ->with('companyDocument.companyDocumentType')
+            ->where('is_deleted', false);
+
+        if ($typeId !== null) {
+            $builder->whereHas('companyDocument', fn (Builder $q) => $q->where('company_document_type_id', $typeId));
+        }
+
+        if ($query->search !== null) {
+            $term = "%{$query->search}%";
+            $builder->where(function (Builder $q) use ($term) {
+                $q->where('doc_number', 'like', $term)
+                    ->orWhere('issuing_body', 'like', $term)
+                    ->orWhereHas('companyDocument', fn (Builder $d) => $d->where('name', 'like', $term));
+            });
+        }
+
+        $sortable = array_column(array_filter(self::MODULE_COLUMNS, fn ($c) => $c['sortable']), 'key');
+        $sort = in_array($query->sort, $sortable, true) ? $query->sort : 'date_expired';
+
+        $paginator = $builder->orderBy($sort, $query->direction)->paginate($query->perPage, page: $query->page);
+
+        $paginator->getCollection()->each(function (CompanyDocumentationRecord $record) use ($numMonths) {
+            $record->warning_status = $this->warningStatus($record, $numMonths);
+        });
+
+        return $paginator;
+    }
+
+    /**
+     * Legacy's add_document() only ever updates a pre-existing
+     * company_docID row — new catalog documents get a blank row created
+     * elsewhere (presumably Company_document_list, not in this
+     * migration). Since there's no such pre-provisioning step here, this
+     * creates a genuine new record instead, matching
+     * VesselDocumentationRepository::create()'s pattern.
+     */
+    public function create(array $data): CompanyDocumentationRecord
+    {
+        return CompanyDocumentationRecord::create([
+            ...$data,
+            'is_active' => true,
+            'is_deleted' => false,
+        ]);
+    }
+
+    /** company_document_id is frozen at creation time, same convention as VesselDocumentRecord. */
+    public function update(CompanyDocumentationRecord $record, array $data): CompanyDocumentationRecord
+    {
+        unset($data['company_document_id']);
+
+        $record->update($data);
+
+        return $record;
+    }
+
+    /** Ported from stat_doc(): flips active/inactive. */
+    public function toggleStatus(CompanyDocumentationRecord $record): CompanyDocumentationRecord
+    {
+        $record->update(['is_active' => ! $record->is_active]);
+
+        return $record;
+    }
+
+    /** Ported from delete_company_documentation(): soft delete. */
+    public function delete(CompanyDocumentationRecord $record): void
+    {
+        $record->update(['is_deleted' => true]);
     }
 
     /** 0 = fine, 1 = expiring soon, 2 = expired. */

@@ -28,6 +28,7 @@ import { KpiSireVsCompanyInspectionsPage } from "./features/kpiSireVsCompanyInsp
 import { KpiInternalAuditsPage } from "./features/kpiInternalAudits/KpiInternalAuditsPage";
 import { KpiClaimsPage } from "./features/kpiClaims/KpiClaimsPage";
 import { VesselDocumentationPage } from "./features/vesselDocumentation/VesselDocumentationPage";
+import { CompanyDocumentationPage } from "./features/companyDocumentation/CompanyDocumentationPage";
 import { ComingSoonPage } from "./pages/ComingSoonPage";
 
 // Placeholder — swap in the real page once the change-password module is migrated.
@@ -70,6 +71,7 @@ export default function App() {
               <Route path="/kpi_internal" element={<KpiInternalAuditsPage />} />
               <Route path="/kpi_claims" element={<KpiClaimsPage />} />
               <Route path="/vessel_documentation" element={<VesselDocumentationPage />} />
+              <Route path="/company_documentation" element={<CompanyDocumentationPage />} />
               <Route path="/change-password" element={<ChangePasswordPage />} />
               {/* Every other nav link points at a real legacy route that
                   isn't migrated yet — see src/data/navigation.ts */}
