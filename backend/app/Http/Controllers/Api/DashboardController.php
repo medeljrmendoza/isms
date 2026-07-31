@@ -450,13 +450,15 @@ class DashboardController extends Controller
         $paginator = $this->ispsReviews->table(TableQuery::fromRequest($request));
 
         return $this->tableResponse($paginator, IspsReviewRepository::columns(), function (IspsReview $review) {
+            $reference = $review->manualDocument?->reference_no ?? $review->manualChapter?->reference_no ?? '';
+
             return [
                 'vessel' => $review->vessel?->display_name ?? '',
                 'review_date' => $review->review_date->format('Y-m-d'),
                 'added_by' => $review->added_by,
                 'review_quarter' => $review->review_quarter,
                 'review_year' => $review->review_year,
-                'sms' => "{$review->manualDocument->reference_no} ({$review->manual_section})",
+                'sms' => trim("{$reference} ({$review->manual_section})"),
             ];
         });
     }

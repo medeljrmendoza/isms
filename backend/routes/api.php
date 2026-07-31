@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\FlagState\KpiFlagStateController;
 use App\Http\Controllers\Api\IncidentReports\IncidentReportController;
 use App\Http\Controllers\Api\InternalAudits\InternalAuditController;
 use App\Http\Controllers\Api\InternalAudits\KpiInternalAuditsController;
+use App\Http\Controllers\Api\IspsReview\IspsReviewController;
 use App\Http\Controllers\Api\MasterReview\MasterReviewController;
 use App\Http\Controllers\Api\Nonconformities\NonconformityController;
 use App\Http\Controllers\Api\NonSire\KpiNonSireController;
@@ -244,6 +245,19 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/master-review/{masterReview}/under-review', [MasterReviewController::class, 'underReview']);
     Route::post('/master-review/{masterReview}/reopen', [MasterReviewController::class, 'reopen']);
     Route::delete('/master-review/{masterReview}', [MasterReviewController::class, 'destroy']);
+
+    Route::get('/isps-review/options', [IspsReviewController::class, 'options']);
+    Route::get('/isps-review/document-options', [IspsReviewController::class, 'documentOptions']);
+    Route::get('/isps-review', [IspsReviewController::class, 'index']);
+    Route::post('/isps-review', [IspsReviewController::class, 'store']);
+    Route::get('/isps-review/{ispsReview}', [IspsReviewController::class, 'show']);
+    Route::put('/isps-review/{ispsReview}', [IspsReviewController::class, 'update']);
+    Route::post('/isps-review/{ispsReview}/approve', [IspsReviewController::class, 'approve']);
+    Route::post('/isps-review/{ispsReview}/disapprove', [IspsReviewController::class, 'disapprove']);
+    Route::post('/isps-review/{ispsReview}/disregard', [IspsReviewController::class, 'disregard']);
+    Route::post('/isps-review/{ispsReview}/recommend-approval', [IspsReviewController::class, 'recommendApproval']);
+    Route::post('/isps-review/{ispsReview}/reopen', [IspsReviewController::class, 'reopen']);
+    Route::delete('/isps-review/{ispsReview}', [IspsReviewController::class, 'destroy']);
 
     Route::get('/revision-history/options', [RevisionHistoryController::class, 'options']);
     Route::get('/revision-history/document-options', [RevisionHistoryController::class, 'documentOptions']);
