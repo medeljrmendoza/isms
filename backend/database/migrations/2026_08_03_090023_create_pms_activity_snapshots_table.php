@@ -12,10 +12,12 @@ return new class extends Migration
     /**
      * Ported (in simplified form) from tb_pms_activities_history — legacy
      * archives every per-month-named column of each activity on the
-     * December-to-January rollover. PmsActivity has no such per-month
-     * columns (it's a flat vessel-level model), so this is a plain
-     * point-in-time snapshot instead: a record of what each activity's
-     * counters looked like at the moment a given year closed out.
+     * December-to-January rollover. A point-in-time snapshot of each
+     * activity's counters at year-end, plus (as of the PMS Activities
+     * module) the same monthly_done/monthly_postponed JSON maps and
+     * denormalized display fields PmsActivity carries, so a past year
+     * can be browsed without depending on the live activity/equipment/
+     * part/department rows still existing or being unchanged.
      */
     public function up(): void
     {

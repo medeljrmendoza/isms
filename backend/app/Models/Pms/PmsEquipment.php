@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class PmsEquipment extends Model
 {
-    protected $fillable = ['vessel_id', 'equipment_code', 'equipment_name', 'is_active'];
+    protected $fillable = ['vessel_id', 'equipment_code', 'equipment_name', 'criticality_id', 'is_active'];
 
     protected function casts(): array
     {
@@ -30,5 +30,10 @@ class PmsEquipment extends Model
     public function runningHours(): HasOne
     {
         return $this->hasOne(PmsRunningHoursEquipment::class);
+    }
+
+    public function criticality(): BelongsTo
+    {
+        return $this->belongsTo(PmsCriticality::class);
     }
 }

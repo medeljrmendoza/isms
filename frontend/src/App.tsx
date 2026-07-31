@@ -35,6 +35,7 @@ import { IspsReviewPage } from "./features/ispsReview/IspsReviewPage";
 import { ManualsPage } from "./features/manuals/ManualsPage";
 import { PmsRunningHoursPage } from "./features/pmsRunningHours/PmsRunningHoursPage";
 import { DefectsPage } from "./features/defects/DefectsPage";
+import { PmsActivitiesPage } from "./features/pmsActivities/PmsActivitiesPage";
 import { ComingSoonPage } from "./pages/ComingSoonPage";
 
 // Placeholder — swap in the real page once the change-password module is migrated.
@@ -84,6 +85,7 @@ export default function App() {
               <Route path="/sms" element={<ManualsPage />} />
               <Route path="/pms_running_hours_equipments" element={<PmsRunningHoursPage />} />
               <Route path="/defect_list" element={<DefectsPage />} />
+              <Route path="/pms_activities" element={<PmsActivitiesPage />} />
               <Route path="/change-password" element={<ChangePasswordPage />} />
               {/* Every other nav link points at a real legacy route that
                   isn't migrated yet — see src/data/navigation.ts */}

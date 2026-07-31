@@ -286,19 +286,30 @@ class PmsRunningHoursRepository
 
     private function archiveActivitiesForYearEnd(int $vesselId, int $year): void
     {
-        $activities = PmsActivity::where('vessel_id', $vesselId)->where('is_active', true)->get();
+        $activities = PmsActivity::where('vessel_id', $vesselId)->where('is_active', true)
+            ->with(['equipment.criticality', 'part', 'department', 'mainGroup'])
+            ->get();
 
         foreach ($activities as $activity) {
             PmsActivitySnapshot::create([
                 'vessel_id' => $vesselId,
                 'pms_activity_id' => $activity->id,
                 'activity_name' => $activity->activity_name,
+                'activity_code' => $activity->activity_code,
+                'equipment_name' => $activity->equipment?->equipment_name,
+                'part_name' => $activity->part?->part_name,
+                'department_name' => $activity->department?->name,
+                'main_group_name' => $activity->mainGroup?->name,
+                'criticality_name' => $activity->equipment?->criticality?->name,
+                'incharge' => $activity->incharge,
                 'unit' => $activity->unit,
                 'min_count_interval' => $activity->min_count_interval,
                 'max_count_interval' => $activity->max_count_interval,
                 'no_of_hours' => $activity->no_of_hours,
                 'since_delivery' => $activity->since_delivery,
                 'due_date' => $activity->due_date,
+                'monthly_done' => $activity->monthly_done,
+                'monthly_postponed' => $activity->monthly_postponed,
                 'archived_year' => $year,
             ]);
         }
