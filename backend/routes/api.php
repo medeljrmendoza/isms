@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\MasterReview\MasterReviewController;
 use App\Http\Controllers\Api\Nonconformities\NonconformityController;
 use App\Http\Controllers\Api\NonSire\KpiNonSireController;
 use App\Http\Controllers\Api\NonSire\NonSireReportController;
+use App\Http\Controllers\Api\Pms\PmsRunningHoursController;
 use App\Http\Controllers\Api\PscReports\KpiPscInspectionsController;
 use App\Http\Controllers\Api\PscReports\PscReportController;
 use App\Http\Controllers\Api\RevisionHistory\RevisionHistoryController;
@@ -246,6 +247,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/master-review/{masterReview}/under-review', [MasterReviewController::class, 'underReview']);
     Route::post('/master-review/{masterReview}/reopen', [MasterReviewController::class, 'reopen']);
     Route::delete('/master-review/{masterReview}', [MasterReviewController::class, 'destroy']);
+
+    Route::get('/pms-running-hours/options', [PmsRunningHoursController::class, 'options']);
+    Route::get('/pms-running-hours', [PmsRunningHoursController::class, 'index']);
+    Route::post('/pms-running-hours/update', [PmsRunningHoursController::class, 'update']);
+    Route::post('/pms-running-hours/proceed-next-month', [PmsRunningHoursController::class, 'proceedNextMonth']);
 
     Route::get('/manuals/options', [ManualBrowserController::class, 'options']);
     Route::get('/manuals/tree', [ManualBrowserController::class, 'tree']);

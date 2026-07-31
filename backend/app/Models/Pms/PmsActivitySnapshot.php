@@ -6,11 +6,11 @@ use App\Models\Vessel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class PmsActivity extends Model
+class PmsActivitySnapshot extends Model
 {
     protected $fillable = [
         'vessel_id',
-        'pms_equipment_id',
+        'pms_activity_id',
         'activity_name',
         'unit',
         'min_count_interval',
@@ -18,8 +18,7 @@ class PmsActivity extends Model
         'no_of_hours',
         'since_delivery',
         'due_date',
-        'is_postponed',
-        'is_active',
+        'archived_year',
     ];
 
     protected function casts(): array
@@ -28,8 +27,6 @@ class PmsActivity extends Model
             'no_of_hours' => 'float',
             'since_delivery' => 'float',
             'due_date' => 'date',
-            'is_postponed' => 'boolean',
-            'is_active' => 'boolean',
         ];
     }
 
@@ -38,8 +35,8 @@ class PmsActivity extends Model
         return $this->belongsTo(Vessel::class);
     }
 
-    public function equipment(): BelongsTo
+    public function activity(): BelongsTo
     {
-        return $this->belongsTo(PmsEquipment::class, 'pms_equipment_id');
+        return $this->belongsTo(PmsActivity::class, 'pms_activity_id');
     }
 }
