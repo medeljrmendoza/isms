@@ -36,6 +36,7 @@ import { ManualsPage } from "./features/manuals/ManualsPage";
 import { PmsRunningHoursPage } from "./features/pmsRunningHours/PmsRunningHoursPage";
 import { DefectsPage } from "./features/defects/DefectsPage";
 import { PmsActivitiesPage } from "./features/pmsActivities/PmsActivitiesPage";
+import { PmsDoneActivitiesPage } from "./features/pmsDoneActivities/PmsDoneActivitiesPage";
 import { PmsWorkPlanPage } from "./features/pmsWorkPlan/PmsWorkPlanPage";
 import { ComingSoonPage } from "./pages/ComingSoonPage";
 
@@ -88,6 +89,7 @@ export default function App() {
               <Route path="/defect_list" element={<DefectsPage />} />
               <Route path="/pms_activities" element={<PmsActivitiesPage />} />
               <Route path="/pms_work_plan" element={<PmsWorkPlanPage />} />
+              <Route path="/pms_done_activities" element={<PmsDoneActivitiesPage />} />
               <Route path="/change-password" element={<ChangePasswordPage />} />
               {/* Every other nav link points at a real legacy route that
                   isn't migrated yet — see src/data/navigation.ts */}
