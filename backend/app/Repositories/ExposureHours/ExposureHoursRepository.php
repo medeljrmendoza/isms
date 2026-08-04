@@ -4,11 +4,13 @@ namespace App\Repositories\ExposureHours;
 
 use App\Models\ExposureHours\ExposureHoursRecord;
 use App\Models\Vessel;
+use App\Support\LegacyDb;
 use App\Support\TableQuery;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class ExposureHoursRepository
 {
@@ -124,6 +126,75 @@ class ExposureHoursRepository
             $query->page,
             ['path' => LengthAwarePaginator::resolveCurrentPath()],
         );
+    }
+
+    /**
+     * Ported from Dashboard_exposure_hours.php's loadData(): one row per
+     * vessel showing its most recent reporting period, scoped to the
+     * logged-in user's assigned vessels.
+     */
+    public function legacyTable(TableQuery $query, ?string $legacyUserId): array
+    {
+        $vessels = LegacyDb::vesselNames();
+        $assignedVesselIds = LegacyDb::assignedVesselIds($legacyUserId);
+
+        $latestPerVessel = DB::connection('legacy')->table('tb_exposure_hours_records')
+            ->whereIn('vesID', $assignedVesselIds)
+            ->orderByDesc('date_from')
+            ->get()
+            ->unique('vesID')
+            ->keyBy('vesID');
+
+        $rows = collect($assignedVesselIds)
+            ->filter(fn ($vesID) => $latestPerVessel->has($vesID))
+            ->map(function ($vesID) use ($latestPerVessel, $vessels) {
+                $r = $latestPerVessel->get($vesID);
+
+                return [
+                    'vessel' => $vessels[$vesID] ?? '',
+                    'date_from' => $r->date_from,
+                    'date_to' => $r->date_to,
+                    'no_of_crew' => $r->no_of_crew,
+                    'no_of_fat' => $r->no_of_fat,
+                    'no_of_ptd' => $r->no_of_ptd,
+                    'no_of_ppd' => $r->no_of_ppd,
+                    'no_of_lwc' => $r->no_of_lwc,
+                    'no_of_rwc' => $r->no_of_rwc,
+                    'no_of_mtc' => $r->no_of_mtc,
+                    'total_hours' => number_format((float) $r->total_hours),
+                    '_sort_vessel' => $vessels[$vesID] ?? '',
+                    '_sort_total' => (float) $r->total_hours,
+                ];
+            })
+            ->values();
+
+        if ($query->search !== null) {
+            $term = mb_strtolower($query->search);
+            $rows = $rows->filter(fn (array $r) => str_contains(mb_strtolower($r['vessel']), $term)
+                || str_contains(mb_strtolower((string) $r['date_from']), $term)
+                || str_contains(mb_strtolower((string) $r['date_to']), $term));
+        }
+
+        $sortMap = [
+            'vessel' => '_sort_vessel',
+            'total_hours' => '_sort_total',
+        ];
+        $sortKey = $sortMap[$query->sort ?? 'vessel'] ?? $query->sort ?? '_sort_vessel';
+        $sorted = $rows->sortBy($sortKey, SORT_REGULAR, $query->direction === 'desc')->values()
+            ->map(fn (array $r) => collect($r)->except(['_sort_vessel', '_sort_total'])->all());
+
+        $total = $sorted->count();
+        $items = $sorted->slice(($query->page - 1) * $query->perPage, $query->perPage)->values()->all();
+
+        return [
+            'rows' => $items,
+            'meta' => [
+                'current_page' => $query->page,
+                'last_page' => (int) max(1, ceil($total / $query->perPage)),
+                'per_page' => $query->perPage,
+                'total' => $total,
+            ],
+        ];
     }
 
     /** @return array<int, array{id:int,label:string}> */

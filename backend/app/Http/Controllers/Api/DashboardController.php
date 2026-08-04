@@ -152,6 +152,12 @@ class DashboardController extends Controller
      */
     public function claimsTable(Request $request): JsonResponse
     {
+        if (LegacyDb::isConfigured()) {
+            $result = $this->claims->legacyTable(TableQuery::fromRequest($request), $request->user()?->legacy_user_id);
+
+            return response()->json(['data' => ['columns' => ClaimRepository::columns(), ...$result]]);
+        }
+
         $paginator = $this->claims->table(TableQuery::fromRequest($request));
 
         return $this->tableResponse($paginator, ClaimRepository::columns(), function (Claim $claim) {
@@ -169,6 +175,12 @@ class DashboardController extends Controller
      */
     public function exposureHoursTable(Request $request): JsonResponse
     {
+        if (LegacyDb::isConfigured()) {
+            $result = $this->exposureHours->legacyTable(TableQuery::fromRequest($request), $request->user()?->legacy_user_id);
+
+            return response()->json(['data' => ['columns' => ExposureHoursRepository::columns(), ...$result]]);
+        }
+
         $paginator = $this->exposureHours->table(TableQuery::fromRequest($request));
 
         return $this->tableResponse($paginator, ExposureHoursRepository::columns(), function (Vessel $vessel) {
@@ -214,6 +226,12 @@ class DashboardController extends Controller
      */
     public function incidentReportsTable(Request $request): JsonResponse
     {
+        if (LegacyDb::isConfigured()) {
+            $result = $this->incidentReports->legacyTable(TableQuery::fromRequest($request), $request->user()?->legacy_user_id);
+
+            return response()->json(['data' => ['columns' => IncidentReportRepository::columns(), ...$result]]);
+        }
+
         $paginator = $this->incidentReports->table(TableQuery::fromRequest($request));
 
         return $this->tableResponse($paginator, IncidentReportRepository::columns(), function (IncidentReport $incident) {
@@ -393,6 +411,12 @@ class DashboardController extends Controller
      */
     public function companyDocumentationTable(Request $request): JsonResponse
     {
+        if (LegacyDb::isConfigured()) {
+            $result = $this->companyDocumentation->legacyTable(TableQuery::fromRequest($request));
+
+            return response()->json(['data' => ['columns' => CompanyDocumentationRepository::columns(), ...$result]]);
+        }
+
         $paginator = $this->companyDocumentation->table(TableQuery::fromRequest($request));
 
         return $this->tableResponse($paginator, CompanyDocumentationRepository::columns(), function (CompanyDocumentationRecord $record) {

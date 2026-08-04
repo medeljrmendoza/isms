@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class CompanyDocumentationRepository
 {
@@ -113,6 +114,86 @@ class CompanyDocumentationRepository
             $query->page,
             ['path' => LengthAwarePaginator::resolveCurrentPath()],
         );
+    }
+
+    /**
+     * Ported from Controllers/Dashboard_company_documentation.php's
+     * loadCompanyDocsData(). No vessel/user scoping — legacy's own query
+     * has none for this dashlet (company documents aren't vessel-scoped).
+     * The warning-status CASE expression runs against the real legacy
+     * MySQL connection directly (unlike the local `pending()` path,
+     * which has to reimplement it in PHP against SQLite).
+     */
+    public function legacyTable(TableQuery $query): array
+    {
+        $numMonths = (int) (DB::connection('legacy')->table('tb_company_document_expiring')->where('expID', 1)->value('num_month') ?? 3);
+
+        $warningCase = "(CASE
+            WHEN tb_company_documentation.date_expired = '0000-00-00' THEN 0
+            WHEN tb_company_documentation.date_expired <> '0000-00-00' AND tb_company_documentation.date_expired <= CURDATE() THEN 2
+            WHEN tb_company_documentation.date_expired <> '0000-00-00' AND tb_company_documentation.date_expired > CURDATE() AND tb_company_documentation.date_range_from = '0000-00-00' AND CURDATE() >= DATE_SUB(tb_company_documentation.date_expired, INTERVAL {$numMonths} MONTH) THEN 1
+            WHEN tb_company_documentation.date_expired <> '0000-00-00' AND tb_company_documentation.date_expired > CURDATE() AND tb_company_documentation.date_range_from <> '0000-00-00' AND CURDATE() BETWEEN tb_company_documentation.date_range_from AND tb_company_documentation.date_range_to THEN 1
+            ELSE 0
+        END)";
+
+        $builder = DB::connection('legacy')->table('tb_company_documentation')
+            ->leftJoin('pl_company_document', 'tb_company_documentation.docID', '=', 'pl_company_document.vesDocID')
+            ->leftJoin('pl_company_document_type', 'pl_company_document.vesDocTypeID', '=', 'pl_company_document_type.vesDocTypeID')
+            ->where('pl_company_document_type.status', '1')
+            ->where('pl_company_document_type.is_deleted', '0')
+            ->where('pl_company_document.status', '1')
+            ->where('pl_company_document.is_deleted', '0')
+            ->where('tb_company_documentation.status', '1')
+            ->where('tb_company_documentation.is_deleted', '0')
+            ->whereRaw("(((tb_company_documentation.date_expired<>'0000-00-00') AND (tb_company_documentation.date_expired > CURDATE()) AND ((tb_company_documentation.date_range_from='0000-00-00' AND CURDATE() >= DATE_SUB(tb_company_documentation.date_expired, INTERVAL {$numMonths} MONTH)) OR (tb_company_documentation.date_range_from<>'0000-00-00' AND CURDATE() BETWEEN tb_company_documentation.date_range_from AND tb_company_documentation.date_range_to))) OR (tb_company_documentation.date_expired<>'0000-00-00' AND (tb_company_documentation.date_expired <= CURDATE())))")
+            ->select([
+                'pl_company_document.document_name',
+                'tb_company_documentation.date_issued',
+                'tb_company_documentation.date_expired',
+                DB::raw("{$warningCase} as warning_status"),
+            ]);
+
+        if ($query->search !== null) {
+            $term = "%{$query->search}%";
+            $builder->where(function ($q) use ($term) {
+                $q->where('pl_company_document.document_name', 'like', $term)
+                    ->orWhere('tb_company_documentation.date_issued', 'like', $term)
+                    ->orWhere('tb_company_documentation.date_expired', 'like', $term);
+            });
+        }
+
+        $sortMap = [
+            'document' => 'pl_company_document.document_name',
+            'date_issued' => 'tb_company_documentation.date_issued',
+            'date_expired' => 'tb_company_documentation.date_expired',
+            'warning' => 'warning_status',
+        ];
+        $sort = $sortMap[$query->sort ?? 'warning'] ?? 'warning_status';
+        // Legacy's own default order is by warning status descending (expired before expiring soon) — see table()'s equivalent local-path comment.
+        $direction = $query->sort === null ? 'desc' : $query->direction;
+
+        $paginator = $builder->orderBy($sort, $direction)->paginate($query->perPage, page: $query->page);
+
+        $rows = collect($paginator->items())->map(fn ($r) => [
+            'document' => $r->document_name,
+            'date_issued' => $r->date_issued,
+            'date_expired' => $r->date_expired === '0000-00-00' ? 'Never' : $r->date_expired,
+            'warning' => match ((int) $r->warning_status) {
+                2 => 'EXPIRED',
+                1 => 'EXPIRING SOON',
+                default => '',
+            },
+        ])->all();
+
+        return [
+            'rows' => $rows,
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
+        ];
     }
 
     /** @return array<int, array{id:int,label:string}> */

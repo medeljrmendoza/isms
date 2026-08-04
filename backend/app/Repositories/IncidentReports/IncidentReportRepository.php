@@ -6,9 +6,11 @@ use App\Models\IncidentReports\IncidentPersonParticipated;
 use App\Models\IncidentReports\IncidentReport;
 use App\Models\IncidentReports\IncidentRootCause;
 use App\Models\Vessel;
+use App\Support\LegacyDb;
 use App\Support\TableQuery;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
 
 class IncidentReportRepository
 {
@@ -111,6 +113,95 @@ class IncidentReportRepository
 
         return $builder->orderBy($sort, $query->direction)
             ->paginate($query->perPage, page: $query->page);
+    }
+
+    /**
+     * Ported from Controllers/Dashboard_incident.php's loadIncidentData():
+     * still open (no closing date, or the zero-date sentinel) or not yet
+     * approved, scoped to the logged-in user's assigned vessels.
+     */
+    public function legacyTable(TableQuery $query, ?string $legacyUserId): array
+    {
+        $vessels = LegacyDb::vesselNames();
+        $assignedVesselIds = LegacyDb::assignedVesselIds($legacyUserId);
+
+        $builder = DB::connection('legacy')->table('tb_incident_report')
+            ->leftJoin('tb_natureof_incident', 'tb_natureof_incident.natureID', '=', 'tb_incident_report.natureof_incidentid')
+            ->where(function ($q) {
+                $q->whereNull('tb_incident_report.closing_date')
+                    ->orWhere('tb_incident_report.closing_date', '0000-00-00')
+                    ->orWhere('tb_incident_report.is_approved', '0');
+            })
+            ->whereIn('tb_incident_report.vesid', $assignedVesselIds)
+            ->select([
+                'tb_incident_report.vesid',
+                'tb_incident_report.dateof_report',
+                'tb_incident_report.nature_type',
+                'tb_incident_report.natureof_incidentid',
+                'tb_incident_report.hazardous_occurrence_type',
+                'tb_incident_report.others',
+                'tb_incident_report.accident_collision',
+                'tb_natureof_incident.name as nature_name',
+            ]);
+
+        if ($query->search !== null) {
+            $term = "%{$query->search}%";
+            $builder->where(function ($q) use ($term) {
+                $q->where('tb_incident_report.dateof_report', 'like', $term)
+                    ->orWhere('tb_incident_report.nature_type', 'like', $term)
+                    ->orWhere('tb_incident_report.hazardous_occurrence_type', 'like', $term)
+                    ->orWhere('tb_natureof_incident.name', 'like', $term);
+            });
+        }
+
+        $sortMap = ['dateof_report' => 'tb_incident_report.dateof_report', 'nature' => 'tb_incident_report.nature_type'];
+        $sort = $sortMap[$query->sort ?? ''] ?? 'tb_incident_report.dateof_report';
+
+        $paginator = $builder->orderBy($sort, $query->direction)->paginate($query->perPage, page: $query->page);
+
+        $rows = collect($paginator->items())->map(fn ($r) => [
+            'vessel' => $vessels[$r->vesid] ?? '',
+            'dateof_report' => $r->dateof_report,
+            'nature' => $r->nature_type === 'accident' ? 'ACCIDENT' : 'HAZARDOUS OCCURRENCE',
+            'type' => $this->legacyIncidentTypeLabel($r),
+        ])->all();
+
+        return [
+            'rows' => $rows,
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
+        ];
+    }
+
+    /**
+     * Matches Dashboard_incident.php's edit('natureof_incidentid', ...)
+     * exactly: it branches on the fixed natureof_incidentid values (not
+     * the name text — the real "Other"/"Collision" lookup rows are named
+     * "OTHERS (not named above)" / "COLLISION WITH OTHER VESSEL(S)...",
+     * not literally "Other"/"Collision").
+     */
+    private function legacyIncidentTypeLabel(object $r): string
+    {
+        if ($r->nature_type === 'accident') {
+            $name = $r->nature_name ?? '';
+
+            return match ($r->natureof_incidentid) {
+                'nature57199de8cd5ad' => trim("{$name} - {$r->others}"),
+                'nature57199de883f63' => trim("{$name} - {$r->accident_collision}"),
+                default => $name,
+            };
+        }
+
+        return match ($r->hazardous_occurrence_type) {
+            'unsafe_act' => 'UNSAFE ACT',
+            'unsafe_condition' => 'UNSAFE CONDITION',
+            'near_miss' => 'NEAR MISS',
+            default => '',
+        };
     }
 
     /**
