@@ -5,9 +5,11 @@ namespace App\Repositories\ExternalAudits;
 use App\Models\ExternalAudits\ExternalAuditReport;
 use App\Models\Nonconformities\Nonconformity;
 use App\Models\Vessel;
+use App\Support\LegacyDb;
 use App\Support\TableQuery;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
 
 class ExternalAuditReportRepository
 {
@@ -108,6 +110,96 @@ class ExternalAuditReportRepository
 
         return $builder->orderBy($sort, $query->direction)
             ->paginate($query->perPage, page: $query->page);
+    }
+
+    /**
+     * Ported from Controllers/Dashboard_external.php's loadData() — same
+     * shape as FlagStateReportRepository::legacyTable() (visible when
+     * still-needs-approval OR has a pending NC OR has a pending
+     * observation), using the same "clearly intended" 3-way-OR reading
+     * rather than the literal missing-parens bug — see that method's
+     * docblock and this class's `pendingQuery()` docblock.
+     */
+    public function legacyTable(TableQuery $query, ?string $legacyUserId): array
+    {
+        $vessels = LegacyDb::vesselNames();
+        $assignedVesselIds = LegacyDb::assignedVesselIds($legacyUserId);
+
+        $pendingNcSub = fn ($q) => $q->from('tb_nonconformities')->selectRaw('COUNT(*)')
+            ->whereColumn('source_of_nc_ref_no', 'tb_external_audit_report.ref_no')
+            ->where('is_inactive', '!=', '1')
+            ->where(function ($qq) {
+                $qq->whereNull('close_out_date')->orWhere('close_out_date', '0000-00-00');
+            });
+        $totalNcSub = fn ($q) => $q->from('tb_nonconformities')->selectRaw('COUNT(*)')
+            ->whereColumn('source_of_nc_ref_no', 'tb_external_audit_report.ref_no')
+            ->where('is_inactive', '!=', '1');
+        $pendingObsSub = fn ($q) => $q->from('tb_observations')->selectRaw('COUNT(*)')
+            ->whereColumn('reportID', 'tb_external_audit_report.externalID')
+            ->where('status', '!=', 'COMPLETED')->where('is_deleted', '0');
+        $totalObsSub = fn ($q) => $q->from('tb_observations')->selectRaw('COUNT(*)')
+            ->whereColumn('reportID', 'tb_external_audit_report.externalID')->where('is_deleted', '0');
+
+        $needsApproval = function ($q) {
+            $q->where(function ($shore) {
+                $shore->where('added_by', 'SHORE')->where('is_published', '1')->where('is_approved', '0');
+            })->orWhere(function ($vessel) {
+                $vessel->where('added_by', 'VESSEL')->where('is_approved', '0');
+            });
+        };
+
+        $builder = DB::connection('legacy')->table('tb_external_audit_report')
+            ->where('is_deleted', '0')
+            ->whereIn('vesID', $assignedVesselIds)
+            ->where(function ($q) use ($needsApproval) {
+                $needsApproval($q);
+                $q->orWhereIn('ref_no', function ($sub) {
+                    $sub->select('source_of_nc_ref_no')->from('tb_nonconformities')
+                        ->where('is_inactive', '!=', '1')
+                        ->where(function ($qq) {
+                            $qq->whereNull('close_out_date')->orWhere('close_out_date', '0000-00-00');
+                        });
+                })->orWhereIn('externalID', function ($sub) {
+                    $sub->select('reportID')->from('tb_observations')
+                        ->where('is_deleted', '0')->where('status', '!=', 'COMPLETED');
+                });
+            })
+            ->select(['tb_external_audit_report.externalID', 'tb_external_audit_report.ref_no', 'tb_external_audit_report.vesID', 'tb_external_audit_report.dateof_audit'])
+            ->selectSub($pendingNcSub, 'pending_nc')
+            ->selectSub($totalNcSub, 'total_nc')
+            ->selectSub($pendingObsSub, 'pending_obs')
+            ->selectSub($totalObsSub, 'total_obs');
+
+        if ($query->search !== null) {
+            $term = "%{$query->search}%";
+            $builder->where(function ($q) use ($term) {
+                $q->where('tb_external_audit_report.ref_no', 'like', $term)
+                    ->orWhere('tb_external_audit_report.dateof_audit', 'like', $term);
+            });
+        }
+
+        $sortMap = ['ref_no' => 'tb_external_audit_report.ref_no', 'date' => 'tb_external_audit_report.dateof_audit'];
+        $sort = $sortMap[$query->sort ?? ''] ?? 'tb_external_audit_report.dateof_audit';
+
+        $paginator = $builder->orderBy($sort, $query->direction)->paginate($query->perPage, page: $query->page);
+
+        $rows = collect($paginator->items())->map(fn ($r) => [
+            'ref_no' => $r->ref_no,
+            'vessel' => $vessels[$r->vesID] ?? '',
+            'date' => $r->dateof_audit,
+            'nc' => $r->total_nc > 0 ? "{$r->pending_nc}/{$r->total_nc}" : '',
+            'obs' => $r->total_obs > 0 ? "{$r->pending_obs}/{$r->total_obs}" : '',
+        ])->all();
+
+        return [
+            'rows' => $rows,
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
+        ];
     }
 
     /**

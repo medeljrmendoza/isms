@@ -5,9 +5,11 @@ namespace App\Repositories\InternalAudits;
 use App\Models\InternalAudits\InternalAuditReport;
 use App\Models\Nonconformities\Nonconformity;
 use App\Models\Vessel;
+use App\Support\LegacyDb;
 use App\Support\TableQuery;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
 
 class InternalAuditReportRepository
 {
@@ -83,6 +85,85 @@ class InternalAuditReportRepository
 
         return $builder->orderBy($sort, $query->direction)
             ->paginate($query->perPage, page: $query->page);
+    }
+
+    /**
+     * Ported from Controllers/Dashboard_internal_audit_reports.php's
+     * loadData(): visible when there's at least one pending NC or
+     * pending observation, scoped to the logged-in user's assigned
+     * vessels — same shape as PscReportRepository::legacyTable().
+     */
+    public function legacyTable(TableQuery $query, ?string $legacyUserId): array
+    {
+        $vessels = LegacyDb::vesselNames();
+        $assignedVesselIds = LegacyDb::assignedVesselIds($legacyUserId);
+
+        $pendingNcSub = fn ($q) => $q->from('tb_nonconformities')->selectRaw('COUNT(*)')
+            ->whereColumn('source_of_nc_ref_no', 'tb_internal_audit_report.audit_ref')
+            ->where('is_inactive', '!=', '1')
+            ->where(function ($qq) {
+                $qq->whereNull('close_out_date')->orWhere('close_out_date', '0000-00-00');
+            });
+        $totalNcSub = fn ($q) => $q->from('tb_nonconformities')->selectRaw('COUNT(*)')
+            ->whereColumn('source_of_nc_ref_no', 'tb_internal_audit_report.audit_ref')
+            ->where('is_inactive', '!=', '1');
+        $pendingObsSub = fn ($q) => $q->from('tb_observations')->selectRaw('COUNT(*)')
+            ->whereColumn('reportID', 'tb_internal_audit_report.auditID')
+            ->where('is_deleted', '!=', '1')->where('status', '!=', 'COMPLETED');
+        $totalObsSub = fn ($q) => $q->from('tb_observations')->selectRaw('COUNT(*)')
+            ->whereColumn('reportID', 'tb_internal_audit_report.auditID')->where('is_deleted', '!=', '1');
+
+        $builder = DB::connection('legacy')->table('tb_internal_audit_report')
+            ->where('is_deleted', '0')
+            ->whereIn('vesID', $assignedVesselIds)
+            ->where(function ($q) {
+                $q->whereIn('audit_ref', function ($sub) {
+                    $sub->select('source_of_nc_ref_no')->from('tb_nonconformities')
+                        ->where('is_inactive', '!=', '1')
+                        ->where(function ($qq) {
+                            $qq->whereNull('close_out_date')->orWhere('close_out_date', '0000-00-00');
+                        });
+                })->orWhereIn('auditID', function ($sub) {
+                    $sub->select('reportID')->from('tb_observations')
+                        ->where('is_deleted', '!=', '1')->where('status', '!=', 'COMPLETED');
+                });
+            })
+            ->select(['tb_internal_audit_report.auditID', 'tb_internal_audit_report.audit_ref', 'tb_internal_audit_report.vesID', 'tb_internal_audit_report.this_date'])
+            ->selectSub($pendingNcSub, 'pending_nc')
+            ->selectSub($totalNcSub, 'total_nc')
+            ->selectSub($pendingObsSub, 'pending_obs')
+            ->selectSub($totalObsSub, 'total_obs');
+
+        if ($query->search !== null) {
+            $term = "%{$query->search}%";
+            $builder->where(function ($q) use ($term) {
+                $q->where('tb_internal_audit_report.audit_ref', 'like', $term)
+                    ->orWhere('tb_internal_audit_report.this_date', 'like', $term);
+            });
+        }
+
+        $sortMap = ['audit_ref' => 'tb_internal_audit_report.audit_ref', 'this_date' => 'tb_internal_audit_report.this_date'];
+        $sort = $sortMap[$query->sort ?? ''] ?? 'tb_internal_audit_report.this_date';
+
+        $paginator = $builder->orderBy($sort, $query->direction)->paginate($query->perPage, page: $query->page);
+
+        $rows = collect($paginator->items())->map(fn ($r) => [
+            'audit_ref' => $r->audit_ref,
+            'vessel' => $vessels[$r->vesID] ?? '',
+            'this_date' => $r->this_date,
+            'nc' => $r->total_nc > 0 ? "{$r->pending_nc}/{$r->total_nc}" : '',
+            'obs' => $r->total_obs > 0 ? "{$r->pending_obs}/{$r->total_obs}" : '',
+        ])->all();
+
+        return [
+            'rows' => $rows,
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
+        ];
     }
 
     /**

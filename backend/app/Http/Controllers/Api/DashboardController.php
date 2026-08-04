@@ -249,6 +249,12 @@ class DashboardController extends Controller
      */
     public function companyInspectionsTable(Request $request): JsonResponse
     {
+        if (LegacyDb::isConfigured()) {
+            $result = $this->auditReports->legacyTable(TableQuery::fromRequest($request), $request->user()?->legacy_user_id);
+
+            return response()->json(['data' => ['columns' => AuditReportRepository::columns(), ...$result]]);
+        }
+
         $paginator = $this->auditReports->table(TableQuery::fromRequest($request));
 
         return $this->tableResponse($paginator, AuditReportRepository::columns(), function (AuditReport $audit) {
@@ -270,6 +276,12 @@ class DashboardController extends Controller
      */
     public function internalAuditsTable(Request $request): JsonResponse
     {
+        if (LegacyDb::isConfigured()) {
+            $result = $this->internalAuditReports->legacyTable(TableQuery::fromRequest($request), $request->user()?->legacy_user_id);
+
+            return response()->json(['data' => ['columns' => InternalAuditReportRepository::columns(), ...$result]]);
+        }
+
         $paginator = $this->internalAuditReports->table(TableQuery::fromRequest($request));
 
         return $this->tableResponse($paginator, InternalAuditReportRepository::columns(), function (InternalAuditReport $audit) {
@@ -288,6 +300,12 @@ class DashboardController extends Controller
      */
     public function pscInspectionsTable(Request $request): JsonResponse
     {
+        if (LegacyDb::isConfigured()) {
+            $result = $this->pscReports->legacyTable(TableQuery::fromRequest($request), $request->user()?->legacy_user_id);
+
+            return response()->json(['data' => ['columns' => PscReportRepository::columns(), ...$result]]);
+        }
+
         $paginator = $this->pscReports->table(TableQuery::fromRequest($request));
 
         return $this->tableResponse($paginator, PscReportRepository::columns(), function (PscReport $psc) {
@@ -306,6 +324,12 @@ class DashboardController extends Controller
      */
     public function externalAuditsTable(Request $request): JsonResponse
     {
+        if (LegacyDb::isConfigured()) {
+            $result = $this->externalAuditReports->legacyTable(TableQuery::fromRequest($request), $request->user()?->legacy_user_id);
+
+            return response()->json(['data' => ['columns' => ExternalAuditReportRepository::columns(), ...$result]]);
+        }
+
         $paginator = $this->externalAuditReports->table(TableQuery::fromRequest($request));
 
         return $this->tableResponse($paginator, ExternalAuditReportRepository::columns(), function (ExternalAuditReport $audit) {
@@ -342,6 +366,12 @@ class DashboardController extends Controller
      */
     public function sireTable(Request $request): JsonResponse
     {
+        if (LegacyDb::isConfigured()) {
+            $result = $this->sireReports->legacyTable(TableQuery::fromRequest($request), $request->user()?->legacy_user_id);
+
+            return response()->json(['data' => ['columns' => SireReportRepository::columns(), ...$result]]);
+        }
+
         $paginator = $this->sireReports->table(TableQuery::fromRequest($request));
 
         return $this->tableResponse($paginator, SireReportRepository::columns(), function (SireReport $sire) {
@@ -360,6 +390,12 @@ class DashboardController extends Controller
      */
     public function nonSireTable(Request $request): JsonResponse
     {
+        if (LegacyDb::isConfigured()) {
+            $result = $this->nonSireReports->legacyTable(TableQuery::fromRequest($request), $request->user()?->legacy_user_id);
+
+            return response()->json(['data' => ['columns' => NonSireReportRepository::columns(), ...$result]]);
+        }
+
         $paginator = $this->nonSireReports->table(TableQuery::fromRequest($request));
 
         return $this->tableResponse($paginator, NonSireReportRepository::columns(), function (NonSireReport $report) {
@@ -377,6 +413,12 @@ class DashboardController extends Controller
      */
     public function flagStateTable(Request $request): JsonResponse
     {
+        if (LegacyDb::isConfigured()) {
+            $result = $this->flagStateReports->legacyTable(TableQuery::fromRequest($request), $request->user()?->legacy_user_id);
+
+            return response()->json(['data' => ['columns' => FlagStateReportRepository::columns(), ...$result]]);
+        }
+
         $paginator = $this->flagStateReports->table(TableQuery::fromRequest($request));
 
         return $this->tableResponse($paginator, FlagStateReportRepository::columns(), function (FlagStateReport $report) {
