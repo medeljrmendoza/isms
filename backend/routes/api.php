@@ -43,6 +43,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', [AuthController::class, 'me']);
     Route::get('/dashboard', [DashboardController::class, 'index']);
     Route::get('/dashboard/nonconformities', [DashboardController::class, 'nonconformitiesTable']);
+    Route::get('/dashboard/nonconformities/{id}', [DashboardController::class, 'nonconformityDetail']);
     Route::get('/dashboard/claims', [DashboardController::class, 'claimsTable']);
     Route::get('/dashboard/exposure-hours', [DashboardController::class, 'exposureHoursTable']);
     Route::get('/dashboard/assigned-tasks', [DashboardController::class, 'assignedTasksTable']);
@@ -58,6 +59,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/dashboard/committee-meetings', [DashboardController::class, 'committeeMeetingsTable']);
     Route::get('/dashboard/company-documentation', [DashboardController::class, 'companyDocumentationTable']);
     Route::get('/dashboard/defects', [DashboardController::class, 'defectsTable']);
+    Route::get('/dashboard/defects/{id}', [DashboardController::class, 'defectDetail']);
     Route::get('/dashboard/sms-publish-manual', [DashboardController::class, 'smsPublishManualTable']);
     Route::get('/dashboard/master-reviews', [DashboardController::class, 'masterReviewsTable']);
     Route::get('/dashboard/isps-reviews', [DashboardController::class, 'ispsReviewsTable']);

@@ -107,6 +107,7 @@ class DefectRepository
         $paginator = $builder->orderBy($sort, $query->direction)->paginate($query->perPage, page: $query->page);
 
         $rows = collect($paginator->items())->map(fn ($d) => [
+            'record_id' => $d->defectID,
             'sl_no' => $d->sl_no,
             'vessel' => $vessels[$d->vesID] ?? '',
             'defect_date' => $d->defect_date,
@@ -123,6 +124,89 @@ class DefectRepository
                 'per_page' => $paginator->perPage(),
                 'total' => $paginator->total(),
             ],
+        ];
+    }
+
+    /**
+     * Powers the dashlet's "click SL No. to view" — ported from
+     * Defect_list::view_record()'s field set (see
+     * Views/admin/defect_list/view_defect_list.php), minus the report
+     * header/footer and file attachments (both already dropped
+     * everywhere else in this migration) and the tb_logs write.
+     */
+    public function detail(int $id): ?array
+    {
+        $d = Defect::query()->with('vessel')->find($id);
+
+        if ($d === null) {
+            return null;
+        }
+
+        return $this->toDetailArray([
+            'sl_no' => $d->sl_no,
+            'vessel' => $d->vessel?->display_name ?? '',
+            'defect_date' => $d->defect_date->format('Y-m-d'),
+            'priority' => $d->priority,
+            'category' => $d->category,
+            'compl_code' => $d->compl_code,
+            'description' => $d->description,
+            'present_status' => $d->present_status,
+            'expected_compl_date' => $d->expected_compl_date?->format('Y-m-d'),
+            'compl_date' => $d->compl_date?->format('Y-m-d'),
+            'raised_by' => $d->raised_by,
+            'vessel_remarks' => $d->vessel_remarks,
+            'shore_remarks' => $d->shore_remarks,
+        ]);
+    }
+
+    /** Same as detail(), reading tb_defect_list directly from the legacy connection. */
+    public function legacyDetail(string $defectID): ?array
+    {
+        $d = DB::connection('legacy')->table('tb_defect_list')->where('defectID', $defectID)->first();
+
+        if ($d === null) {
+            return null;
+        }
+
+        $vessels = LegacyDb::vesselNames();
+        $zeroDateToNull = fn (?string $date) => ($date === null || $date === '0000-00-00') ? null : $date;
+
+        return $this->toDetailArray([
+            'sl_no' => $d->sl_no,
+            'vessel' => $vessels[$d->vesID] ?? '',
+            'defect_date' => $zeroDateToNull($d->defect_date),
+            'priority' => $d->defect_priority,
+            'category' => $d->defect_cat,
+            'compl_code' => $d->compl_code,
+            'description' => $d->defect_description,
+            'present_status' => $d->present_status,
+            'expected_compl_date' => $zeroDateToNull($d->expected_compl_date),
+            'compl_date' => $zeroDateToNull($d->compl_date),
+            'raised_by' => $d->raised_by,
+            'vessel_remarks' => $d->vessel_remarks,
+            'shore_remarks' => $d->shore_remarks,
+        ]);
+    }
+
+    /** @param array<string, mixed> $r */
+    private function toDetailArray(array $r): array
+    {
+        return [
+            'id' => 0,
+            'sl_no' => $r['sl_no'],
+            'vessel' => $r['vessel'],
+            'defect_date' => $r['defect_date'],
+            'priority' => $r['priority'],
+            'category' => $r['category'],
+            'compl_code' => $r['compl_code'],
+            'description' => $r['description'],
+            'present_status' => $r['present_status'],
+            'expected_compl_date' => $r['expected_compl_date'],
+            'compl_date' => $r['compl_date'],
+            'vessel_id' => 0,
+            'raised_by' => $r['raised_by'],
+            'vessel_remarks' => $r['vessel_remarks'],
+            'shore_remarks' => $r['shore_remarks'],
         ];
     }
 

@@ -178,6 +178,7 @@ class NonconformityRepository
         $paginator = $builder->orderBy($sort, $query->direction)->paginate($query->perPage, page: $query->page);
 
         $rows = collect($paginator->items())->map(fn ($nc) => [
+            'record_id' => $nc->ncID,
             'ncr_no' => $nc->ncr_no,
             'date_of_nc' => $nc->date_of_nc,
             'vessel_company' => $nc->vessel_company === 'VESSEL' ? ($vessels[$nc->vesID] ?? '') : ($nc->company ?? ''),
@@ -192,6 +193,181 @@ class NonconformityRepository
                 'per_page' => $paginator->perPage(),
                 'total' => $paginator->total(),
             ],
+        ];
+    }
+
+    /**
+     * Powers the dashlet's "click NCR No. to view" — ported from
+     * Nonconformities::view_item()'s field set (see
+     * Views/admin/nonconformities/view_nonconformity.php), minus the
+     * report header/footer and file attachments (both already dropped
+     * everywhere else in this migration) and the tb_logs write. The
+     * list-only computed fields (status/is_published/is_approved/can_*)
+     * are inert placeholders — this view has no action buttons.
+     */
+    public function detail(int $id): ?array
+    {
+        $nc = Nonconformity::query()->with(['vessel', 'manualChapter'])->find($id);
+
+        if ($nc === null) {
+            return null;
+        }
+
+        return $this->toDetailArray([
+            'ncr_no' => $nc->ncr_no,
+            'date_of_nc' => $nc->date_of_nc->format('Y-m-d'),
+            'added_by' => $nc->added_by,
+            'source_of_nc' => $nc->source_of_nc,
+            'reported_by' => $nc->reported_by,
+            'reporter_name' => $nc->reporter_name,
+            'vessel_or_company_name' => $nc->vessel_company === 'VESSEL' ? ($nc->vessel?->display_name ?? '') : ($nc->company ?? ''),
+            'vessel_company' => $nc->vessel_company,
+            'company' => $nc->company,
+            'department_name' => $nc->department_name,
+            'source_of_nc_others' => $nc->source_of_nc_others,
+            'source_of_nc_ref_no' => $nc->source_of_nc_ref_no,
+            'manual_chapter_label' => $nc->manualChapter ? "({$nc->manualChapter->reference_no}) {$nc->manualChapter->chapter_name}" : null,
+            'sms_details' => $nc->sms_details,
+            'description' => $nc->description,
+            'root_cause' => $nc->root_cause,
+            'root_cause_incharge' => $nc->root_cause_incharge,
+            'corrective_action' => $nc->corrective_action,
+            'corrective_action_incharge' => $nc->corrective_action_incharge,
+            'corrective_action_date' => $nc->corrective_action_date?->format('Y-m-d'),
+            'verification' => $nc->verification,
+            'verification_followup' => $nc->verification_followup,
+            'verification_assistance' => $nc->verification_assistance,
+            'verification_dpa' => $nc->verification_dpa,
+            'verification_date' => $nc->verification_date?->format('Y-m-d'),
+            'close_out_completed' => $nc->close_out_completed,
+            'close_out_followup' => $nc->close_out_followup,
+            'close_out_followup_nature' => $nc->close_out_followup_nature,
+            'close_out_dpa' => $nc->close_out_dpa,
+            'close_out_date' => $nc->close_out_date?->format('Y-m-d'),
+            'attach_safety_meeting' => $nc->attach_safety_meeting,
+            'attach_record_training' => $nc->attach_record_training,
+            'attach_logbook' => $nc->attach_logbook,
+            'attach_delivery_note' => $nc->attach_delivery_note,
+            'attach_photo' => $nc->attach_photo,
+            'attach_company_forms' => $nc->attach_company_forms,
+            'attach_others' => $nc->attach_others,
+            'attach_others_details' => $nc->attach_others_details,
+        ]);
+    }
+
+    /** Same as detail(), reading tb_nonconformities directly from the legacy connection. */
+    public function legacyDetail(string $ncID): ?array
+    {
+        $nc = DB::connection('legacy')->table('tb_nonconformities')->where('ncID', $ncID)->first();
+
+        if ($nc === null) {
+            return null;
+        }
+
+        $vessels = LegacyDb::vesselNames();
+        $chapter = $nc->sms_chapterID !== ''
+            ? DB::connection('legacy')->table('tb_manual_chapter')->where('chapterID', $nc->sms_chapterID)->first()
+            : null;
+
+        $zeroDateToNull = fn (?string $date) => ($date === null || $date === '0000-00-00') ? null : $date;
+
+        return $this->toDetailArray([
+            'ncr_no' => $nc->ncr_no,
+            'date_of_nc' => $zeroDateToNull($nc->date_of_nc),
+            'added_by' => $nc->added_by,
+            'source_of_nc' => $nc->source_of_nc,
+            'reported_by' => $nc->reported_by,
+            'reporter_name' => $nc->reporter_name,
+            'vessel_or_company_name' => $nc->vessel_company === 'VESSEL' ? ($vessels[$nc->vesID] ?? '') : ($nc->company ?? ''),
+            'vessel_company' => $nc->vessel_company,
+            'company' => $nc->company,
+            'department_name' => $nc->department_name,
+            'source_of_nc_others' => $nc->source_of_nc_others,
+            'source_of_nc_ref_no' => $nc->source_of_nc_ref_no,
+            'manual_chapter_label' => $chapter ? "({$chapter->reference_no}) {$chapter->chapter_name}" : null,
+            'sms_details' => $nc->sms_details,
+            'description' => $nc->description,
+            'root_cause' => $nc->root_cause,
+            'root_cause_incharge' => $nc->root_cause_incharge,
+            'corrective_action' => $nc->corrective_action,
+            'corrective_action_incharge' => $nc->corrective_action_incharge,
+            'corrective_action_date' => $zeroDateToNull($nc->corrective_action_date),
+            'verification' => $nc->verification !== '' ? $nc->verification : null,
+            'verification_followup' => $nc->verification_followup,
+            'verification_assistance' => $nc->verification_assistance,
+            'verification_dpa' => $nc->verification_dpa,
+            'verification_date' => $zeroDateToNull($nc->verification_date),
+            'close_out_completed' => $nc->close_out_completed,
+            'close_out_followup' => $nc->close_out_followup,
+            'close_out_followup_nature' => $nc->close_out_followup_nature,
+            'close_out_dpa' => $nc->close_out_dpa,
+            'close_out_date' => $zeroDateToNull($nc->close_out_date),
+            'attach_safety_meeting' => $nc->attach_safety_meeting,
+            'attach_record_training' => $nc->attach_record_training,
+            'attach_logbook' => $nc->attach_logbook,
+            'attach_delivery_note' => $nc->attach_delivery_note,
+            'attach_photo' => $nc->attach_photo,
+            'attach_company_forms' => $nc->attach_company_forms,
+            'attach_others' => $nc->attach_others,
+            'attach_others_details' => $nc->attach_others_details,
+        ]);
+    }
+
+    /** @param array<string, mixed> $r */
+    private function toDetailArray(array $r): array
+    {
+        return [
+            'id' => 0,
+            'ncr_no' => $r['ncr_no'],
+            'date_of_nc' => $r['date_of_nc'],
+            'added_by' => $r['added_by'],
+            'source_of_nc' => $r['source_of_nc'],
+            'reported_by' => trim("{$r['reported_by']} - {$r['reporter_name']}", ' -'),
+            'vessel_company' => $r['vessel_or_company_name'],
+            'description' => $r['description'],
+            'is_published' => null,
+            'is_approved' => null,
+            'status' => 'IN PROGRESS',
+            'status_color' => 'yellow',
+            'can_edit' => false,
+            'can_publish' => false,
+            'can_approve' => false,
+            'can_reopen' => false,
+            'vessel_id' => null,
+            'vessel_company_raw' => $r['vessel_company'],
+            'company' => $r['company'],
+            'department_name' => $r['department_name'],
+            'reported_by_raw' => $r['reported_by'],
+            'reporter_name' => $r['reporter_name'],
+            'source_of_nc_raw' => $r['source_of_nc'],
+            'source_of_nc_others' => $r['source_of_nc_others'],
+            'source_of_nc_ref_no' => $r['source_of_nc_ref_no'],
+            'manual_chapter_id' => null,
+            'manual_chapter_label' => $r['manual_chapter_label'],
+            'sms_details' => $r['sms_details'],
+            'root_cause' => $r['root_cause'],
+            'root_cause_incharge' => $r['root_cause_incharge'],
+            'corrective_action' => $r['corrective_action'],
+            'corrective_action_incharge' => $r['corrective_action_incharge'],
+            'corrective_action_date' => $r['corrective_action_date'],
+            'verification' => $r['verification'],
+            'verification_followup' => $r['verification_followup'],
+            'verification_assistance' => $r['verification_assistance'],
+            'verification_dpa' => $r['verification_dpa'],
+            'verification_date' => $r['verification_date'],
+            'close_out_completed' => (bool) $r['close_out_completed'],
+            'close_out_followup' => (bool) $r['close_out_followup'],
+            'close_out_followup_nature' => $r['close_out_followup_nature'],
+            'close_out_dpa' => $r['close_out_dpa'],
+            'close_out_date' => $r['close_out_date'],
+            'attach_safety_meeting' => (bool) $r['attach_safety_meeting'],
+            'attach_record_training' => (bool) $r['attach_record_training'],
+            'attach_logbook' => (bool) $r['attach_logbook'],
+            'attach_delivery_note' => (bool) $r['attach_delivery_note'],
+            'attach_photo' => (bool) $r['attach_photo'],
+            'attach_company_forms' => (bool) $r['attach_company_forms'],
+            'attach_others' => (bool) $r['attach_others'],
+            'attach_others_details' => $r['attach_others_details'],
         ];
     }
 

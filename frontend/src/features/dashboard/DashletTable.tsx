@@ -16,11 +16,16 @@ export function DashletTable({
   endpoint,
   columns,
   defaultDirection = "desc",
+  linkColumn,
+  onLinkClick,
 }: {
   endpoint: string;
   columns: DashletColumn[];
   /** PMS's legacy dashlet lists vessels in ascending order by default; every other dashlet defaults to descending. */
   defaultDirection?: "asc" | "desc";
+  /** Column key to render as a clickable link (e.g. "ncr_no", "sl_no"), matching legacy's clickable-to-view columns. */
+  linkColumn?: string;
+  onLinkClick?: (row: TableRow) => void;
 }) {
   const [rows, setRows] = useState<TableRow[]>([]);
   const [page, setPage] = useState(1);
@@ -109,7 +114,17 @@ export function DashletTable({
               <tr key={index} className="border-b border-slate-100">
                 {columns.map((column) => (
                   <td key={column.key} className="px-2 py-1.5 text-slate-700">
-                    {row[column.key]}
+                    {column.key === linkColumn && onLinkClick ? (
+                      <button
+                        type="button"
+                        className="text-blue-600 hover:underline"
+                        onClick={() => onLinkClick(row)}
+                      >
+                        {row[column.key]}
+                      </button>
+                    ) : (
+                      row[column.key]
+                    )}
                   </td>
                 ))}
               </tr>

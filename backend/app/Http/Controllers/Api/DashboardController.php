@@ -118,6 +118,7 @@ class DashboardController extends Controller
 
         return $this->tableResponse($paginator, NonconformityRepository::columns(), function (Nonconformity $nc) {
             return [
+                'record_id' => (string) $nc->id,
                 'ncr_no' => $nc->ncr_no,
                 'date_of_nc' => $nc->date_of_nc->format('Y-m-d'),
                 'vessel_company' => $nc->vessel_company === 'VESSEL'
@@ -126,6 +127,24 @@ class DashboardController extends Controller
                 'description' => $nc->description,
             ];
         });
+    }
+
+    /**
+     * GET /api/dashboard/nonconformities/{id} — powers the dashlet's
+     * "click NCR No. to view" (see NonconformityRepository::detail()/
+     * legacyDetail()). {id} is the local numeric id or, in legacy mode,
+     * the raw legacy ncID string — matching whatever `record_id` the
+     * table endpoint just returned for that row.
+     */
+    public function nonconformityDetail(string $id): JsonResponse
+    {
+        $detail = LegacyDb::isConfigured()
+            ? $this->nonconformities->legacyDetail($id)
+            : $this->nonconformities->detail((int) $id);
+
+        abort_if($detail === null, 404);
+
+        return response()->json(['data' => $detail]);
     }
 
     /**
@@ -405,6 +424,7 @@ class DashboardController extends Controller
 
         return $this->tableResponse($paginator, DefectRepository::columns(), function (Defect $defect) {
             return [
+                'record_id' => (string) $defect->id,
                 'sl_no' => $defect->sl_no,
                 'vessel' => $defect->vessel?->display_name ?? '',
                 'defect_date' => $defect->defect_date->format('Y-m-d'),
@@ -413,6 +433,24 @@ class DashboardController extends Controller
                 'compl_code' => $defect->compl_code,
             ];
         });
+    }
+
+    /**
+     * GET /api/dashboard/defects/{id} — powers the dashlet's "click SL
+     * No. to view" (see DefectRepository::detail()/legacyDetail()). {id}
+     * is the local numeric id or, in legacy mode, the raw legacy
+     * defectID string — matching whatever `record_id` the table endpoint
+     * just returned for that row.
+     */
+    public function defectDetail(string $id): JsonResponse
+    {
+        $detail = LegacyDb::isConfigured()
+            ? $this->defects->legacyDetail($id)
+            : $this->defects->detail((int) $id);
+
+        abort_if($detail === null, 404);
+
+        return response()->json(['data' => $detail]);
     }
 
     /**

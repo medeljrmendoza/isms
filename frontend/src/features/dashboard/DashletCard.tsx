@@ -1,8 +1,13 @@
 import { useState } from "react";
-import type { Dashlet } from "./dashboard";
+import type { Dashlet, TableRow } from "./dashboard";
 import { Modal } from "../../components/ui/Modal";
 import { Button } from "../../components/ui/Button";
 import { DashletTable } from "./DashletTable";
+import { dashboardTableService } from "./dashboardTableService";
+import { NonconformityViewModal } from "../nonconformities/NonconformityViewModal";
+import type { NonconformityDetail } from "../nonconformities/nonconformity";
+import { DefectViewModal } from "../defects/DefectViewModal";
+import type { DefectDetail } from "../defects/defects";
 
 function DashletList({ items }: { items: Dashlet["items"] }) {
   if (items.length === 0) {
@@ -21,11 +26,20 @@ function DashletList({ items }: { items: Dashlet["items"] }) {
   );
 }
 
+/** The dashlet key + row column that legacy makes clickable to open a view modal (NCR NO. / SL NO.). */
+const LINK_COLUMNS: Record<string, string> = {
+  nonconformities: "ncr_no",
+  defect_list: "sl_no",
+};
+
 export function DashletCard({ dashlet }: { dashlet: Dashlet }) {
   const [loaded, setLoaded] = useState(!dashlet.manual_load);
   const [loading, setLoading] = useState(false);
   const [showLarger, setShowLarger] = useState(false);
+  const [nonconformity, setNonconformity] = useState<NonconformityDetail | null>(null);
+  const [defect, setDefect] = useState<DefectDetail | null>(null);
   const isTable = dashlet.columns !== null && dashlet.endpoint !== null;
+  const linkColumn = LINK_COLUMNS[dashlet.key];
 
   const handleLoad = () => {
     setLoading(true);
@@ -35,6 +49,15 @@ export function DashletCard({ dashlet }: { dashlet: Dashlet }) {
       setLoading(false);
       setLoaded(true);
     }, 400);
+  };
+
+  const handleLinkClick = (row: TableRow) => {
+    const recordId = String(row.record_id);
+    if (dashlet.key === "nonconformities") {
+      dashboardTableService.fetchNonconformityDetail(recordId).then(setNonconformity);
+    } else if (dashlet.key === "defect_list") {
+      dashboardTableService.fetchDefectDetail(recordId).then(setDefect);
+    }
   };
 
   return (
@@ -94,6 +117,8 @@ export function DashletCard({ dashlet }: { dashlet: Dashlet }) {
               endpoint={dashlet.endpoint!}
               columns={dashlet.columns!}
               defaultDirection={dashlet.key === "pms" ? "asc" : undefined}
+              linkColumn={linkColumn}
+              onLinkClick={linkColumn ? handleLinkClick : undefined}
             />
           ) : (
             <DashletList items={dashlet.items} />
@@ -107,12 +132,17 @@ export function DashletCard({ dashlet }: { dashlet: Dashlet }) {
               endpoint={dashlet.endpoint!}
               columns={dashlet.columns!}
               defaultDirection={dashlet.key === "pms" ? "asc" : undefined}
+              linkColumn={linkColumn}
+              onLinkClick={linkColumn ? handleLinkClick : undefined}
             />
           ) : (
             <DashletList items={dashlet.items} />
           )}
         </Modal>
       )}
+
+      {nonconformity && <NonconformityViewModal nonconformity={nonconformity} onClose={() => setNonconformity(null)} />}
+      {defect && <DefectViewModal defect={defect} onClose={() => setDefect(null)} />}
     </div>
   );
 }

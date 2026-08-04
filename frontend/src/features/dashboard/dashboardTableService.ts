@@ -1,5 +1,7 @@
 import { axiosClient } from "../../api/axiosClient";
 import type { ApiResource } from "../auth/auth";
+import type { NonconformityDetail } from "../nonconformities/nonconformity";
+import type { DefectDetail } from "../defects/defects";
 import type { TableResponse } from "./dashboard";
 
 export interface TableParams {
@@ -13,6 +15,16 @@ export interface TableParams {
 export const dashboardTableService = {
   async fetch(endpoint: string, params: TableParams): Promise<TableResponse> {
     const response = await axiosClient.get<ApiResource<TableResponse>>(endpoint, { params });
+    return response.data.data;
+  },
+
+  async fetchNonconformityDetail(recordId: string): Promise<NonconformityDetail> {
+    const response = await axiosClient.get<ApiResource<NonconformityDetail>>(`/dashboard/nonconformities/${recordId}`);
+    return response.data.data;
+  },
+
+  async fetchDefectDetail(recordId: string): Promise<DefectDetail> {
+    const response = await axiosClient.get<ApiResource<DefectDetail>>(`/dashboard/defects/${recordId}`);
     return response.data.data;
   },
 };
