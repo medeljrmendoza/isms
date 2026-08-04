@@ -26,7 +26,10 @@ export function DashboardPage() {
   }, []);
 
   return (
-    <>
+    // Pinned to the app's original content width — the dashlet cards'
+    // sizing/proportions are unaffected by AppLayout's wider max-width,
+    // which other (non-dashboard) pages use for their full-page tables.
+    <div className="mx-auto max-w-6xl">
       {error && (
         <div className="mb-4">
           <Alert variant="error">{error}</Alert>
@@ -46,6 +49,6 @@ export function DashboardPage() {
           ))}
         </div>
       )}
-    </>
+    </div>
   );
 }

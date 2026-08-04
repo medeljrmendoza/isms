@@ -123,7 +123,7 @@ class DashboardService
         return [
             'key' => $key,
             'title' => $title,
-            'span' => 'full',
+            'span' => 'half',
             'manual_load' => false,
             'extra_action' => $extraAction,
             'items' => [],

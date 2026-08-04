@@ -7,7 +7,7 @@ export function AppLayout() {
     <div className="min-h-screen bg-slate-50">
       <NavBar />
       <NotificationBar />
-      <main className="mx-auto max-w-6xl px-4 py-6">
+      <main className="mx-auto max-w-screen-2xl px-4 py-6">
         <Outlet />
       </main>
     </div>
