@@ -173,6 +173,7 @@ class FlagStateReportRepository
         $paginator = $builder->orderBy($sort, $query->direction)->paginate($query->perPage, page: $query->page);
 
         $rows = collect($paginator->items())->map(fn ($r) => [
+            'record_id' => $r->flagID,
             'ref_no' => $r->ref_no,
             'vessel' => $vessels[$r->vesID] ?? '',
             'date' => $r->dateof_inspection,
@@ -315,6 +316,106 @@ class FlagStateReportRepository
         $report->update(['is_deleted' => true]);
 
         Nonconformity::where('source_of_nc_ref_no', $report->ref_no)->update(['is_inactive' => true]);
+    }
+
+    /**
+     * Ported from admin/flag_state/view_flag_state.php, surfaced via
+     * the dashboard's clickable ref_no column. Read-only — see
+     * SireReportRepository::detail()'s docblock for the convention.
+     */
+    public function detail(int $id): ?array
+    {
+        $r = FlagStateReport::query()->with('vessel')
+            ->withCount([
+                'nonconformities as pending_nc_count' => fn (Builder $q) => $q->where('is_inactive', false)->whereNull('close_out_date'),
+                'nonconformities as total_nc_count' => fn (Builder $q) => $q->where('is_inactive', false),
+            ])
+            ->find($id);
+
+        if ($r === null) {
+            return null;
+        }
+
+        return $this->toDetailArray([
+            'ref_no' => $r->ref_no,
+            'vessel' => $r->vessel?->display_name ?? '',
+            'added_by' => $r->added_by,
+            'dateof_inspection' => $r->dateof_inspection->format('Y-m-d'),
+            'placeof_inspection' => $r->placeof_inspection,
+            'inspector' => $r->inspector,
+            'published' => $r->added_by === 'SHORE' ? $r->is_published : null,
+            'is_approved' => $r->is_published ? $r->is_approved : null,
+            'pending_nc_count' => $r->pending_nc_count ?? 0,
+            'total_nc_count' => $r->total_nc_count ?? 0,
+            'flag_cost' => $r->flag_cost,
+            'shore_remarks' => $r->shore_remarks,
+            'vessel_remarks' => $r->vessel_remarks,
+        ]);
+    }
+
+    /** Same as detail(), reading tb_flag_state directly from the legacy connection. */
+    public function legacyDetail(string $flagID): ?array
+    {
+        $r = DB::connection('legacy')->table('tb_flag_state')->where('flagID', $flagID)->first();
+
+        if ($r === null) {
+            return null;
+        }
+
+        $vessels = LegacyDb::vesselNames();
+
+        $pendingNc = DB::connection('legacy')->table('tb_nonconformities')
+            ->where('source_of_nc_ref_no', $r->ref_no)
+            ->where('is_inactive', '!=', '1')
+            ->where(function ($q) {
+                $q->whereNull('close_out_date')->orWhere('close_out_date', '0000-00-00');
+            })->count();
+        $totalNc = DB::connection('legacy')->table('tb_nonconformities')
+            ->where('source_of_nc_ref_no', $r->ref_no)
+            ->where('is_inactive', '!=', '1')
+            ->count();
+
+        return $this->toDetailArray([
+            'ref_no' => $r->ref_no,
+            'vessel' => $vessels[$r->vesID] ?? '',
+            'added_by' => $r->added_by,
+            'dateof_inspection' => $r->dateof_inspection,
+            'placeof_inspection' => $r->placeof_inspection,
+            'inspector' => $r->inspector,
+            'published' => $r->added_by === 'SHORE' ? $r->is_published === '1' : null,
+            'is_approved' => $r->is_published === '1' ? $r->is_approved === '1' : null,
+            'pending_nc_count' => $pendingNc,
+            'total_nc_count' => $totalNc,
+            'flag_cost' => $r->flag_cost,
+            'shore_remarks' => $r->shore_remarks,
+            'vessel_remarks' => $r->vessel_remarks,
+        ]);
+    }
+
+    /** @param array<string, mixed> $r */
+    private function toDetailArray(array $r): array
+    {
+        return [
+            'id' => 0,
+            'ref_no' => $r['ref_no'],
+            'vessel' => $r['vessel'],
+            'added_by' => $r['added_by'],
+            'dateof_inspection' => $r['dateof_inspection'],
+            'placeof_inspection' => $r['placeof_inspection'],
+            'inspector' => $r['inspector'],
+            'published' => $r['published'],
+            'is_approved' => $r['is_approved'],
+            'pending_nc_count' => $r['pending_nc_count'],
+            'total_nc_count' => $r['total_nc_count'],
+            'can_edit' => false,
+            'can_publish' => false,
+            'can_approve' => false,
+            'can_delete' => false,
+            'vessel_id' => null,
+            'flag_cost' => $r['flag_cost'],
+            'shore_remarks' => $r['shore_remarks'],
+            'vessel_remarks' => $r['vessel_remarks'],
+        ];
     }
 
     /** @return array<int, array{id:int,label:string}> */

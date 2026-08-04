@@ -8,6 +8,30 @@ import { NonconformityViewModal } from "../nonconformities/NonconformityViewModa
 import type { NonconformityDetail } from "../nonconformities/nonconformity";
 import { DefectViewModal } from "../defects/DefectViewModal";
 import type { DefectDetail } from "../defects/defects";
+import { SireReportViewModal } from "../sire/SireReportViewModal";
+import type { SireReportDetail } from "../sire/sire";
+import { NonSireReportViewModal } from "../nonSire/NonSireReportViewModal";
+import type { NonSireReportDetail } from "../nonSire/nonSire";
+import { FlagStateReportViewModal } from "../flagState/FlagStateReportViewModal";
+import type { FlagStateReportDetail } from "../flagState/flagState";
+import { PscReportViewModal } from "../pscReports/PscReportViewModal";
+import type { PscReportDetail } from "../pscReports/pscReport";
+import { ExternalAuditViewModal } from "../externalAudits/ExternalAuditViewModal";
+import type { ExternalAuditDetail } from "../externalAudits/externalAudit";
+import { CompanyInspectionViewModal } from "../companyInspections/CompanyInspectionViewModal";
+import type { CompanyInspectionDetail } from "../companyInspections/companyInspection";
+import { InternalAuditViewModal } from "../internalAudits/InternalAuditViewModal";
+import type { InternalAuditDetail } from "../internalAudits/internalAudit";
+import { IncidentReportViewModal } from "../incidentReports/IncidentReportViewModal";
+import type { IncidentReportDetail } from "../incidentReports/incidentReport";
+import { CommitteeMeetingViewModal } from "../committeeMeetings/CommitteeMeetingViewModal";
+import type { CommitteeMeetingDetail } from "../committeeMeetings/committeeMeeting";
+import { RiskAssessmentViewModal } from "../riskAssessment/RiskAssessmentViewModal";
+import type { RiskAssessmentDetail } from "../riskAssessment/riskAssessment";
+import { MasterReviewViewModal } from "../masterReview/MasterReviewViewModal";
+import type { MasterReviewDetail } from "../masterReview/masterReview";
+import { IspsReviewViewModal } from "../ispsReview/IspsReviewViewModal";
+import type { IspsReviewDetail } from "../ispsReview/ispsReview";
 
 function DashletList({ items }: { items: Dashlet["items"] }) {
   if (items.length === 0) {
@@ -26,10 +50,22 @@ function DashletList({ items }: { items: Dashlet["items"] }) {
   );
 }
 
-/** The dashlet key + row column that legacy makes clickable to open a view modal (NCR NO. / SL NO.). */
+/** The dashlet key + row column that legacy makes clickable to open a view modal (NCR NO. / SL NO. / etc). */
 const LINK_COLUMNS: Record<string, string> = {
   nonconformities: "ncr_no",
   defect_list: "sl_no",
+  sire: "vessel",
+  non_sire: "vessel",
+  flag_state: "ref_no",
+  psc: "ref_no",
+  external: "ref_no",
+  company_inspections: "audit_ref",
+  internal_audit_reports: "audit_ref",
+  incident: "vessel",
+  committee_meeting: "meeting_date",
+  risk_assessment: "report_no",
+  master_review: "review_date",
+  isps_review: "review_date",
 };
 
 export function DashletCard({ dashlet }: { dashlet: Dashlet }) {
@@ -38,6 +74,18 @@ export function DashletCard({ dashlet }: { dashlet: Dashlet }) {
   const [showLarger, setShowLarger] = useState(false);
   const [nonconformity, setNonconformity] = useState<NonconformityDetail | null>(null);
   const [defect, setDefect] = useState<DefectDetail | null>(null);
+  const [sireReport, setSireReport] = useState<SireReportDetail | null>(null);
+  const [nonSireReport, setNonSireReport] = useState<NonSireReportDetail | null>(null);
+  const [flagStateReport, setFlagStateReport] = useState<FlagStateReportDetail | null>(null);
+  const [pscReport, setPscReport] = useState<PscReportDetail | null>(null);
+  const [externalAudit, setExternalAudit] = useState<ExternalAuditDetail | null>(null);
+  const [companyInspection, setCompanyInspection] = useState<CompanyInspectionDetail | null>(null);
+  const [internalAudit, setInternalAudit] = useState<InternalAuditDetail | null>(null);
+  const [incidentReport, setIncidentReport] = useState<IncidentReportDetail | null>(null);
+  const [committeeMeeting, setCommitteeMeeting] = useState<CommitteeMeetingDetail | null>(null);
+  const [riskAssessment, setRiskAssessment] = useState<RiskAssessmentDetail | null>(null);
+  const [masterReview, setMasterReview] = useState<MasterReviewDetail | null>(null);
+  const [ispsReview, setIspsReview] = useState<IspsReviewDetail | null>(null);
   const isTable = dashlet.columns !== null && dashlet.endpoint !== null;
   const linkColumn = LINK_COLUMNS[dashlet.key];
 
@@ -57,6 +105,30 @@ export function DashletCard({ dashlet }: { dashlet: Dashlet }) {
       dashboardTableService.fetchNonconformityDetail(recordId).then(setNonconformity);
     } else if (dashlet.key === "defect_list") {
       dashboardTableService.fetchDefectDetail(recordId).then(setDefect);
+    } else if (dashlet.key === "sire") {
+      dashboardTableService.fetchSireDetail(recordId).then(setSireReport);
+    } else if (dashlet.key === "non_sire") {
+      dashboardTableService.fetchNonSireDetail(recordId).then(setNonSireReport);
+    } else if (dashlet.key === "flag_state") {
+      dashboardTableService.fetchFlagStateDetail(recordId).then(setFlagStateReport);
+    } else if (dashlet.key === "psc") {
+      dashboardTableService.fetchPscDetail(recordId).then(setPscReport);
+    } else if (dashlet.key === "external") {
+      dashboardTableService.fetchExternalAuditDetail(recordId).then(setExternalAudit);
+    } else if (dashlet.key === "company_inspections") {
+      dashboardTableService.fetchCompanyInspectionDetail(recordId).then(setCompanyInspection);
+    } else if (dashlet.key === "internal_audit_reports") {
+      dashboardTableService.fetchInternalAuditDetail(recordId).then(setInternalAudit);
+    } else if (dashlet.key === "incident") {
+      dashboardTableService.fetchIncidentReportDetail(recordId).then(setIncidentReport);
+    } else if (dashlet.key === "committee_meeting") {
+      dashboardTableService.fetchCommitteeMeetingDetail(recordId).then(setCommitteeMeeting);
+    } else if (dashlet.key === "risk_assessment") {
+      dashboardTableService.fetchRiskAssessmentDetail(recordId).then(setRiskAssessment);
+    } else if (dashlet.key === "master_review") {
+      dashboardTableService.fetchMasterReviewDetail(recordId).then(setMasterReview);
+    } else if (dashlet.key === "isps_review") {
+      dashboardTableService.fetchIspsReviewDetail(recordId).then(setIspsReview);
     }
   };
 
@@ -143,6 +215,18 @@ export function DashletCard({ dashlet }: { dashlet: Dashlet }) {
 
       {nonconformity && <NonconformityViewModal nonconformity={nonconformity} onClose={() => setNonconformity(null)} />}
       {defect && <DefectViewModal defect={defect} onClose={() => setDefect(null)} />}
+      {sireReport && <SireReportViewModal sireReport={sireReport} onClose={() => setSireReport(null)} />}
+      {nonSireReport && <NonSireReportViewModal nonSireReport={nonSireReport} onClose={() => setNonSireReport(null)} />}
+      {flagStateReport && <FlagStateReportViewModal flagStateReport={flagStateReport} onClose={() => setFlagStateReport(null)} />}
+      {pscReport && <PscReportViewModal pscReport={pscReport} onClose={() => setPscReport(null)} />}
+      {externalAudit && <ExternalAuditViewModal externalAudit={externalAudit} onClose={() => setExternalAudit(null)} />}
+      {companyInspection && <CompanyInspectionViewModal companyInspection={companyInspection} onClose={() => setCompanyInspection(null)} />}
+      {internalAudit && <InternalAuditViewModal internalAudit={internalAudit} onClose={() => setInternalAudit(null)} />}
+      {incidentReport && <IncidentReportViewModal incidentReport={incidentReport} onClose={() => setIncidentReport(null)} />}
+      {committeeMeeting && <CommitteeMeetingViewModal committeeMeeting={committeeMeeting} onClose={() => setCommitteeMeeting(null)} />}
+      {riskAssessment && <RiskAssessmentViewModal report={riskAssessment} onClose={() => setRiskAssessment(null)} />}
+      {masterReview && <MasterReviewViewModal review={masterReview} onClose={() => setMasterReview(null)} />}
+      {ispsReview && <IspsReviewViewModal review={ispsReview} onClose={() => setIspsReview(null)} />}
     </div>
   );
 }

@@ -124,6 +124,7 @@ class MasterReviewRepository
                     });
             })
             ->select([
+                'tb_master_review.reviewID',
                 'tb_master_review.vesID',
                 'tb_master_review.review_date',
                 'tb_master_review.added_by',
@@ -154,6 +155,7 @@ class MasterReviewRepository
         $paginator = $builder->orderBy($sort, $query->direction)->paginate($query->perPage, page: $query->page);
 
         $rows = collect($paginator->items())->map(fn ($r) => [
+            'record_id' => $r->reviewID,
             'vessel' => $vessels[$r->vesID] ?? '',
             'review_date' => $r->review_date,
             'added_by' => $r->added_by,
@@ -170,6 +172,143 @@ class MasterReviewRepository
                 'per_page' => $paginator->perPage(),
                 'total' => $paginator->total(),
             ],
+        ];
+    }
+
+    /**
+     * Ported from Master_review.php's view_record(), surfaced via the
+     * dashboard's clickable review_date column. Read-only — see
+     * SireReportRepository::detail()'s docblock for the convention.
+     */
+    public function detail(int $id): ?array
+    {
+        $r = MasterReview::query()->with(['vessel', 'manualChapter', 'manualDocument', 'present'])->find($id);
+
+        if ($r === null) {
+            return null;
+        }
+
+        $reference = $r->manualDocument?->reference_no ?? $r->manualChapter?->reference_no ?? '';
+
+        return $this->toDetailArray([
+            'vessel' => $r->vessel?->display_name ?? '',
+            'review_date' => $r->review_date?->format('Y-m-d'),
+            'added_by' => $r->added_by,
+            'review_quarter' => (int) ltrim((string) $r->review_quarter, 'Q'),
+            'review_year' => $r->review_year,
+            'sms' => trim("{$reference} ({$r->manual_section})"),
+            'review_recommendation' => $r->review_recommendation,
+            'has_vessel_remarks' => filled($r->vessel_remarks),
+            'has_shore_remarks' => filled($r->shore_remarks),
+            'shore_status' => $r->shore_status,
+            'manual_chapter_id' => $r->manual_chapter_id,
+            'manual_document_id' => $r->manual_document_id,
+            'manual_section' => $r->manual_section,
+            'review_description' => $r->review_description,
+            'shore_reviewed_by' => $r->shore_reviewed_by,
+            'shore_remarks' => $r->shore_remarks,
+            'vessel_reviewed_by' => $r->vessel_reviewed_by,
+            'vessel_reviewed_position' => $r->vessel_reviewed_position,
+            'vessel_remarks' => $r->vessel_remarks,
+            'present' => $r->present->map(fn ($p) => [
+                'id' => $p->id,
+                'name' => $p->name,
+                'position' => $p->position,
+            ])->all(),
+        ]);
+    }
+
+    /** Same as detail(), reading tb_master_review directly from the legacy connection. */
+    public function legacyDetail(string $reviewID): ?array
+    {
+        $r = DB::connection('legacy')->table('tb_master_review')
+            ->leftJoin('tb_manual_documents', 'tb_manual_documents.manDocID', '=', 'tb_master_review.manDocID')
+            ->where('tb_master_review.reviewID', $reviewID)
+            ->select(['tb_master_review.*', 'tb_manual_documents.reference_no'])
+            ->first();
+
+        if ($r === null) {
+            return null;
+        }
+
+        $vessels = LegacyDb::vesselNames();
+        $zeroDateToNull = fn (?string $date) => ($date === null || $date === '0000-00-00') ? null : $date;
+
+        $present = DB::connection('legacy')->table('tb_master_review_present')
+            ->where('reviewID', $reviewID)
+            ->orderBy('arrangement')
+            ->get();
+
+        $shoreReviewedByName = null;
+        if ($r->shore_reviewed_by !== null && $r->shore_reviewed_by !== '') {
+            $person = DB::connection('legacy')->table('tb_address_book')->where('id', $r->shore_reviewed_by)->first();
+            if ($person !== null) {
+                $name = trim("{$person->firstname} {$person->lastname}");
+                $shoreReviewedByName = $name !== '' ? trim("{$person->company} ({$name})") : $person->company;
+            }
+        }
+
+        return $this->toDetailArray([
+            'vessel' => $vessels[$r->vesID] ?? '',
+            'review_date' => $zeroDateToNull($r->review_date),
+            'added_by' => $r->added_by,
+            'review_quarter' => (int) ltrim((string) $r->review_quarter, 'Q'),
+            'review_year' => $r->review_year,
+            'sms' => $r->reference_no !== null ? trim("{$r->reference_no} ({$r->manual_section})") : '',
+            'review_recommendation' => $r->review_recommendation,
+            'has_vessel_remarks' => filled($r->vessel_remarks),
+            'has_shore_remarks' => filled($r->shore_remarks),
+            'shore_status' => $r->shore_status,
+            'manual_chapter_id' => null,
+            'manual_document_id' => null,
+            'manual_section' => $r->manual_section,
+            'review_description' => $r->review_description,
+            'shore_reviewed_by' => $shoreReviewedByName,
+            'shore_remarks' => $r->shore_remarks,
+            'vessel_reviewed_by' => $r->vessel_reviewed_by,
+            'vessel_reviewed_position' => $r->vessel_reviewed_position,
+            'vessel_remarks' => $r->vessel_remarks,
+            'present' => $present->map(fn ($p) => [
+                'id' => $p->reviewPresentID,
+                'name' => $p->review_name,
+                'position' => $p->review_position,
+            ])->all(),
+        ]);
+    }
+
+    /** @param array<string, mixed> $r */
+    private function toDetailArray(array $r): array
+    {
+        return [
+            'id' => 0,
+            'vessel' => $r['vessel'],
+            'review_date' => $r['review_date'],
+            'added_by' => $r['added_by'],
+            'review_quarter' => $r['review_quarter'],
+            'review_year' => $r['review_year'],
+            'sms' => $r['sms'],
+            'review_recommendation' => $r['review_recommendation'],
+            'has_vessel_remarks' => $r['has_vessel_remarks'],
+            'has_shore_remarks' => $r['has_shore_remarks'],
+            'shore_status' => $r['shore_status'],
+            'can_edit' => false,
+            'can_approve' => false,
+            'can_recommend_approval' => false,
+            'can_under_review' => false,
+            'can_disapprove' => false,
+            'can_disregard' => false,
+            'can_delete' => false,
+            'can_reopen' => false,
+            'manual_chapter_id' => $r['manual_chapter_id'],
+            'manual_document_id' => $r['manual_document_id'],
+            'manual_section' => $r['manual_section'],
+            'review_description' => $r['review_description'],
+            'shore_reviewed_by' => $r['shore_reviewed_by'],
+            'shore_remarks' => $r['shore_remarks'],
+            'vessel_reviewed_by' => $r['vessel_reviewed_by'],
+            'vessel_reviewed_position' => $r['vessel_reviewed_position'],
+            'vessel_remarks' => $r['vessel_remarks'],
+            'present' => $r['present'],
         ];
     }
 

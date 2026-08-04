@@ -151,6 +151,7 @@ class CommitteeMeetingRepository
         $paginator = $builder->orderBy($sort, $query->direction)->paginate($query->perPage, page: $query->page);
 
         $rows = collect($paginator->items())->map(fn ($r) => [
+            'record_id' => $r->meetingID,
             'meeting_date' => $r->meeting_date,
             'vessel' => $vessels[$r->vesID] ?? '',
             'type' => $r->meeting_type ?? '',
@@ -363,5 +364,139 @@ class CommitteeMeetingRepository
                 'arrangement' => $index,
             ]);
         }
+    }
+
+    /**
+     * Ported from admin/committee_meeting/view_committee_meeting.php,
+     * surfaced via the dashboard's clickable meeting_date column.
+     * Read-only — see SireReportRepository::detail()'s docblock for the
+     * convention.
+     */
+    public function detail(int $id): ?array
+    {
+        $m = CommitteeMeeting::query()->with(['vessel', 'meetingTypes', 'attendees', 'members', 'topics'])->find($id);
+
+        if ($m === null) {
+            return null;
+        }
+
+        return $this->toDetailArray([
+            'meeting_date' => $m->meeting_date->format('Y-m-d'),
+            'added_by' => $m->added_by,
+            'shore_vessel_meeting' => $m->shore_vessel_meeting,
+            'vessel' => $m->vessel?->display_name ?? 'SHORE',
+            'meeting_type' => $m->meeting_types_label,
+            'chairman' => $m->chairman,
+            'incharge' => $m->incharge,
+            'has_shore_remarks' => $m->shore_remarks !== '' && $m->shore_remarks !== null,
+            'published' => ($m->added_by === 'SHORE' && $m->vessel_id !== null) ? $m->is_published : null,
+            'is_approved' => $m->vessel_id !== null ? $m->is_approved : null,
+            'meeting_position' => $m->meeting_position,
+            'meeting_time' => $m->meeting_time,
+            'vessel_remarks' => $m->vessel_remarks,
+            'shore_remarks' => $m->shore_remarks,
+            'meeting_types' => $m->meetingTypes->map(fn (CommitteeMeetingType $t) => [
+                'committee_meeting_type_id' => 0,
+                'name' => $t->name,
+                'type_other' => $t->pivot->type_other,
+            ])->all(),
+            'attendees' => $m->attendees->map(fn ($a) => ['name' => $a->name])->all(),
+            'members' => $m->members->map(fn ($mem) => ['name' => $mem->name])->all(),
+            'topics' => $m->topics->map(fn ($t) => [
+                'topic_name' => $t->topic_name,
+                'meeting_details' => $t->meeting_details,
+                'meeting_comments' => $t->meeting_comments,
+            ])->all(),
+        ]);
+    }
+
+    /** Same as detail(), reading tb_committee_meeting directly from the legacy connection. */
+    public function legacyDetail(string $meetingID): ?array
+    {
+        $m = DB::connection('legacy')->table('tb_committee_meeting')->where('meetingID', $meetingID)->first();
+
+        if ($m === null) {
+            return null;
+        }
+
+        $vessels = LegacyDb::vesselNames();
+
+        $meetingType = DB::connection('legacy')->table('tb_committee_meeting_type')
+            ->join('pl_committee_meeting_type', 'pl_committee_meeting_type.typeID', '=', 'tb_committee_meeting_type.typeID')
+            ->where('tb_committee_meeting_type.meetingID', $meetingID)
+            ->select(['pl_committee_meeting_type.type_name', 'tb_committee_meeting_type.type_other'])
+            ->get();
+        $meetingTypeLabel = $meetingType->map(fn ($t) => $t->type_name === 'OTHERS' && $t->type_other
+            ? "{$t->type_name} ({$t->type_other})"
+            : $t->type_name)->implode(', ');
+
+        $attendees = DB::connection('legacy')->table('tb_committee_meeting_attendance')
+            ->where('meetingID', $meetingID)->where('is_inactive', '!=', '1')
+            ->orderBy('arrangement')->pluck('attendance_name')
+            ->map(fn ($name) => ['name' => $name])->all();
+        $members = DB::connection('legacy')->table('tb_committee_meeting_member')
+            ->where('meetingID', $meetingID)->where('is_inactive', '!=', '1')
+            ->orderBy('arrangement')->pluck('member_name')
+            ->map(fn ($name) => ['name' => $name])->all();
+        $topics = DB::connection('legacy')->table('tb_committee_meeting_topics')
+            ->where('meetingID', $meetingID)->where('is_inactive', '!=', '1')
+            ->orderBy('arrangement')
+            ->get(['topic_name', 'meeting_details', 'meeting_comments'])
+            ->map(fn ($t) => ['topic_name' => $t->topic_name, 'meeting_details' => $t->meeting_details, 'meeting_comments' => $t->meeting_comments])
+            ->all();
+
+        $hasVessel = $m->vesID !== '' && $m->vesID !== null;
+
+        return $this->toDetailArray([
+            'meeting_date' => $m->meeting_date,
+            'added_by' => $m->added_by,
+            'shore_vessel_meeting' => $m->shore_vessel_meeting,
+            'vessel' => $hasVessel ? ($vessels[$m->vesID] ?? '') : 'SHORE',
+            'meeting_type' => $meetingTypeLabel,
+            'chairman' => $m->chairman,
+            'incharge' => $m->incharge,
+            'has_shore_remarks' => $m->shore_remarks !== '' && $m->shore_remarks !== null,
+            'published' => ($m->added_by === 'SHORE' && $hasVessel) ? $m->is_published === '1' : null,
+            'is_approved' => $hasVessel ? $m->is_approved === '1' : null,
+            'meeting_position' => $m->meeting_position,
+            'meeting_time' => $m->meeting_time,
+            'vessel_remarks' => $m->vessel_remarks,
+            'shore_remarks' => $m->shore_remarks,
+            'meeting_types' => $meetingType->map(fn ($t) => ['committee_meeting_type_id' => 0, 'name' => $t->type_name, 'type_other' => $t->type_other])->all(),
+            'attendees' => $attendees,
+            'members' => $members,
+            'topics' => $topics,
+        ]);
+    }
+
+    /** @param array<string, mixed> $r */
+    private function toDetailArray(array $r): array
+    {
+        return [
+            'id' => 0,
+            'meeting_date' => $r['meeting_date'],
+            'added_by' => $r['added_by'],
+            'shore_vessel_meeting' => $r['shore_vessel_meeting'],
+            'vessel' => $r['vessel'],
+            'meeting_type' => $r['meeting_type'],
+            'chairman' => $r['chairman'],
+            'incharge' => $r['incharge'],
+            'has_shore_remarks' => $r['has_shore_remarks'],
+            'published' => $r['published'],
+            'is_approved' => $r['is_approved'],
+            'can_edit' => false,
+            'can_publish' => false,
+            'can_approve' => false,
+            'can_delete' => false,
+            'vessel_id' => null,
+            'meeting_position' => $r['meeting_position'],
+            'meeting_time' => $r['meeting_time'],
+            'vessel_remarks' => $r['vessel_remarks'],
+            'shore_remarks' => $r['shore_remarks'],
+            'meeting_types' => $r['meeting_types'],
+            'attendees' => $r['attendees'],
+            'members' => $r['members'],
+            'topics' => $r['topics'],
+        ];
     }
 }

@@ -112,6 +112,7 @@ class RiskAssessmentRepository
             })
             ->whereIn('tb_risk_assessment.vesid', $assignedVesselIds)
             ->select([
+                'tb_risk_assessment.riskID',
                 'tb_risk_assessment.report_no',
                 'tb_risk_assessment.vesid',
                 'tb_risk_assessment.risk_date',
@@ -139,6 +140,7 @@ class RiskAssessmentRepository
         $paginator = $builder->orderBy($sort, $query->direction)->paginate($query->perPage, page: $query->page);
 
         $rows = collect($paginator->items())->map(fn ($r) => [
+            'record_id' => $r->riskID,
             'report_no' => $r->report_no,
             'vessel' => $vessels[$r->vesid] ?? '',
             'risk_date' => $r->risk_date,
@@ -163,6 +165,181 @@ class RiskAssessmentRepository
         return Vessel::query()->orderBy('name')->get()
             ->map(fn (Vessel $v) => ['id' => $v->id, 'label' => $v->display_name])
             ->all();
+    }
+
+    /**
+     * Ported from Risk_assessment_vessel.php's view_report(), surfaced via
+     * the dashboard's clickable report_no column. Read-only — see
+     * SireReportRepository::detail()'s docblock for the convention.
+     */
+    public function detail(int $id): ?array
+    {
+        $r = RiskAssessment::query()->with(['vessel', 'hazards', 'people'])->find($id);
+
+        if ($r === null) {
+            return null;
+        }
+
+        return $this->toDetailArray([
+            'report_no' => $r->report_no,
+            'vessel' => $r->vessel?->display_name ?? '',
+            'risk_date' => $r->risk_date?->format('Y-m-d'),
+            'port' => $r->port,
+            'category' => $r->category_label,
+            'task' => $r->operation_label,
+            'approval_from_shore' => $r->approval_from_shore,
+            'shore_is_approved' => $r->shore_is_approved,
+            'approval_from_marine' => $r->approval_from_marine,
+            'marine_is_approved' => $r->marine_is_approved,
+            'hazard_count' => $r->hazards->count(),
+            'risk_schedule' => $r->risk_schedule?->format('Y-m-d'),
+            'department' => $r->department,
+            'activity' => $r->activity,
+            'other_category_name' => $r->other_category_name,
+            'other_operation_name' => $r->other_operation_name,
+            'overall_risk' => $r->overall_risk,
+            'master' => $r->master,
+            'ce_co' => $r->ce_co,
+            'vessel_remarks' => $r->vessel_remarks,
+            'date_approved' => $r->date_approved?->format('Y-m-d'),
+            'shore_remarks' => $r->shore_remarks,
+            'marine_date_approved' => $r->marine_date_approved?->format('Y-m-d'),
+            'marine_remarks' => $r->marine_remarks,
+            'date_closed' => $r->date_closed?->format('Y-m-d'),
+            'hazards' => $r->hazards->map(fn ($h) => [
+                'id' => $h->id,
+                'arrangement' => $h->arrangement,
+                'unwanted_consequences' => $h->unwanted_consequences,
+                'underlying_causes' => $h->underlying_causes,
+                'severity' => $h->severity,
+                'likelihood' => $h->likelihood,
+                'risk' => $h->risk,
+                'existing_control' => $h->existing_control,
+                'additional_control' => $h->additional_control,
+                're_severity' => $h->re_severity,
+                're_likelihood' => $h->re_likelihood,
+                're_risk' => $h->re_risk,
+            ])->all(),
+            'people' => $r->people->map(fn ($p) => [
+                'id' => $p->id,
+                'arrangement' => $p->arrangement,
+                'person_details' => $p->person_details,
+            ])->all(),
+        ]);
+    }
+
+    /** Same as detail(), reading tb_risk_assessment directly from the legacy connection. */
+    public function legacyDetail(string $riskID): ?array
+    {
+        $r = DB::connection('legacy')->table('tb_risk_assessment')
+            ->leftJoin('tb_risk_category', 'tb_risk_category.categoryID', '=', 'tb_risk_assessment.categoryID')
+            ->leftJoin('tb_risk_operation', 'tb_risk_operation.operationID', '=', 'tb_risk_assessment.operationID')
+            ->where('tb_risk_assessment.riskID', $riskID)
+            ->select(['tb_risk_assessment.*', 'tb_risk_category.category', 'tb_risk_operation.operation'])
+            ->first();
+
+        if ($r === null) {
+            return null;
+        }
+
+        $vessels = LegacyDb::vesselNames();
+        $zeroDateToNull = fn (?string $date) => ($date === null || $date === '0000-00-00') ? null : $date;
+
+        $hazards = DB::connection('legacy')->table('tb_risk_assessment_hazzards')
+            ->where('riskID', $riskID)
+            ->orderBy('arrangement')
+            ->get();
+
+        $people = DB::connection('legacy')->table('tb_risk_assessment_person')
+            ->where('riskID', $riskID)
+            ->orderBy('arrangement')
+            ->get();
+
+        return $this->toDetailArray([
+            'report_no' => $r->report_no,
+            'vessel' => $vessels[$r->vesid] ?? '',
+            'risk_date' => $zeroDateToNull($r->risk_date),
+            'port' => $r->port,
+            'category' => $r->categoryID === 'OTHER' ? $r->other_category_name : $r->category,
+            'task' => $r->operationID === 'OTHER' ? $r->other_operation_name : $r->operation,
+            'approval_from_shore' => (bool) $r->approval_from_shore,
+            'shore_is_approved' => (bool) $r->shore_is_approved,
+            'approval_from_marine' => (bool) $r->approval_from_marine,
+            'marine_is_approved' => (bool) $r->marine_shore_is_approved,
+            'hazard_count' => $hazards->count(),
+            'risk_schedule' => $zeroDateToNull($r->risk_schedule),
+            'department' => $r->department,
+            'activity' => $r->activity,
+            'other_category_name' => $r->other_category_name,
+            'other_operation_name' => $r->other_operation_name,
+            'overall_risk' => $r->overall_risk,
+            'master' => $r->masterID,
+            'ce_co' => $r->chiefmateID,
+            'vessel_remarks' => $r->remarks,
+            'date_approved' => $zeroDateToNull($r->date_approved),
+            'shore_remarks' => $r->shore_remarks,
+            'marine_date_approved' => $zeroDateToNull($r->marine_date_approved),
+            'marine_remarks' => $r->marine_remarks,
+            'date_closed' => $zeroDateToNull($r->date_closed),
+            'hazards' => $hazards->map(fn ($h) => [
+                'id' => $h->asshazzID,
+                'arrangement' => $h->arrangement,
+                'unwanted_consequences' => $h->unwanted_consequences,
+                'underlying_causes' => $h->underlying_causes,
+                'severity' => $h->severity,
+                'likelihood' => $h->likelihood,
+                'risk' => $h->risk,
+                'existing_control' => $h->existing_control,
+                'additional_control' => $h->additional_control,
+                're_severity' => $h->re_severity,
+                're_likelihood' => $h->re_likelihood,
+                're_risk' => $h->re_risk,
+            ])->all(),
+            'people' => $people->map(fn ($p) => [
+                'id' => $p->riskPersonID,
+                'arrangement' => $p->arrangement,
+                'person_details' => $p->person_details,
+            ])->all(),
+        ]);
+    }
+
+    /** @param array<string, mixed> $r */
+    private function toDetailArray(array $r): array
+    {
+        return [
+            'id' => 0,
+            'report_no' => $r['report_no'],
+            'vessel' => $r['vessel'],
+            'risk_date' => $r['risk_date'],
+            'port' => $r['port'],
+            'category' => $r['category'],
+            'task' => $r['task'],
+            'approval_from_shore' => $r['approval_from_shore'],
+            'shore_is_approved' => $r['shore_is_approved'],
+            'approval_from_marine' => $r['approval_from_marine'],
+            'marine_is_approved' => $r['marine_is_approved'],
+            'hazard_count' => $r['hazard_count'],
+            'can_edit' => false,
+            'vessel_id' => 0,
+            'risk_schedule' => $r['risk_schedule'],
+            'department' => $r['department'],
+            'activity' => $r['activity'],
+            'risk_category_id' => null,
+            'other_category_name' => $r['other_category_name'],
+            'risk_operation_id' => null,
+            'other_operation_name' => $r['other_operation_name'],
+            'overall_risk' => $r['overall_risk'],
+            'master' => $r['master'],
+            'ce_co' => $r['ce_co'],
+            'vessel_remarks' => $r['vessel_remarks'],
+            'date_approved' => $r['date_approved'],
+            'shore_remarks' => $r['shore_remarks'],
+            'marine_date_approved' => $r['marine_date_approved'],
+            'marine_remarks' => $r['marine_remarks'],
+            'date_closed' => $r['date_closed'],
+            'hazards' => $r['hazards'],
+            'people' => $r['people'],
+        ];
     }
 
     /**

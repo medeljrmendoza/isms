@@ -126,6 +126,7 @@ class NonSireReportRepository
         $paginator = $builder->orderBy($sort, $query->direction)->paginate($query->perPage, page: $query->page);
 
         $rows = collect($paginator->items())->map(fn ($r) => [
+            'record_id' => $r->nonsireID,
             'vessel' => $vessels[$r->vesID] ?? '',
             'dateof_inspection' => $r->dateof_inspection,
             'placeof_inspection' => $r->placeof_inspection,
@@ -238,6 +239,94 @@ class NonSireReportRepository
     public function delete(NonSireReport $report): void
     {
         $report->update(['is_deleted' => true]);
+    }
+
+    /**
+     * Ported from admin/non_sire/view_non_sire.php, surfaced via the
+     * dashboard's clickable vessel column. Read-only — see
+     * SireReportRepository::detail()'s docblock for the convention.
+     */
+    public function detail(int $id): ?array
+    {
+        $r = NonSireReport::query()->with('vessel')->find($id);
+
+        if ($r === null) {
+            return null;
+        }
+
+        return $this->toDetailArray([
+            'vessel' => $r->vessel?->display_name ?? '',
+            'added_by' => $r->added_by,
+            'dateof_inspection' => $r->dateof_inspection->format('Y-m-d'),
+            'placeof_inspection' => $r->placeof_inspection,
+            'company_name' => $r->company_name,
+            'inspector_name' => $r->inspector_name,
+            'inspection_type' => $r->inspection_type,
+            'pass_fail' => $r->pass_fail,
+            'published' => $r->added_by === 'SHORE' ? $r->is_published : null,
+            'is_approved' => $r->is_published ? $r->is_approved : null,
+            'sire_cost' => $r->sire_cost,
+            'shore_remarks' => $r->shore_remarks,
+            'vessel_remarks' => $r->vessel_remarks,
+        ]);
+    }
+
+    /** Same as detail(), reading tb_non_sire directly from the legacy connection. */
+    public function legacyDetail(string $nonsireID): ?array
+    {
+        $r = DB::connection('legacy')->table('tb_non_sire')
+            ->leftJoin('pl_non_sire_inspection_type', 'pl_non_sire_inspection_type.inspectionTypeID', '=', 'tb_non_sire.inspectionTypeID')
+            ->where('tb_non_sire.nonsireID', $nonsireID)
+            ->select(['tb_non_sire.*', 'pl_non_sire_inspection_type.inspection_type as inspection_type_name'])
+            ->first();
+
+        if ($r === null) {
+            return null;
+        }
+
+        $vessels = LegacyDb::vesselNames();
+
+        return $this->toDetailArray([
+            'vessel' => $vessels[$r->vesID] ?? '',
+            'added_by' => $r->added_by,
+            'dateof_inspection' => $r->dateof_inspection,
+            'placeof_inspection' => $r->placeof_inspection,
+            'company_name' => LegacyDb::addressBookEntry($r->company)['company'] ?? $r->company,
+            'inspector_name' => LegacyDb::addressBookEntry($r->inspector)['name'] ?? $r->inspector,
+            'inspection_type' => $r->inspection_type_name,
+            'pass_fail' => $r->pass_fail,
+            'published' => $r->added_by === 'SHORE' ? $r->is_published === '1' : null,
+            'is_approved' => $r->is_published === '1' ? $r->is_approved === '1' : null,
+            'sire_cost' => $r->sire_cost,
+            'shore_remarks' => $r->shore_remarks,
+            'vessel_remarks' => $r->vessel_remarks,
+        ]);
+    }
+
+    /** @param array<string, mixed> $r */
+    private function toDetailArray(array $r): array
+    {
+        return [
+            'id' => 0,
+            'vessel' => $r['vessel'],
+            'added_by' => $r['added_by'],
+            'dateof_inspection' => $r['dateof_inspection'],
+            'placeof_inspection' => $r['placeof_inspection'],
+            'company_name' => $r['company_name'],
+            'inspector_name' => $r['inspector_name'],
+            'inspection_type' => $r['inspection_type'],
+            'pass_fail' => $r['pass_fail'],
+            'published' => $r['published'],
+            'is_approved' => $r['is_approved'],
+            'can_edit' => false,
+            'can_publish' => false,
+            'can_approve' => false,
+            'can_delete' => false,
+            'vessel_id' => null,
+            'sire_cost' => $r['sire_cost'],
+            'shore_remarks' => $r['shore_remarks'],
+            'vessel_remarks' => $r['vessel_remarks'],
+        ];
     }
 
     /** @return array<int, array{id:int,label:string}> */

@@ -71,4 +71,34 @@ class LegacyDb
             ->where('tb_principal.status', '1')
             ->pluck('tb_vessel.vesID');
     }
+
+    /**
+     * tb_address_book is a shared contacts table — some modules (SIRE,
+     * Non-SIRE) store a "company"/"inspector" column as an FK into it
+     * rather than free text (unlike e.g. Flag State's plain-text
+     * inspector column). Looks up a single row and returns a person
+     * label (name, falling back to company) and the row's own company
+     * field, for the two different display needs.
+     *
+     * @return array{name: string, company: string}|null
+     */
+    public static function addressBookEntry(?string $id): ?array
+    {
+        if ($id === null || $id === '') {
+            return null;
+        }
+
+        $r = DB::connection('legacy')->table('tb_address_book')->where('id', $id)->first();
+
+        if ($r === null) {
+            return null;
+        }
+
+        $name = trim("{$r->firstname} {$r->lastname}");
+
+        return [
+            'name' => $name !== '' ? $name : $r->company,
+            'company' => $r->company,
+        ];
+    }
 }

@@ -134,6 +134,7 @@ class IncidentReportRepository
             })
             ->whereIn('tb_incident_report.vesid', $assignedVesselIds)
             ->select([
+                'tb_incident_report.incidentid',
                 'tb_incident_report.vesid',
                 'tb_incident_report.dateof_report',
                 'tb_incident_report.nature_type',
@@ -160,6 +161,7 @@ class IncidentReportRepository
         $paginator = $builder->orderBy($sort, $query->direction)->paginate($query->perPage, page: $query->page);
 
         $rows = collect($paginator->items())->map(fn ($r) => [
+            'record_id' => $r->incidentid,
             'vessel' => $vessels[$r->vesid] ?? '',
             'dateof_report' => $r->dateof_report,
             'nature' => $r->nature_type === 'accident' ? 'ACCIDENT' : 'HAZARDOUS OCCURRENCE',
@@ -388,5 +390,488 @@ class IncidentReportRepository
         return Vessel::query()->orderBy('name')->get()
             ->map(fn (Vessel $v) => ['id' => $v->id, 'label' => $v->display_name])
             ->all();
+    }
+
+    /**
+     * Ported from admin/incident/view_incident_report_dialog.php,
+     * surfaced via the dashboard's clickable vessel column. Read-only —
+     * see SireReportRepository::detail()'s docblock for the convention.
+     * `location_of_injury_label` has no legacy-verifiable source for the
+     * local path (this migration's `locations_of_injury` seed list
+     * isn't a literal port of any single legacy lookup table) — see
+     * legacyDetail()'s docblock for the real legacy source once
+     * available.
+     */
+    public function detail(int $id): ?array
+    {
+        $r = IncidentReport::query()
+            ->with(['vessel', 'natureOfIncident', 'incidentLocation', 'incidentOperation', 'locationOfInjury', 'typeOfInjury', 'rootCauses.rootCause.category', 'personsParticipated'])
+            ->find($id);
+
+        if ($r === null) {
+            return null;
+        }
+
+        $isClosed = $r->closing_date !== null;
+        $typeLabel = $this->typeLabel($r->nature_type, $r->natureOfIncident?->name, $r->others, $r->accident_collision, $r->hazardous_occurrence_type);
+
+        return $this->toDetailArray([
+            'vessel' => $r->vessel?->display_name ?? '',
+            'dateof_report' => $r->dateof_report->format('Y-m-d'),
+            'report_no' => $r->report_no,
+            'nature' => $r->nature_type === 'accident' ? 'ACCIDENT' : 'HAZARDOUS OCCURRENCE',
+            'type' => $typeLabel,
+            'added_by' => $r->added_by,
+            'published' => $r->added_by === 'SHORE' ? $r->published : null,
+            'is_approved' => $r->is_approved,
+            'is_closed' => $isClosed,
+            'vessel_id' => $r->vessel_id,
+            'voyage_no' => $r->voyage_no,
+            'master_name' => $r->master_name,
+            'chief_engineer_name' => $r->chief_engineer_name,
+            'person_reporting' => $r->person_reporting,
+            'nature_type' => $r->nature_type,
+            'nature_of_incident_id' => $r->nature_of_incident_id,
+            'nature_of_incident_label' => $r->natureOfIncident?->name,
+            'hazardous_occurrence_type' => $r->hazardous_occurrence_type,
+            'others' => $r->others,
+            'accident_collision' => $r->accident_collision,
+            'statementof_work' => $r->statementof_work,
+            'bac' => $r->bac,
+            'vdr' => $r->vdr,
+            'dateof_event' => $r->dateof_event?->format('Y-m-d'),
+            'timeof_event' => $r->timeof_event,
+            'zone' => $r->zone,
+            'country' => $r->country,
+            'speed' => $r->speed,
+            'course' => $r->course,
+            'draft_forward' => $r->draft_forward,
+            'draft_alt' => $r->draft_alt,
+            'wind_direction' => $r->wind_direction,
+            'direction_sea' => $r->direction_sea,
+            'direction_swell' => $r->direction_swell,
+            'geographical_location' => $r->geographical_location,
+            'port_departure' => $r->port_departure,
+            'date_departure' => $r->date_departure?->format('Y-m-d'),
+            'port_which_bound' => $r->port_which_bound,
+            'type_cargo' => $r->type_cargo,
+            'cargo_quantity' => $r->cargo_quantity,
+            'special_requirement' => $r->special_requirement,
+            'atmospheric_clear' => $r->atmospheric_clear,
+            'atmospheric_partly_cloudy' => $r->atmospheric_partly_cloudy,
+            'atmospheric_overcast' => $r->atmospheric_overcast,
+            'atmospheric_fog' => $r->atmospheric_fog,
+            'atmospheric_rain' => $r->atmospheric_rain,
+            'atmospheric_snow' => $r->atmospheric_snow,
+            'atmospheric_other' => $r->atmospheric_other,
+            'atmospheric_other_name' => $r->atmospheric_other_name,
+            'distance1' => $r->distance1,
+            'distance2' => $r->distance2,
+            'distance3' => $r->distance3,
+            'sea1' => $r->sea1,
+            'sea2' => $r->sea2,
+            'sea3' => $r->sea3,
+            'crew_onboard' => $r->crew_onboard,
+            'other_onboard' => $r->other_onboard,
+            'total_onboard' => $r->total_onboard,
+            'crew_dead' => $r->crew_dead,
+            'other_dead' => $r->other_dead,
+            'total_dead' => $r->total_dead,
+            'crew_missing' => $r->crew_missing,
+            'other_missing' => $r->other_missing,
+            'total_missing' => $r->total_missing,
+            'crew_injured' => $r->crew_injured,
+            'other_injured' => $r->other_injured,
+            'total_injured' => $r->total_injured,
+            'fs_ro' => $r->fs_ro,
+            'incident_location_id' => $r->incident_location_id,
+            'incident_location_label' => $r->incidentLocation?->name,
+            'location_other' => $r->location_other,
+            'ship_position' => $r->ship_position,
+            'incident_operation_id' => $r->incident_operation_id,
+            'incident_operation_label' => $r->incidentOperation?->name,
+            'ship_operation_other' => $r->ship_operation_other,
+            'hazardous_occurrence_ppe_used' => $r->hazardous_occurrence_ppe_used,
+            'hazardous_occurrence_ppe_used_comment' => $r->hazardous_occurrence_ppe_used_comment,
+            'hazardous_occurrence_severity' => $r->hazardous_occurrence_severity,
+            'hazardous_occurrence_severity_comment' => $r->hazardous_occurrence_severity_comment,
+            'hazardous_occurrence_likelihood' => $r->hazardous_occurrence_likelihood,
+            'hazardous_occurrence_likelihood_comment' => $r->hazardous_occurrence_likelihood_comment,
+            'subject_investigation' => $r->subject_investigation,
+            'evidence_safety_meeting' => $r->evidence_safety_meeting,
+            'evidence_certificate' => $r->evidence_certificate,
+            'evidence_logbook' => $r->evidence_logbook,
+            'evidence_delivery' => $r->evidence_delivery,
+            'evidence_photo' => $r->evidence_photo,
+            'evidence_company' => $r->evidence_company,
+            'evidence_others' => $r->evidence_others,
+            'evidence_others_name' => $r->evidence_others_name,
+            'causal_factor' => $r->causal_factor,
+            'intermediate_cause' => $r->intermediate_cause,
+            'shore_root_cause_summary' => $r->shore_root_cause_summary,
+            'severity_itp' => $r->severity_itp,
+            'comment_itp' => $r->comment_itp,
+            'location_of_injury_id' => $r->location_of_injury_id,
+            'location_of_injury_label' => $r->locationOfInjury?->body_part,
+            'type_of_injury_id' => $r->type_of_injury_id,
+            'type_of_injury_label' => $r->typeOfInjury?->name,
+            'other_typeof_injury' => $r->other_typeof_injury,
+            'other_affected_area' => $r->other_affected_area,
+            'severity_itv' => $r->severity_itv,
+            'comment_itv' => $r->comment_itv,
+            'signed_by' => $r->signed_by,
+            'date_signed' => $r->date_signed?->format('Y-m-d'),
+            'vessel_remarks' => $r->vessel_remarks,
+            'date_received' => $r->date_received?->format('Y-m-d'),
+            'reviewed_by' => $r->reviewed_by,
+            'investigator' => $r->investigator,
+            'dpa' => $r->dpa,
+            'closing_date' => $r->closing_date?->format('Y-m-d'),
+            'root_causes' => $r->rootCauses->map(fn ($rc) => [
+                'root_cause_id' => $rc->root_cause_id,
+                'root_cause_category_label' => $rc->rootCause?->category?->name,
+                'root_cause_label' => $rc->rootCause?->name,
+                'root_cause_other' => $rc->root_cause_other,
+                'investigation' => $rc->investigation,
+                'analysis' => $rc->analysis,
+                'corrective_actions' => $rc->corrective_actions,
+            ])->all(),
+            'persons' => $r->personsParticipated->map(fn ($p) => [
+                'person_name' => $p->person_name,
+                'position' => $p->position,
+            ])->all(),
+        ]);
+    }
+
+    /**
+     * Same as detail(), reading tb_incident_report directly from the
+     * legacy connection. Ported from Controllers/Incident.php's
+     * view_incident_report() query (the joins on
+     * tb_locationof_injuries/tb_typeof_injury for
+     * location_itp/type_itp, tb_incident_location_occurences for
+     * `location`, tb_incident_operations for `ship_operation`, and
+     * tb_natureof_incident for `natureof_incidentid`). master_id/ce_id
+     * are tb_address_book FKs, resolved the same way as e.g.
+     * SireReportRepository's inspector.
+     */
+    public function legacyDetail(string $incidentid): ?array
+    {
+        $r = DB::connection('legacy')->table('tb_incident_report')
+            ->leftJoin('tb_natureof_incident', 'tb_natureof_incident.natureID', '=', 'tb_incident_report.natureof_incidentid')
+            ->leftJoin('tb_incident_location_occurences', 'tb_incident_location_occurences.incidentLocationID', '=', 'tb_incident_report.location')
+            ->leftJoin('tb_incident_operations', 'tb_incident_operations.incidentOperationID', '=', 'tb_incident_report.ship_operation')
+            ->leftJoin('tb_locationof_injuries', 'tb_locationof_injuries.locationID', '=', 'tb_incident_report.location_itp')
+            ->leftJoin('tb_typeof_injury', 'tb_typeof_injury.type_ID', '=', 'tb_incident_report.type_itp')
+            ->where('tb_incident_report.incidentid', $incidentid)
+            ->select([
+                'tb_incident_report.*',
+                'tb_natureof_incident.name as nature_name',
+                'tb_incident_location_occurences.location_occurences',
+                'tb_incident_operations.operation_name',
+                'tb_locationof_injuries.body_part',
+                'tb_typeof_injury.type as type_of_injury_name',
+            ])
+            ->first();
+
+        if ($r === null) {
+            return null;
+        }
+
+        $vessels = LegacyDb::vesselNames();
+        $zeroDateToNull = fn (?string $date) => ($date === null || $date === '0000-00-00') ? null : $date;
+        $isClosed = $zeroDateToNull($r->closing_date) !== null;
+        $typeLabel = $this->typeLabel($r->nature_type, $r->nature_name, $r->others, $r->accident_collision, $r->hazardous_occurrence_type);
+
+        $rootCauses = DB::connection('legacy')->table('tb_incident_root_cause')
+            ->leftJoin('tb_root_cause', 'tb_root_cause.rootCauseID', '=', 'tb_incident_root_cause.rootCauseID')
+            ->leftJoin('tb_root_cause_category', 'tb_root_cause_category.rootCauseCatID', '=', 'tb_root_cause.rootCauseCatID')
+            ->where('tb_incident_root_cause.incidentID', $incidentid)
+            ->where('tb_incident_root_cause.is_inactive', '!=', '1')
+            ->orderBy('tb_incident_root_cause.arrangement')
+            ->select(['tb_incident_root_cause.*', 'tb_root_cause.root_cause as root_cause_name', 'tb_root_cause_category.category as category_name'])
+            ->get()
+            ->map(fn ($rc) => [
+                'root_cause_id' => $rc->rootCauseID,
+                'root_cause_category_label' => $rc->category_name,
+                'root_cause_label' => $rc->root_cause_name,
+                'root_cause_other' => $rc->root_cause_other,
+                'investigation' => $rc->investigation,
+                'analysis' => $rc->analysis,
+                'corrective_actions' => $rc->corrective_actions,
+            ])->all();
+
+        $persons = DB::connection('legacy')->table('tb_incident_person_participated')
+            ->where('incidentID', $incidentid)
+            ->where('is_inactive', '!=', '1')
+            ->orderBy('arrangement')
+            ->get()
+            ->map(fn ($p) => ['person_name' => $p->person_name, 'position' => $p->position])
+            ->all();
+
+        return $this->toDetailArray([
+            'vessel' => $vessels[$r->vesid] ?? '',
+            'dateof_report' => $r->dateof_report,
+            'report_no' => $r->report_no,
+            'nature' => $r->nature_type === 'accident' ? 'ACCIDENT' : 'HAZARDOUS OCCURRENCE',
+            'type' => $typeLabel,
+            'added_by' => $r->added_by,
+            'published' => $r->added_by === 'SHORE' ? $r->published === '1' : null,
+            'is_approved' => $r->is_approved === '1',
+            'is_closed' => $isClosed,
+            'vessel_id' => null,
+            'voyage_no' => $r->voyage_no,
+            'master_name' => LegacyDb::addressBookEntry($r->master_id)['name'] ?? $r->master_id,
+            'chief_engineer_name' => LegacyDb::addressBookEntry($r->ce_id)['name'] ?? $r->ce_id,
+            'person_reporting' => $r->person_reporting,
+            'nature_type' => $r->nature_type,
+            'nature_of_incident_id' => null,
+            'nature_of_incident_label' => $r->nature_name,
+            'hazardous_occurrence_type' => $r->hazardous_occurrence_type,
+            'others' => $r->others,
+            'accident_collision' => $r->accident_collision,
+            'statementof_work' => $r->statementof_work,
+            'bac' => $r->bac,
+            'vdr' => $r->vdr,
+            'dateof_event' => $zeroDateToNull($r->dateof_event),
+            'timeof_event' => $r->timeof_event,
+            'zone' => $r->zone,
+            'country' => $r->country,
+            'speed' => $r->speed,
+            'course' => $r->course,
+            'draft_forward' => $r->draft_forward,
+            'draft_alt' => $r->draft_alt,
+            'wind_direction' => $r->wind_direction,
+            'direction_sea' => $r->direction_sea,
+            'direction_swell' => $r->direction_swell,
+            'geographical_location' => $r->geographical_location,
+            'port_departure' => $r->port_departure,
+            'date_departure' => $zeroDateToNull($r->date_departure),
+            'port_which_bound' => $r->port_which_bound,
+            'type_cargo' => $r->type_cargo,
+            'cargo_quantity' => $r->cargo_quantity,
+            'special_requirement' => $r->special_requirement,
+            'atmospheric_clear' => $r->atmospheric_clear === '1',
+            'atmospheric_partly_cloudy' => $r->atmospheric_partly_cloudy === '1',
+            'atmospheric_overcast' => $r->atmospheric_overcast === '1',
+            'atmospheric_fog' => $r->atmospheric_fog === '1',
+            'atmospheric_rain' => $r->atmospheric_rain === '1',
+            'atmospheric_snow' => $r->atmospheric_snow === '1',
+            'atmospheric_other' => $r->atmospheric_other === '1',
+            'atmospheric_other_name' => $r->atmospheric_other_name,
+            'distance1' => $r->distance1 === '1',
+            'distance2' => $r->distance2 === '1',
+            'distance3' => $r->distance3 === '1',
+            'sea1' => $r->sea1 === '1',
+            'sea2' => $r->sea2 === '1',
+            'sea3' => $r->sea3 === '1',
+            'crew_onboard' => $r->crew_onboard,
+            'other_onboard' => $r->other_onboard,
+            'total_onboard' => $r->total_onboard,
+            'crew_dead' => $r->crew_dead,
+            'other_dead' => $r->other_dead,
+            'total_dead' => $r->total_dead,
+            'crew_missing' => $r->crew_missing,
+            'other_missing' => $r->other_missing,
+            'total_missing' => $r->total_missing,
+            'crew_injured' => $r->crew_injured,
+            'other_injured' => $r->other_injured,
+            'total_injured' => $r->total_injured,
+            'fs_ro' => $r->fs_ro,
+            'incident_location_id' => null,
+            'incident_location_label' => $r->location_occurences,
+            'location_other' => $r->location_other,
+            'ship_position' => $r->ship_position,
+            'incident_operation_id' => null,
+            'incident_operation_label' => $r->operation_name,
+            'ship_operation_other' => $r->ship_operation_other,
+            'hazardous_occurrence_ppe_used' => $r->hazardous_occurrence_ppe_used,
+            'hazardous_occurrence_ppe_used_comment' => $r->hazardous_occurrence_ppe_used_comment,
+            'hazardous_occurrence_severity' => $r->hazardous_occurrence_severity,
+            'hazardous_occurrence_severity_comment' => $r->hazardous_occurrence_severity_comment,
+            'hazardous_occurrence_likelihood' => $r->hazardous_occurrence_likelihood,
+            'hazardous_occurrence_likelihood_comment' => $r->hazardous_occurrence_likelihood_comment,
+            'subject_investigation' => $r->subject_investigation,
+            'evidence_safety_meeting' => $r->evidence_safety_meeting === '1',
+            'evidence_certificate' => $r->evidence_certificate === '1',
+            'evidence_logbook' => $r->evidence_logbook === '1',
+            'evidence_delivery' => $r->evidence_delivery === '1',
+            'evidence_photo' => $r->evidence_photo === '1',
+            'evidence_company' => $r->evidence_company === '1',
+            'evidence_others' => $r->evidence_others === '1',
+            'evidence_others_name' => $r->evidence_others_name,
+            'causal_factor' => $r->causal_factor,
+            'intermediate_cause' => $r->intermediate_cause,
+            'shore_root_cause_summary' => null,
+            'severity_itp' => $r->severity_itp,
+            'comment_itp' => $r->comment_itp,
+            'location_of_injury_id' => null,
+            'location_of_injury_label' => $r->body_part,
+            'type_of_injury_id' => null,
+            'type_of_injury_label' => $r->type_of_injury_name,
+            'other_typeof_injury' => $r->other_typeof_injury,
+            'other_affected_area' => $r->other_affected_area,
+            'severity_itv' => $r->severity_itv,
+            'comment_itv' => $r->comment_itv,
+            'signed_by' => $r->signed_by,
+            'date_signed' => $zeroDateToNull($r->date_signed),
+            'vessel_remarks' => $r->remarks,
+            'date_received' => $zeroDateToNull($r->date_received),
+            'reviewed_by' => $r->reviewed_by,
+            'investigator' => $r->investigator,
+            'dpa' => $r->dpa,
+            'closing_date' => $zeroDateToNull($r->closing_date),
+            'root_causes' => $rootCauses,
+            'persons' => $persons,
+        ]);
+    }
+
+    private function typeLabel(string $natureType, ?string $natureName, ?string $others, ?string $accidentCollision, ?string $hazardousOccurrenceType): string
+    {
+        if ($natureType === 'accident') {
+            $name = $natureName ?? '';
+
+            return match ($name) {
+                'Other' => trim("{$name} - {$others}"),
+                'Collision' => trim("{$name} - {$accidentCollision}"),
+                default => $name,
+            };
+        }
+
+        return match ($hazardousOccurrenceType) {
+            'unsafe_act' => 'UNSAFE ACT',
+            'unsafe_condition' => 'UNSAFE CONDITION',
+            'near_miss' => 'NEAR MISS',
+            default => '',
+        };
+    }
+
+    /** @param array<string, mixed> $r */
+    private function toDetailArray(array $r): array
+    {
+        $isClosed = $r['is_closed'];
+        $statusColor = ! $isClosed ? 'yellow' : (($r['published'] ?? false) && ! $r['is_approved'] ? 'yellow' : 'green');
+
+        return [
+            'id' => 0,
+            'vessel' => $r['vessel'],
+            'dateof_report' => $r['dateof_report'],
+            'report_no' => $r['report_no'],
+            'nature' => $r['nature'],
+            'type' => $r['type'],
+            'added_by' => $r['added_by'],
+            'published' => $r['published'],
+            'is_approved' => $r['is_approved'],
+            'status' => $isClosed ? 'CLOSED' : 'IN PROGRESS',
+            'status_color' => $statusColor,
+            'can_edit' => false,
+            'can_publish' => false,
+            'can_approve' => false,
+            'can_reopen' => false,
+            'can_delete' => false,
+            'vessel_id' => $r['vessel_id'],
+            'voyage_no' => $r['voyage_no'],
+            'master_name' => $r['master_name'],
+            'chief_engineer_name' => $r['chief_engineer_name'],
+            'person_reporting' => $r['person_reporting'],
+            'nature_type' => $r['nature_type'],
+            'nature_of_incident_id' => $r['nature_of_incident_id'],
+            'nature_of_incident_label' => $r['nature_of_incident_label'],
+            'hazardous_occurrence_type' => $r['hazardous_occurrence_type'],
+            'others' => $r['others'],
+            'accident_collision' => $r['accident_collision'],
+            'statementof_work' => $r['statementof_work'],
+            'bac' => $r['bac'],
+            'vdr' => $r['vdr'],
+            'dateof_event' => $r['dateof_event'],
+            'timeof_event' => $r['timeof_event'],
+            'zone' => $r['zone'],
+            'country' => $r['country'],
+            'speed' => $r['speed'],
+            'course' => $r['course'],
+            'draft_forward' => $r['draft_forward'],
+            'draft_alt' => $r['draft_alt'],
+            'wind_direction' => $r['wind_direction'],
+            'direction_sea' => $r['direction_sea'],
+            'direction_swell' => $r['direction_swell'],
+            'geographical_location' => $r['geographical_location'],
+            'port_departure' => $r['port_departure'],
+            'date_departure' => $r['date_departure'],
+            'port_which_bound' => $r['port_which_bound'],
+            'type_cargo' => $r['type_cargo'],
+            'cargo_quantity' => $r['cargo_quantity'],
+            'special_requirement' => $r['special_requirement'],
+            'atmospheric_clear' => $r['atmospheric_clear'],
+            'atmospheric_partly_cloudy' => $r['atmospheric_partly_cloudy'],
+            'atmospheric_overcast' => $r['atmospheric_overcast'],
+            'atmospheric_fog' => $r['atmospheric_fog'],
+            'atmospheric_rain' => $r['atmospheric_rain'],
+            'atmospheric_snow' => $r['atmospheric_snow'],
+            'atmospheric_other' => $r['atmospheric_other'],
+            'atmospheric_other_name' => $r['atmospheric_other_name'],
+            'distance1' => $r['distance1'],
+            'distance2' => $r['distance2'],
+            'distance3' => $r['distance3'],
+            'sea1' => $r['sea1'],
+            'sea2' => $r['sea2'],
+            'sea3' => $r['sea3'],
+            'crew_onboard' => $r['crew_onboard'],
+            'other_onboard' => $r['other_onboard'],
+            'total_onboard' => $r['total_onboard'],
+            'crew_dead' => $r['crew_dead'],
+            'other_dead' => $r['other_dead'],
+            'total_dead' => $r['total_dead'],
+            'crew_missing' => $r['crew_missing'],
+            'other_missing' => $r['other_missing'],
+            'total_missing' => $r['total_missing'],
+            'crew_injured' => $r['crew_injured'],
+            'other_injured' => $r['other_injured'],
+            'total_injured' => $r['total_injured'],
+            'fs_ro' => $r['fs_ro'],
+            'incident_location_id' => $r['incident_location_id'],
+            'incident_location_label' => $r['incident_location_label'],
+            'location_other' => $r['location_other'],
+            'ship_position' => $r['ship_position'],
+            'incident_operation_id' => $r['incident_operation_id'],
+            'incident_operation_label' => $r['incident_operation_label'],
+            'ship_operation_other' => $r['ship_operation_other'],
+            'hazardous_occurrence_ppe_used' => $r['hazardous_occurrence_ppe_used'],
+            'hazardous_occurrence_ppe_used_comment' => $r['hazardous_occurrence_ppe_used_comment'],
+            'hazardous_occurrence_severity' => $r['hazardous_occurrence_severity'],
+            'hazardous_occurrence_severity_comment' => $r['hazardous_occurrence_severity_comment'],
+            'hazardous_occurrence_likelihood' => $r['hazardous_occurrence_likelihood'],
+            'hazardous_occurrence_likelihood_comment' => $r['hazardous_occurrence_likelihood_comment'],
+            'subject_investigation' => $r['subject_investigation'],
+            'evidence_safety_meeting' => $r['evidence_safety_meeting'],
+            'evidence_certificate' => $r['evidence_certificate'],
+            'evidence_logbook' => $r['evidence_logbook'],
+            'evidence_delivery' => $r['evidence_delivery'],
+            'evidence_photo' => $r['evidence_photo'],
+            'evidence_company' => $r['evidence_company'],
+            'evidence_others' => $r['evidence_others'],
+            'evidence_others_name' => $r['evidence_others_name'],
+            'causal_factor' => $r['causal_factor'],
+            'intermediate_cause' => $r['intermediate_cause'],
+            'shore_root_cause_summary' => $r['shore_root_cause_summary'],
+            'severity_itp' => $r['severity_itp'],
+            'comment_itp' => $r['comment_itp'],
+            'location_of_injury_id' => $r['location_of_injury_id'],
+            'location_of_injury_label' => $r['location_of_injury_label'],
+            'type_of_injury_id' => $r['type_of_injury_id'],
+            'type_of_injury_label' => $r['type_of_injury_label'],
+            'other_typeof_injury' => $r['other_typeof_injury'],
+            'other_affected_area' => $r['other_affected_area'],
+            'severity_itv' => $r['severity_itv'],
+            'comment_itv' => $r['comment_itv'],
+            'signed_by' => $r['signed_by'],
+            'date_signed' => $r['date_signed'],
+            'vessel_remarks' => $r['vessel_remarks'],
+            'date_received' => $r['date_received'],
+            'reviewed_by' => $r['reviewed_by'],
+            'investigator' => $r['investigator'],
+            'dpa' => $r['dpa'],
+            'closing_date' => $r['closing_date'],
+            'root_causes' => $r['root_causes'],
+            'persons' => $r['persons'],
+        ];
     }
 }

@@ -149,6 +149,7 @@ class PscReportRepository
         $paginator = $builder->orderBy($sort, $query->direction)->paginate($query->perPage, page: $query->page);
 
         $rows = collect($paginator->items())->map(fn ($r) => [
+            'record_id' => $r->pscreportid,
             'ref_no' => $r->ref_no,
             'vessel' => $vessels[$r->vesid] ?? '',
             'date' => $r->dateof_inspection,
@@ -270,6 +271,127 @@ class PscReportRepository
         }
 
         return $data;
+    }
+
+    /**
+     * Ported from admin/psc/view_psc.php, surfaced via the dashboard's
+     * clickable ref_no column. Read-only — see
+     * SireReportRepository::detail()'s docblock for the convention.
+     */
+    public function detail(int $id): ?array
+    {
+        $r = PscReport::query()->with(['vessel', 'mou'])
+            ->withCount([
+                'nonconformities as pending_nc_count' => fn (Builder $q) => $q->where('is_inactive', false)->whereNull('close_out_date'),
+                'nonconformities as total_nc_count' => fn (Builder $q) => $q->where('is_inactive', false),
+            ])
+            ->find($id);
+
+        if ($r === null) {
+            return null;
+        }
+
+        $mouName = $r->mou === null ? null : ($r->mou->name === 'Others' ? "MOU - {$r->mou_others}" : $r->mou->name);
+
+        return $this->toDetailArray([
+            'ref_no' => $r->ref_no,
+            'vessel' => $r->vessel?->display_name ?? '',
+            'dateof_inspection' => $r->dateof_inspection->format('Y-m-d'),
+            'mou' => $mouName,
+            'pending_nc_count' => $r->pending_nc_count ?? 0,
+            'total_nc_count' => $r->total_nc_count ?? 0,
+            'placeof_inspection' => $r->placeof_inspection,
+            'name_psco' => $r->name_psco,
+            'master_name' => $r->master_name,
+            'chief_engineer' => $r->chief_engineer,
+            'is_detained' => $r->is_detained,
+            'detained_date' => $r->detained_date?->format('Y-m-d'),
+            'detained_time' => $r->detained_time,
+            'is_released' => $r->is_released,
+            'released_date' => $r->released_date?->format('Y-m-d'),
+            'released_time' => $r->released_time,
+            'closing_date' => $r->closing_date?->format('Y-m-d'),
+            'remarks' => $r->remarks,
+        ]);
+    }
+
+    /** Same as detail(), reading tb_psc_report directly from the legacy connection. */
+    public function legacyDetail(string $pscreportid): ?array
+    {
+        $r = DB::connection('legacy')->table('tb_psc_report')
+            ->leftJoin('tb_psc_mou', 'tb_psc_mou.mouID', '=', 'tb_psc_report.mouID')
+            ->where('tb_psc_report.pscreportid', $pscreportid)
+            ->select(['tb_psc_report.*', 'tb_psc_mou.mou_name'])
+            ->first();
+
+        if ($r === null) {
+            return null;
+        }
+
+        $vessels = LegacyDb::vesselNames();
+        $zeroDateToNull = fn (?string $date) => ($date === null || $date === '0000-00-00') ? null : $date;
+        $mouName = $r->mou_name === null ? null : ($r->mou_name === 'Others' ? "MOU - {$r->mou_others}" : $r->mou_name);
+
+        $pendingNc = DB::connection('legacy')->table('tb_nonconformities')
+            ->where('source_of_nc_ref_no', $r->ref_no)->where('is_inactive', '!=', '1')
+            ->where(function ($q) {
+                $q->whereNull('close_out_date')->orWhere('close_out_date', '0000-00-00');
+            })->count();
+        $totalNc = DB::connection('legacy')->table('tb_nonconformities')
+            ->where('source_of_nc_ref_no', $r->ref_no)->where('is_inactive', '!=', '1')->count();
+
+        return $this->toDetailArray([
+            'ref_no' => $r->ref_no,
+            'vessel' => $vessels[$r->vesid] ?? '',
+            'dateof_inspection' => $r->dateof_inspection,
+            'mou' => $mouName,
+            'pending_nc_count' => $pendingNc,
+            'total_nc_count' => $totalNc,
+            'placeof_inspection' => $r->placeof_inspection,
+            'name_psco' => $r->name_psco,
+            'master_name' => $r->master_id,
+            'chief_engineer' => $r->chief_engineer,
+            'is_detained' => $r->is_detained === '1',
+            'detained_date' => $zeroDateToNull($r->detained_date),
+            'detained_time' => $r->detained_time,
+            'is_released' => $r->is_released === '1',
+            'released_date' => $zeroDateToNull($r->released_date),
+            'released_time' => $r->released_time,
+            'closing_date' => $zeroDateToNull($r->closing_date),
+            'remarks' => $r->remarks,
+        ]);
+    }
+
+    /** @param array<string, mixed> $r */
+    private function toDetailArray(array $r): array
+    {
+        return [
+            'id' => 0,
+            'ref_no' => $r['ref_no'],
+            'vessel' => $r['vessel'],
+            'dateof_inspection' => $r['dateof_inspection'],
+            'mou' => $r['mou'],
+            'pending_nc_count' => $r['pending_nc_count'],
+            'total_nc_count' => $r['total_nc_count'],
+            'can_edit' => false,
+            'can_delete' => false,
+            'can_reopen' => false,
+            'vessel_id' => null,
+            'placeof_inspection' => $r['placeof_inspection'],
+            'mou_id' => null,
+            'mou_others' => null,
+            'name_psco' => $r['name_psco'],
+            'master_name' => $r['master_name'],
+            'chief_engineer' => $r['chief_engineer'],
+            'is_detained' => $r['is_detained'],
+            'detained_date' => $r['detained_date'],
+            'detained_time' => $r['detained_time'],
+            'is_released' => $r['is_released'],
+            'released_date' => $r['released_date'],
+            'released_time' => $r['released_time'],
+            'closing_date' => $r['closing_date'],
+            'remarks' => $r['remarks'],
+        ];
     }
 
     /** @return array<int, array{id:int,label:string}> */

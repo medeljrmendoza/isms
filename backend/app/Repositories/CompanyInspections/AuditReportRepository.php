@@ -170,6 +170,7 @@ class AuditReportRepository
         $paginator = $builder->orderBy($sort, $query->direction)->paginate($query->perPage, page: $query->page);
 
         $rows = collect($paginator->items())->map(fn ($r) => [
+            'record_id' => $r->auditID,
             'audit_ref' => $r->audit_ref,
             'vessel_company' => $r->vessel_company === 'VESSEL' ? ($vessels[$r->vesID] ?? '') : ($r->company ?? ''),
             'this_date' => $r->this_date,
@@ -319,5 +320,113 @@ class AuditReportRepository
         return AuditKind::query()->orderBy('name')->get()
             ->map(fn (AuditKind $k) => ['id' => $k->id, 'label' => $k->name])
             ->all();
+    }
+
+    /**
+     * Ported from admin/company/view_company.php, surfaced via the
+     * dashboard's clickable audit_ref column. Read-only — see
+     * SireReportRepository::detail()'s docblock for the convention.
+     */
+    public function detail(int $id): ?array
+    {
+        $r = AuditReport::query()->with(['vessel', 'auditType', 'auditKind'])
+            ->withCount([
+                'nonconformities as pending_nc_count' => fn (Builder $q) => $q->where('is_inactive', false)->whereNull('close_out_date'),
+                'nonconformities as total_nc_count' => fn (Builder $q) => $q->where('is_inactive', false),
+            ])
+            ->find($id);
+
+        if ($r === null) {
+            return null;
+        }
+
+        return $this->toDetailArray([
+            'audit_ref' => $r->audit_ref,
+            'vessel_company' => $r->vessel_company === 'VESSEL' ? ($r->vessel?->display_name ?? '') : ($r->company ?? ''),
+            'vessel_company_raw' => $r->vessel_company,
+            'this_date' => $r->this_date->format('Y-m-d'),
+            'placeof_audit' => $r->placeof_audit,
+            'audit_type' => $r->auditType?->name,
+            'audit_kind' => $r->auditKind?->name,
+            'pending_nc_count' => $r->pending_nc_count ?? 0,
+            'total_nc_count' => $r->total_nc_count ?? 0,
+            'company' => $r->company,
+            'department' => $r->department,
+            'inspector_name' => $r->inspector_name,
+            'master_name' => $r->master_name,
+            'chief_engineer' => $r->chief_engineer,
+            'remarks' => $r->remarks,
+        ]);
+    }
+
+    /** Same as detail(), reading tb_audit_report directly from the legacy connection. */
+    public function legacyDetail(string $auditID): ?array
+    {
+        $r = DB::connection('legacy')->table('tb_audit_report')
+            ->leftJoin('pl_audit_types', 'pl_audit_types.auditTypeID', '=', 'tb_audit_report.audit_type')
+            ->leftJoin('pl_audit_kinds', 'pl_audit_kinds.auditKindID', '=', 'tb_audit_report.audit_kind')
+            ->where('tb_audit_report.auditID', $auditID)
+            ->select(['tb_audit_report.*', 'pl_audit_types.audit_type_name', 'pl_audit_kinds.audit_kind_name'])
+            ->first();
+
+        if ($r === null) {
+            return null;
+        }
+
+        $vessels = LegacyDb::vesselNames();
+
+        $pendingNc = DB::connection('legacy')->table('tb_nonconformities')
+            ->where('source_of_nc_ref_no', $r->audit_ref)->where('is_inactive', '!=', '1')
+            ->where(function ($q) {
+                $q->whereNull('close_out_date')->orWhere('close_out_date', '0000-00-00');
+            })->count();
+        $totalNc = DB::connection('legacy')->table('tb_nonconformities')
+            ->where('source_of_nc_ref_no', $r->audit_ref)->where('is_inactive', '!=', '1')->count();
+
+        return $this->toDetailArray([
+            'audit_ref' => $r->audit_ref,
+            'vessel_company' => $r->vessel_company === 'VESSEL' ? ($vessels[$r->vesID] ?? '') : ($r->company ?? ''),
+            'vessel_company_raw' => $r->vessel_company,
+            'this_date' => $r->this_date,
+            'placeof_audit' => $r->placeof_audit,
+            'audit_type' => $r->audit_type_name,
+            'audit_kind' => $r->audit_kind_name,
+            'pending_nc_count' => $pendingNc,
+            'total_nc_count' => $totalNc,
+            'company' => $r->company,
+            'department' => $r->department,
+            'inspector_name' => LegacyDb::addressBookEntry($r->audit_auditor)['name'] ?? $r->audit_auditor,
+            'master_name' => $r->audit_master,
+            'chief_engineer' => $r->audit_chief_eng,
+            'remarks' => $r->remarks,
+        ]);
+    }
+
+    /** @param array<string, mixed> $r */
+    private function toDetailArray(array $r): array
+    {
+        return [
+            'id' => 0,
+            'audit_ref' => $r['audit_ref'],
+            'vessel_company' => $r['vessel_company'],
+            'this_date' => $r['this_date'],
+            'placeof_audit' => $r['placeof_audit'],
+            'audit_type' => $r['audit_type'],
+            'audit_kind' => $r['audit_kind'],
+            'pending_nc_count' => $r['pending_nc_count'],
+            'total_nc_count' => $r['total_nc_count'],
+            'can_edit' => false,
+            'can_delete' => false,
+            'vessel_company_raw' => $r['vessel_company_raw'],
+            'vessel_id' => null,
+            'company' => $r['company'],
+            'department' => $r['department'],
+            'audit_type_id' => null,
+            'audit_kind_id' => null,
+            'inspector_name' => $r['inspector_name'],
+            'master_name' => $r['master_name'],
+            'chief_engineer' => $r['chief_engineer'],
+            'remarks' => $r['remarks'],
+        ];
     }
 }

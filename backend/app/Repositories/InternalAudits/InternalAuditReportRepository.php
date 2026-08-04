@@ -148,6 +148,7 @@ class InternalAuditReportRepository
         $paginator = $builder->orderBy($sort, $query->direction)->paginate($query->perPage, page: $query->page);
 
         $rows = collect($paginator->items())->map(fn ($r) => [
+            'record_id' => $r->auditID,
             'audit_ref' => $r->audit_ref,
             'vessel' => $vessels[$r->vesID] ?? '',
             'this_date' => $r->this_date,
@@ -246,6 +247,98 @@ class InternalAuditReportRepository
         $report->update(['is_deleted' => true]);
 
         Nonconformity::where('source_of_nc_ref_no', $report->audit_ref)->update(['is_inactive' => true]);
+    }
+
+    /**
+     * Ported from admin/internal/view_internal.php, surfaced via the
+     * dashboard's clickable audit_ref column. Read-only — see
+     * SireReportRepository::detail()'s docblock for the convention.
+     */
+    public function detail(int $id): ?array
+    {
+        $r = InternalAuditReport::query()->with('vessel')
+            ->withCount([
+                'nonconformities as pending_nc_count' => fn (Builder $q) => $q->where('is_inactive', false)->whereNull('close_out_date'),
+                'nonconformities as total_nc_count' => fn (Builder $q) => $q->where('is_inactive', false),
+            ])
+            ->find($id);
+
+        if ($r === null) {
+            return null;
+        }
+
+        return $this->toDetailArray([
+            'audit_ref' => $r->audit_ref,
+            'vessel' => $r->vessel?->display_name ?? '',
+            'this_date' => $r->this_date->format('Y-m-d'),
+            'placeof_audit' => $r->placeof_audit,
+            'typeof_audit' => $r->typeof_audit,
+            'auditor_name' => $r->auditor_name,
+            'pending_nc_count' => $r->pending_nc_count ?? 0,
+            'total_nc_count' => $r->total_nc_count ?? 0,
+            'department' => $r->department,
+            'master_name' => $r->master_name,
+            'chief_engineer' => $r->chief_engineer,
+            'remarks' => $r->remarks,
+        ]);
+    }
+
+    /** Same as detail(), reading tb_internal_audit_report directly from the legacy connection. */
+    public function legacyDetail(string $auditID): ?array
+    {
+        $r = DB::connection('legacy')->table('tb_internal_audit_report')->where('auditID', $auditID)->first();
+
+        if ($r === null) {
+            return null;
+        }
+
+        $vessels = LegacyDb::vesselNames();
+
+        $pendingNc = DB::connection('legacy')->table('tb_nonconformities')
+            ->where('source_of_nc_ref_no', $r->audit_ref)->where('is_inactive', '!=', '1')
+            ->where(function ($q) {
+                $q->whereNull('close_out_date')->orWhere('close_out_date', '0000-00-00');
+            })->count();
+        $totalNc = DB::connection('legacy')->table('tb_nonconformities')
+            ->where('source_of_nc_ref_no', $r->audit_ref)->where('is_inactive', '!=', '1')->count();
+
+        return $this->toDetailArray([
+            'audit_ref' => $r->audit_ref,
+            'vessel' => $vessels[$r->vesID] ?? '',
+            'this_date' => $r->this_date,
+            'placeof_audit' => $r->placeof_audit,
+            'typeof_audit' => $r->typeof_audit,
+            'auditor_name' => $r->audit_auditor,
+            'pending_nc_count' => $pendingNc,
+            'total_nc_count' => $totalNc,
+            'department' => $r->department,
+            'master_name' => $r->audit_master,
+            'chief_engineer' => $r->audit_chief_eng,
+            'remarks' => $r->remarks,
+        ]);
+    }
+
+    /** @param array<string, mixed> $r */
+    private function toDetailArray(array $r): array
+    {
+        return [
+            'id' => 0,
+            'audit_ref' => $r['audit_ref'],
+            'vessel' => $r['vessel'],
+            'this_date' => $r['this_date'],
+            'placeof_audit' => $r['placeof_audit'],
+            'typeof_audit' => $r['typeof_audit'],
+            'auditor_name' => $r['auditor_name'],
+            'pending_nc_count' => $r['pending_nc_count'],
+            'total_nc_count' => $r['total_nc_count'],
+            'can_edit' => false,
+            'can_delete' => false,
+            'vessel_id' => null,
+            'department' => $r['department'],
+            'master_name' => $r['master_name'],
+            'chief_engineer' => $r['chief_engineer'],
+            'remarks' => $r['remarks'],
+        ];
     }
 
     /** @return array<int, array{id:int,label:string}> */

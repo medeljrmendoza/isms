@@ -137,6 +137,7 @@ class SireReportRepository
         $paginator = $builder->orderBy($sort, $query->direction)->paginate($query->perPage, page: $query->page);
 
         $rows = collect($paginator->items())->map(fn ($r) => [
+            'record_id' => $r->sireID,
             'vessel' => $vessels[$r->vesID] ?? '',
             'dateof_inspection' => $r->dateof_inspection,
             'placeof_inspection' => $r->placeof_inspection,
@@ -248,6 +249,88 @@ class SireReportRepository
     public function delete(SireReport $report): void
     {
         $report->update(['is_deleted' => true]);
+    }
+
+    /**
+     * Ported from admin/sire/view_sire.php, surfaced via the dashboard's
+     * clickable vessel column. Read-only — all can_* flags are false and
+     * id/vessel_id are inert placeholders, same convention as
+     * NonconformityRepository::detail().
+     */
+    public function detail(int $id): ?array
+    {
+        $r = SireReport::query()->with('vessel')->find($id);
+
+        if ($r === null) {
+            return null;
+        }
+
+        return $this->toDetailArray([
+            'vessel' => $r->vessel?->display_name ?? '',
+            'added_by' => $r->added_by,
+            'dateof_inspection' => $r->dateof_inspection->format('Y-m-d'),
+            'placeof_inspection' => $r->placeof_inspection,
+            'company_name' => $r->company_name,
+            'inspector_name' => $r->inspector_name,
+            'pass_fail' => $r->pass_fail,
+            'published' => $r->added_by === 'SHORE' ? $r->is_published : null,
+            'is_approved' => $r->is_published ? $r->is_approved : null,
+            'sire_cost' => $r->sire_cost,
+            'shore_remarks' => $r->shore_remarks,
+            'vessel_remarks' => $r->vessel_remarks,
+        ]);
+    }
+
+    /** Same as detail(), reading tb_sire directly from the legacy connection. */
+    public function legacyDetail(string $sireID): ?array
+    {
+        $r = DB::connection('legacy')->table('tb_sire')->where('sireID', $sireID)->first();
+
+        if ($r === null) {
+            return null;
+        }
+
+        $vessels = LegacyDb::vesselNames();
+
+        return $this->toDetailArray([
+            'vessel' => $vessels[$r->vesID] ?? '',
+            'added_by' => $r->added_by,
+            'dateof_inspection' => $r->dateof_inspection,
+            'placeof_inspection' => $r->placeof_inspection,
+            'company_name' => LegacyDb::addressBookEntry($r->company)['company'] ?? $r->company,
+            'inspector_name' => LegacyDb::addressBookEntry($r->inspector)['name'] ?? $r->inspector,
+            'pass_fail' => $r->pass_fail,
+            'published' => $r->added_by === 'SHORE' ? $r->is_published === '1' : null,
+            'is_approved' => $r->is_published === '1' ? $r->is_approved === '1' : null,
+            'sire_cost' => $r->sire_cost,
+            'shore_remarks' => $r->shore_remarks,
+            'vessel_remarks' => $r->vessel_remarks,
+        ]);
+    }
+
+    /** @param array<string, mixed> $r */
+    private function toDetailArray(array $r): array
+    {
+        return [
+            'id' => 0,
+            'vessel' => $r['vessel'],
+            'added_by' => $r['added_by'],
+            'dateof_inspection' => $r['dateof_inspection'],
+            'placeof_inspection' => $r['placeof_inspection'],
+            'company_name' => $r['company_name'],
+            'inspector_name' => $r['inspector_name'],
+            'pass_fail' => $r['pass_fail'],
+            'published' => $r['published'],
+            'is_approved' => $r['is_approved'],
+            'can_edit' => false,
+            'can_publish' => false,
+            'can_approve' => false,
+            'can_delete' => false,
+            'vessel_id' => null,
+            'sire_cost' => $r['sire_cost'],
+            'shore_remarks' => $r['shore_remarks'],
+            'vessel_remarks' => $r['vessel_remarks'],
+        ];
     }
 
     /** @return array<int, array{id:int,label:string}> */

@@ -184,6 +184,7 @@ class ExternalAuditReportRepository
         $paginator = $builder->orderBy($sort, $query->direction)->paginate($query->perPage, page: $query->page);
 
         $rows = collect($paginator->items())->map(fn ($r) => [
+            'record_id' => $r->externalID,
             'ref_no' => $r->ref_no,
             'vessel' => $vessels[$r->vesID] ?? '',
             'date' => $r->dateof_audit,
@@ -327,6 +328,112 @@ class ExternalAuditReportRepository
         $report->update(['is_deleted' => true]);
 
         Nonconformity::where('source_of_nc_ref_no', $report->ref_no)->update(['is_inactive' => true]);
+    }
+
+    /**
+     * Ported from admin/external/view_external.php, surfaced via the
+     * dashboard's clickable ref_no column. Read-only — see
+     * SireReportRepository::detail()'s docblock for the convention.
+     */
+    public function detail(int $id): ?array
+    {
+        $r = ExternalAuditReport::query()->with('vessel')
+            ->withCount([
+                'nonconformities as pending_nc_count' => fn (Builder $q) => $q->where('is_inactive', false)->whereNull('close_out_date'),
+                'nonconformities as total_nc_count' => fn (Builder $q) => $q->where('is_inactive', false),
+            ])
+            ->find($id);
+
+        if ($r === null) {
+            return null;
+        }
+
+        return $this->toDetailArray([
+            'ref_no' => $r->ref_no,
+            'vessel' => $r->vessel?->display_name ?? '',
+            'added_by' => $r->added_by,
+            'dateof_audit' => $r->dateof_audit->format('Y-m-d'),
+            'portof_audit' => $r->portof_audit,
+            'typeof_audit' => $r->typeof_audit,
+            'published' => $r->added_by === 'SHORE' ? $r->is_published : null,
+            'is_approved' => $r->is_approved,
+            'pending_nc_count' => $r->pending_nc_count ?? 0,
+            'total_nc_count' => $r->total_nc_count ?? 0,
+            'department' => $r->department,
+            'master_name' => $r->master_name,
+            'chief_engineer' => $r->chief_engineer,
+            'auditor_name' => $r->auditor_name,
+            'shore_remarks' => $r->shore_remarks,
+            'vessel_remarks' => $r->vessel_remarks,
+        ]);
+    }
+
+    /** Same as detail(), reading tb_external_audit_report directly from the legacy connection. */
+    public function legacyDetail(string $externalID): ?array
+    {
+        $r = DB::connection('legacy')->table('tb_external_audit_report')->where('externalID', $externalID)->first();
+
+        if ($r === null) {
+            return null;
+        }
+
+        $vessels = LegacyDb::vesselNames();
+
+        $pendingNc = DB::connection('legacy')->table('tb_nonconformities')
+            ->where('source_of_nc_ref_no', $r->ref_no)->where('is_inactive', '!=', '1')
+            ->where(function ($q) {
+                $q->whereNull('close_out_date')->orWhere('close_out_date', '0000-00-00');
+            })->count();
+        $totalNc = DB::connection('legacy')->table('tb_nonconformities')
+            ->where('source_of_nc_ref_no', $r->ref_no)->where('is_inactive', '!=', '1')->count();
+
+        return $this->toDetailArray([
+            'ref_no' => $r->ref_no,
+            'vessel' => $vessels[$r->vesID] ?? '',
+            'added_by' => $r->added_by,
+            'dateof_audit' => $r->dateof_audit,
+            'portof_audit' => $r->portof_audit,
+            'typeof_audit' => $r->typeof_audit,
+            'published' => $r->added_by === 'SHORE' ? $r->is_published === '1' : null,
+            'is_approved' => $r->is_approved === '1',
+            'pending_nc_count' => $pendingNc,
+            'total_nc_count' => $totalNc,
+            'department' => $r->department,
+            'master_name' => $r->master,
+            'chief_engineer' => $r->chief_engineer,
+            'auditor_name' => LegacyDb::addressBookEntry($r->auditor)['name'] ?? $r->auditor,
+            'shore_remarks' => $r->shore_remarks,
+            'vessel_remarks' => $r->vessel_remarks,
+        ]);
+    }
+
+    /** @param array<string, mixed> $r */
+    private function toDetailArray(array $r): array
+    {
+        return [
+            'id' => 0,
+            'ref_no' => $r['ref_no'],
+            'vessel' => $r['vessel'],
+            'added_by' => $r['added_by'],
+            'dateof_audit' => $r['dateof_audit'],
+            'portof_audit' => $r['portof_audit'],
+            'typeof_audit' => $r['typeof_audit'],
+            'published' => $r['published'],
+            'is_approved' => $r['is_approved'],
+            'pending_nc_count' => $r['pending_nc_count'],
+            'total_nc_count' => $r['total_nc_count'],
+            'can_edit' => false,
+            'can_publish' => false,
+            'can_approve' => false,
+            'can_delete' => false,
+            'vessel_id' => null,
+            'department' => $r['department'],
+            'master_name' => $r['master_name'],
+            'chief_engineer' => $r['chief_engineer'],
+            'auditor_name' => $r['auditor_name'],
+            'shore_remarks' => $r['shore_remarks'],
+            'vessel_remarks' => $r['vessel_remarks'],
+        ];
     }
 
     /** @return array<int, array{id:int,label:string}> */
