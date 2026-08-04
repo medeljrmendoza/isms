@@ -90,7 +90,11 @@ export function DashletCard({ dashlet }: { dashlet: Dashlet }) {
         {loaded &&
           !loading &&
           (isTable ? (
-            <DashletTable endpoint={dashlet.endpoint!} columns={dashlet.columns!} />
+            <DashletTable
+              endpoint={dashlet.endpoint!}
+              columns={dashlet.columns!}
+              defaultDirection={dashlet.key === "pms" ? "asc" : undefined}
+            />
           ) : (
             <DashletList items={dashlet.items} />
           ))}
@@ -99,7 +103,11 @@ export function DashletCard({ dashlet }: { dashlet: Dashlet }) {
       {showLarger && (
         <Modal title={dashlet.title} onClose={() => setShowLarger(false)}>
           {isTable ? (
-            <DashletTable endpoint={dashlet.endpoint!} columns={dashlet.columns!} />
+            <DashletTable
+              endpoint={dashlet.endpoint!}
+              columns={dashlet.columns!}
+              defaultDirection={dashlet.key === "pms" ? "asc" : undefined}
+            />
           ) : (
             <DashletList items={dashlet.items} />
           )}

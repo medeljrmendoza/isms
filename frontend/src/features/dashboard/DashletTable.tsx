@@ -12,7 +12,16 @@ const PER_PAGE = 10;
  * two separate DataTables (one per container) rather than sharing state
  * between them.
  */
-export function DashletTable({ endpoint, columns }: { endpoint: string; columns: DashletColumn[] }) {
+export function DashletTable({
+  endpoint,
+  columns,
+  defaultDirection = "desc",
+}: {
+  endpoint: string;
+  columns: DashletColumn[];
+  /** PMS's legacy dashlet lists vessels in ascending order by default; every other dashlet defaults to descending. */
+  defaultDirection?: "asc" | "desc";
+}) {
   const [rows, setRows] = useState<TableRow[]>([]);
   const [page, setPage] = useState(1);
   const [lastPage, setLastPage] = useState(1);
@@ -20,7 +29,7 @@ export function DashletTable({ endpoint, columns }: { endpoint: string; columns:
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<string | undefined>(undefined);
-  const [direction, setDirection] = useState<"asc" | "desc">("desc");
+  const [direction, setDirection] = useState<"asc" | "desc">(defaultDirection);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
