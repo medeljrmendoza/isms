@@ -74,14 +74,20 @@ class DefectRepository
      * database instead of local seed data — see App\Support\LegacyDb.
      * Same not-yet-Complete rule as pendingQuery(); legacy's column
      * names differ from the local model's (defect_priority/defect_cat
-     * vs priority/category), mapped 1:1 below.
+     * vs priority/category), mapped 1:1 below. Also ported: legacy's
+     * `vesID IN (SELECT vesID FROM tb_user_vessel WHERE userID = ...)
+     * AND tb_vessel.vessel_status = 'ACTIVE'` scoping — unlike
+     * Nonconformities there's no vesID='' fallback here, so a defect
+     * with no vessel or an inactive vessel is simply never shown.
      */
-    public function legacyTable(TableQuery $query): array
+    public function legacyTable(TableQuery $query, ?string $legacyUserId): array
     {
         $vessels = LegacyDb::vesselNames();
+        $eligibleVesselIds = LegacyDb::assignedVesselIds($legacyUserId)->intersect(LegacyDb::activeVesselIds());
 
         $builder = DB::connection('legacy')->table('tb_defect_list')
-            ->where('compl_code', '!=', 'C');
+            ->where('compl_code', '!=', 'C')
+            ->whereIn('vesID', $eligibleVesselIds);
 
         if ($query->search !== null) {
             $term = "%{$query->search}%";

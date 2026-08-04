@@ -132,11 +132,16 @@ class NonconformityRepository
      * Reads the dashlet's "pending" set from the real legacy staging
      * database instead of local seed data — see App\Support\LegacyDb.
      * Same open-or-unapproved rule as pendingQuery(), replicated directly
-     * in SQL since tb_nonconformities' column names match 1:1.
+     * in SQL since tb_nonconformities' column names match 1:1. Also
+     * ported: legacy's `(vesID = '' OR vesID IN (SELECT vesID FROM
+     * tb_user_vessel WHERE userID = ...))` scoping, which restricts
+     * results to vessels assigned to the logged-in user (company/shore
+     * records with no vessel, vesID = '', are always visible).
      */
-    public function legacyTable(TableQuery $query): array
+    public function legacyTable(TableQuery $query, ?string $legacyUserId): array
     {
         $vessels = LegacyDb::vesselNames();
+        $assignedVesselIds = LegacyDb::assignedVesselIds($legacyUserId);
 
         $builder = DB::connection('legacy')->table('tb_nonconformities')
             ->where('is_inactive', 0)
@@ -152,6 +157,9 @@ class NonconformityRepository
                         });
                     });
                 });
+            })
+            ->where(function ($q) use ($assignedVesselIds) {
+                $q->where('vesID', '')->orWhereIn('vesID', $assignedVesselIds);
             });
 
         if ($query->search !== null) {

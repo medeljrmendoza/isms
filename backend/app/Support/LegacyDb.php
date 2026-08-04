@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -25,5 +26,49 @@ class LegacyDb
             ->get()
             ->mapWithKeys(fn ($v) => [$v->vesID => trim("{$v->vessel_prefix} {$v->vessel_name}")])
             ->all();
+    }
+
+    /**
+     * The vessels a given legacy user is assigned to, via tb_user_vessel —
+     * every legacy dashlet scopes its data to this set. Returns empty for
+     * a null/unsynced user (e.g. the local dev admin), which correctly
+     * mirrors how legacy behaves for a userID with no vessel assignments.
+     *
+     * @return Collection<int, string>
+     */
+    public static function assignedVesselIds(?string $legacyUserId): Collection
+    {
+        if ($legacyUserId === null) {
+            return collect();
+        }
+
+        return DB::connection('legacy')->table('tb_user_vessel')
+            ->where('userID', $legacyUserId)
+            ->pluck('vesID');
+    }
+
+    /**
+     * @return Collection<int, string> vesIDs where vessel_status = 'ACTIVE'
+     */
+    public static function activeVesselIds(): Collection
+    {
+        return DB::connection('legacy')->table('tb_vessel')
+            ->where('vessel_status', 'ACTIVE')
+            ->pluck('vesID');
+    }
+
+    /**
+     * Ported from Dashboard_pms.php's pms_vessel_query: active vessels
+     * belonging to a principal that is also active.
+     *
+     * @return Collection<int, string>
+     */
+    public static function activeVesselIdsWithActivePrincipal(): Collection
+    {
+        return DB::connection('legacy')->table('tb_vessel')
+            ->join('tb_principal', 'tb_principal.principalID', '=', 'tb_vessel.principalID')
+            ->where('tb_vessel.vessel_status', 'ACTIVE')
+            ->where('tb_principal.status', '1')
+            ->pluck('tb_vessel.vesID');
     }
 }

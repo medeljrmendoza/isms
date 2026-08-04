@@ -109,7 +109,7 @@ class DashboardController extends Controller
     public function nonconformitiesTable(Request $request): JsonResponse
     {
         if (LegacyDb::isConfigured()) {
-            $result = $this->nonconformities->legacyTable(TableQuery::fromRequest($request));
+            $result = $this->nonconformities->legacyTable(TableQuery::fromRequest($request), $request->user()?->legacy_user_id);
 
             return response()->json(['data' => ['columns' => NonconformityRepository::columns(), ...$result]]);
         }
@@ -396,7 +396,7 @@ class DashboardController extends Controller
     public function defectsTable(Request $request): JsonResponse
     {
         if (LegacyDb::isConfigured()) {
-            $result = $this->defects->legacyTable(TableQuery::fromRequest($request));
+            $result = $this->defects->legacyTable(TableQuery::fromRequest($request), $request->user()?->legacy_user_id);
 
             return response()->json(['data' => ['columns' => DefectRepository::columns(), ...$result]]);
         }
@@ -498,7 +498,7 @@ class DashboardController extends Controller
     public function pmsTable(Request $request): JsonResponse
     {
         if (LegacyDb::isConfigured()) {
-            $result = $this->pms->legacyTable(TableQuery::fromRequest($request));
+            $result = $this->pms->legacyTable(TableQuery::fromRequest($request), $request->user()?->legacy_user_id);
 
             return response()->json(['data' => ['columns' => PmsRepository::columns(), ...$result]]);
         }

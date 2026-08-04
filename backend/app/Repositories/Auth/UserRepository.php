@@ -49,6 +49,7 @@ class UserRepository
                 'password' => $legacyUser->password,
                 'status' => (bool) $legacyUser->status,
                 'force_password_change' => (bool) $legacyUser->force_password_change,
+                'legacy_user_id' => $legacyUser->userID,
             ],
         );
     }

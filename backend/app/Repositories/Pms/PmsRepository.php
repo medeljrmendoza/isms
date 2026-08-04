@@ -111,10 +111,15 @@ class PmsRepository
      * RH-tracked activities skip both when postponed; (2) postponed is
      * counted separately across all active activities for the vessel,
      * so a non-RH activity can be both postponed and overdue/upcoming.
+     * Also ported: pms_vessel_query's own scoping — only vessels that
+     * are vessel_status='ACTIVE', belong to a principal with status='1',
+     * and are assigned to the logged-in user appear as rows at all.
      */
-    public function legacySummaries(): Collection
+    public function legacySummaries(?string $legacyUserId): Collection
     {
-        $vessels = LegacyDb::vesselNames();
+        $eligibleVesselIds = LegacyDb::assignedVesselIds($legacyUserId)
+            ->intersect(LegacyDb::activeVesselIdsWithActivePrincipal());
+        $vessels = array_intersect_key(LegacyDb::vesselNames(), array_flip($eligibleVesselIds->all()));
         $today = Carbon::today()->format('Y-m-d');
 
         $rhPartsIds = DB::connection('legacy')->table('tb_pms_running_hours')->pluck('partsID')->flip();
@@ -193,9 +198,9 @@ class PmsRepository
         })->values();
     }
 
-    public function legacyTable(TableQuery $query): array
+    public function legacyTable(TableQuery $query, ?string $legacyUserId): array
     {
-        $rows = $this->legacySummaries();
+        $rows = $this->legacySummaries($legacyUserId);
 
         if ($query->search !== null) {
             $term = mb_strtolower($query->search);
