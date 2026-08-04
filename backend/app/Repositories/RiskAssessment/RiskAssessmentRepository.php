@@ -4,9 +4,11 @@ namespace App\Repositories\RiskAssessment;
 
 use App\Models\RiskAssessment\RiskAssessment;
 use App\Models\Vessel;
+use App\Support\LegacyDb;
 use App\Support\TableQuery;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
 
 class RiskAssessmentRepository
 {
@@ -85,6 +87,74 @@ class RiskAssessmentRepository
 
         return $builder->orderBy($sort, $query->direction)
             ->paginate($query->perPage, page: $query->page);
+    }
+
+    /**
+     * Ported from Controllers/Dashboard_risk_assessment.php's
+     * loadRiskAssessmentData(): reports still awaiting a required
+     * approval (shore and/or marine), scoped to the logged-in user's
+     * assigned vessels.
+     */
+    public function legacyTable(TableQuery $query, ?string $legacyUserId): array
+    {
+        $vessels = LegacyDb::vesselNames();
+        $assignedVesselIds = LegacyDb::assignedVesselIds($legacyUserId);
+
+        $builder = DB::connection('legacy')->table('tb_risk_assessment')
+            ->leftJoin('tb_risk_category', 'tb_risk_category.categoryID', '=', 'tb_risk_assessment.categoryID')
+            ->leftJoin('tb_risk_operation', 'tb_risk_operation.operationID', '=', 'tb_risk_assessment.operationID')
+            ->where(function ($q) {
+                $q->where(function ($shore) {
+                    $shore->where('tb_risk_assessment.approval_from_shore', '1')->where('tb_risk_assessment.shore_is_approved', '0');
+                })->orWhere(function ($marine) {
+                    $marine->where('tb_risk_assessment.approval_from_marine', '1')->where('tb_risk_assessment.marine_shore_is_approved', '0');
+                });
+            })
+            ->whereIn('tb_risk_assessment.vesid', $assignedVesselIds)
+            ->select([
+                'tb_risk_assessment.report_no',
+                'tb_risk_assessment.vesid',
+                'tb_risk_assessment.risk_date',
+                'tb_risk_assessment.categoryID',
+                'tb_risk_assessment.other_category_name',
+                'tb_risk_category.category',
+                'tb_risk_assessment.operationID',
+                'tb_risk_assessment.other_operation_name',
+                'tb_risk_operation.operation',
+            ]);
+
+        if ($query->search !== null) {
+            $term = "%{$query->search}%";
+            $builder->where(function ($q) use ($term) {
+                $q->where('tb_risk_assessment.report_no', 'like', $term)
+                    ->orWhere('tb_risk_assessment.risk_date', 'like', $term)
+                    ->orWhere('tb_risk_assessment.other_category_name', 'like', $term)
+                    ->orWhere('tb_risk_assessment.other_operation_name', 'like', $term);
+            });
+        }
+
+        $sortMap = ['report_no' => 'tb_risk_assessment.report_no', 'risk_date' => 'tb_risk_assessment.risk_date'];
+        $sort = $sortMap[$query->sort ?? ''] ?? 'tb_risk_assessment.risk_date';
+
+        $paginator = $builder->orderBy($sort, $query->direction)->paginate($query->perPage, page: $query->page);
+
+        $rows = collect($paginator->items())->map(fn ($r) => [
+            'report_no' => $r->report_no,
+            'vessel' => $vessels[$r->vesid] ?? '',
+            'risk_date' => $r->risk_date,
+            'category' => $r->categoryID === 'OTHER' ? $r->other_category_name : $r->category,
+            'task' => $r->operationID === 'OTHER' ? $r->other_operation_name : $r->operation,
+        ])->all();
+
+        return [
+            'rows' => $rows,
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
+        ];
     }
 
     /** @return array<int, array{id:int,label:string}> */

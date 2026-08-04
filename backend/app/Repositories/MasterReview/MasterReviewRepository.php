@@ -8,9 +8,11 @@ use App\Models\MasterReview\MasterReview;
 use App\Models\MasterReview\MasterReviewPresent;
 use App\Models\Vessel;
 use App\Repositories\CommitteeMeetings\CommitteeMeetingRepository;
+use App\Support\LegacyDb;
 use App\Support\TableQuery;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
 
 class MasterReviewRepository
 {
@@ -95,6 +97,80 @@ class MasterReviewRepository
 
         return $builder->orderBy($sort, $query->direction)
             ->paginate($query->perPage, page: $query->page);
+    }
+
+    /**
+     * Ported from Controllers/Dashboard_master_review.php's loadData():
+     * SHORE-added reviews always show (no vessel scoping); VESSEL-added
+     * reviews show only once vessel-approved, scoped to the logged-in
+     * user's assigned vessels. Both stay gated on shore_status=''
+     * (once shore acts on it, it drops off this list).
+     */
+    public function legacyTable(TableQuery $query, ?string $legacyUserId): array
+    {
+        $vessels = LegacyDb::vesselNames();
+        $assignedVesselIds = LegacyDb::assignedVesselIds($legacyUserId);
+
+        $builder = DB::connection('legacy')->table('tb_master_review')
+            ->leftJoin('tb_manual_documents', 'tb_manual_documents.manDocID', '=', 'tb_master_review.manDocID')
+            ->where('tb_master_review.is_deleted', '0')
+            ->where('tb_master_review.shore_status', '')
+            ->where(function ($q) use ($assignedVesselIds) {
+                $q->where('tb_master_review.added_by', 'SHORE')
+                    ->orWhere(function ($vessel) use ($assignedVesselIds) {
+                        $vessel->where('tb_master_review.added_by', 'VESSEL')
+                            ->where('tb_master_review.is_vessel_approved', '1')
+                            ->whereIn('tb_master_review.vesID', $assignedVesselIds);
+                    });
+            })
+            ->select([
+                'tb_master_review.vesID',
+                'tb_master_review.review_date',
+                'tb_master_review.added_by',
+                'tb_master_review.review_quarter',
+                'tb_master_review.review_year',
+                'tb_master_review.manual_section',
+                'tb_manual_documents.reference_no',
+            ]);
+
+        if ($query->search !== null) {
+            $term = "%{$query->search}%";
+            $builder->where(function ($q) use ($term) {
+                $q->where('tb_master_review.review_date', 'like', $term)
+                    ->orWhere('tb_master_review.added_by', 'like', $term)
+                    ->orWhere('tb_master_review.review_year', 'like', $term)
+                    ->orWhere('tb_manual_documents.reference_no', 'like', $term);
+            });
+        }
+
+        $sortMap = [
+            'review_date' => 'tb_master_review.review_date',
+            'added_by' => 'tb_master_review.added_by',
+            'review_quarter' => 'tb_master_review.review_quarter',
+            'review_year' => 'tb_master_review.review_year',
+        ];
+        $sort = $sortMap[$query->sort ?? ''] ?? 'tb_master_review.review_date';
+
+        $paginator = $builder->orderBy($sort, $query->direction)->paginate($query->perPage, page: $query->page);
+
+        $rows = collect($paginator->items())->map(fn ($r) => [
+            'vessel' => $vessels[$r->vesID] ?? '',
+            'review_date' => $r->review_date,
+            'added_by' => $r->added_by,
+            'review_quarter' => $r->review_quarter,
+            'review_year' => $r->review_year,
+            'sms' => $r->reference_no !== null ? trim("{$r->reference_no} ({$r->manual_section})") : '',
+        ])->all();
+
+        return [
+            'rows' => $rows,
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
+        ];
     }
 
     /** @return array<int, array{id:int,label:string}> */

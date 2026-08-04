@@ -8,9 +8,11 @@ use App\Models\CommitteeMeetings\CommitteeMeetingMember;
 use App\Models\CommitteeMeetings\CommitteeMeetingTopic;
 use App\Models\CommitteeMeetings\CommitteeMeetingType;
 use App\Models\Vessel;
+use App\Support\LegacyDb;
 use App\Support\TableQuery;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
 
 class CommitteeMeetingRepository
 {
@@ -96,6 +98,76 @@ class CommitteeMeetingRepository
     }
 
     /**
+     * Ported from Controllers/Dashboard_committee_meeting.php's
+     * loadData(): a meeting that still needs shore remarks or approval,
+     * scoped to the logged-in user's assigned vessels (legacy also
+     * requires a non-blank vesID, i.e. excludes company-wide meetings
+     * from this dashlet even though the module itself allows them).
+     */
+    public function legacyTable(TableQuery $query, ?string $legacyUserId): array
+    {
+        $vessels = LegacyDb::vesselNames();
+        $assignedVesselIds = LegacyDb::assignedVesselIds($legacyUserId);
+
+        $typesSub = DB::raw("(SELECT cmt.meetingID,
+            GROUP_CONCAT(
+                CASE WHEN pmt.type_name = 'OTHERS' THEN CONCAT(pmt.type_name, ' (', cmt.type_other, ')') ELSE pmt.type_name END
+                SEPARATOR ', '
+            ) AS meeting_type
+            FROM tb_committee_meeting_type cmt
+            JOIN pl_committee_meeting_type pmt ON pmt.typeID = cmt.typeID
+            GROUP BY cmt.meetingID) as mt");
+
+        $builder = DB::connection('legacy')->table('tb_committee_meeting')
+            ->leftJoin($typesSub, 'mt.meetingID', '=', 'tb_committee_meeting.meetingID')
+            ->where('tb_committee_meeting.vesID', '!=', '')
+            ->whereIn('tb_committee_meeting.vesID', $assignedVesselIds)
+            ->where(function ($q) {
+                $needsAttention = fn ($qq) => $qq->where('tb_committee_meeting.shore_remarks', '')->orWhere('tb_committee_meeting.is_approved', '0');
+
+                $q->where(function ($shore) use ($needsAttention) {
+                    $shore->where('tb_committee_meeting.added_by', 'SHORE')
+                        ->where('tb_committee_meeting.is_published', '1')
+                        ->where($needsAttention);
+                })->orWhere(function ($vessel) use ($needsAttention) {
+                    $vessel->where('tb_committee_meeting.added_by', 'VESSEL')
+                        ->where($needsAttention);
+                });
+            })
+            ->where('tb_committee_meeting.is_deleted', '0')
+            ->select(['tb_committee_meeting.meetingID', 'tb_committee_meeting.vesID', 'tb_committee_meeting.meeting_date', 'mt.meeting_type']);
+
+        if ($query->search !== null) {
+            $term = "%{$query->search}%";
+            $builder->where(function ($q) use ($term) {
+                $q->where('tb_committee_meeting.meeting_date', 'like', $term)
+                    ->orWhere('mt.meeting_type', 'like', $term);
+            });
+        }
+
+        $sortMap = ['meeting_date' => 'tb_committee_meeting.meeting_date'];
+        $sort = $sortMap[$query->sort ?? ''] ?? 'tb_committee_meeting.meeting_date';
+
+        $paginator = $builder->orderBy($sort, $query->direction)->paginate($query->perPage, page: $query->page);
+
+        $rows = collect($paginator->items())->map(fn ($r) => [
+            'meeting_date' => $r->meeting_date,
+            'vessel' => $vessels[$r->vesID] ?? '',
+            'type' => $r->meeting_type ?? '',
+        ])->all();
+
+        return [
+            'rows' => $rows,
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
+        ];
+    }
+
+    /**
      * Ported from Controllers/Committee_meeting.php's loadData(). The
      * `WHERE vesID IN (SELECT ... tb_user_vessel)` scoping is dropped
      * like everywhere else. `vesselId === 'SHORE'` reproduces legacy's
@@ -140,10 +212,10 @@ class CommitteeMeetingRepository
      * module. vessel_remarks is frozen blank; only the unmigrated
      * vessel-side app would ever populate it.
      *
-     * @param array<int, array{committee_meeting_type_id:int, type_other:?string}> $meetingTypes
-     * @param array<int, array{name:string}> $attendees
-     * @param array<int, array{name:string}> $members
-     * @param array<int, array{topic_name:string, meeting_details:?string, meeting_comments:?string}> $topics
+     * @param  array<int, array{committee_meeting_type_id:int, type_other:?string}>  $meetingTypes
+     * @param  array<int, array{name:string}>  $attendees
+     * @param  array<int, array{name:string}>  $members
+     * @param  array<int, array{topic_name:string, meeting_details:?string, meeting_comments:?string}>  $topics
      */
     public function create(array $data, array $meetingTypes, array $attendees, array $members, array $topics): CommitteeMeeting
     {

@@ -6,11 +6,13 @@ use App\Models\Drills\DrillList;
 use App\Models\Drills\DrillReport;
 use App\Models\Drills\DrillReportCrew;
 use App\Models\Vessel;
+use App\Support\LegacyDb;
 use App\Support\TableQuery;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Ported from Controllers/Dashboard_drill.php (the summaries()/table()
@@ -104,6 +106,98 @@ class DrillRepository
             $query->page,
             ['path' => LengthAwarePaginator::resolveCurrentPath()],
         );
+    }
+
+    /**
+     * Ported from Controllers/Dashboard_drill.php's count_drill_overdue()/
+     * count_drill_upcoming(): same vessel list scoping as
+     * PmsRepository::legacyTable() and VesselDocumentationRepository::legacyTable()
+     * (assigned AND active vessel AND active principal). For each
+     * eligible vessel, checks every active drill list that applies to
+     * it (vessel_access='ALL' or an explicit tb_drill_list_vessel row —
+     * legacy doesn't filter that row's is_inactive flag, so neither does
+     * this), takes the last report date (legacy's MAX(drill_date) query
+     * has no is_deleted/is_approved filter either), and buckets the next
+     * due date the same way as the local `summaries()`.
+     */
+    public function legacyTable(TableQuery $query, ?string $legacyUserId): array
+    {
+        $vessels = LegacyDb::vesselNames();
+        $eligibleVesselIds = LegacyDb::assignedVesselIds($legacyUserId)
+            ->intersect(LegacyDb::activeVesselIdsWithActivePrincipal());
+
+        $drillLists = DB::connection('legacy')->table('tb_drill_list')
+            ->where('status', '1')
+            ->get(['drillListID', 'vessel_access', 'frequency_type', 'frequency_count']);
+
+        $explicitVesselIds = DB::connection('legacy')->table('tb_drill_list_vessel')
+            ->whereIn('vesID', $eligibleVesselIds)
+            ->get(['drillListID', 'vesID'])
+            ->groupBy('vesID')
+            ->map(fn ($rows) => $rows->pluck('drillListID')->all());
+
+        $lastDrillDates = DB::connection('legacy')->table('tb_drill_report')
+            ->whereIn('vesID', $eligibleVesselIds)
+            ->selectRaw('vesID, drillListID, MAX(drill_date) as max_drill_date')
+            ->groupBy('vesID', 'drillListID')
+            ->get()
+            ->groupBy('vesID');
+
+        $today = Carbon::today();
+
+        $rows = collect($eligibleVesselIds)->map(function ($vesID) use ($drillLists, $explicitVesselIds, $lastDrillDates, $today, $vessels) {
+            $applicableLists = $drillLists->filter(fn ($list) => $list->vessel_access === 'ALL'
+                || in_array($list->drillListID, $explicitVesselIds->get($vesID, []), true));
+
+            $lastDrillByList = $lastDrillDates->get($vesID, collect())->keyBy('drillListID');
+
+            $upcoming = 0;
+            $overdue = 0;
+
+            foreach ($applicableLists as $list) {
+                $lastDrillDate = $lastDrillByList->get($list->drillListID)?->max_drill_date;
+
+                if ($lastDrillDate === null || $lastDrillDate === '0000-00-00') {
+                    continue;
+                }
+
+                $nextDrill = $this->nextDrillDate($lastDrillDate, $list->frequency_type, $list->frequency_count);
+
+                if ($nextDrill->lt($today)) {
+                    $overdue++;
+                } elseif ($nextDrill->copy()->subDays(30)->lte($today)) {
+                    $upcoming++;
+                }
+            }
+
+            $vesselName = $vessels[$vesID] ?? '';
+
+            return ['vessel' => $vesselName, 'upcoming' => $upcoming, 'overdue' => $overdue, '_sort_vessel' => $vesselName];
+        });
+
+        if ($query->search !== null) {
+            $term = mb_strtolower($query->search);
+            $rows = $rows->filter(fn (array $row) => str_contains(mb_strtolower($row['vessel']), $term));
+        }
+
+        $sortMap = ['vessel' => '_sort_vessel', 'upcoming' => 'upcoming', 'overdue' => 'overdue'];
+        $sortKey = $sortMap[$query->sort ?? 'vessel'] ?? '_sort_vessel';
+
+        $sorted = $rows->sortBy($sortKey, SORT_REGULAR, $query->direction === 'desc')->values()
+            ->map(fn (array $r) => collect($r)->except('_sort_vessel')->all());
+
+        $total = $sorted->count();
+        $items = $sorted->slice(($query->page - 1) * $query->perPage, $query->perPage)->values()->all();
+
+        return [
+            'rows' => $items,
+            'meta' => [
+                'current_page' => $query->page,
+                'last_page' => (int) max(1, ceil($total / $query->perPage)),
+                'per_page' => $query->perPage,
+                'total' => $total,
+            ],
+        ];
     }
 
     /** @return array<int, array{id:int,label:string}> */
@@ -211,7 +305,7 @@ class DrillRepository
      * them). Crew rows are fully replaced on every save, same
      * delete-then-recreate pattern as every other sub-table in this app.
      *
-     * @param array<int, array{crew_name:string}> $crew
+     * @param  array<int, array{crew_name:string}>  $crew
      */
     public function update(DrillReport $report, array $data, array $crew): DrillReport
     {

@@ -207,6 +207,12 @@ class DashboardController extends Controller
      */
     public function assignedTasksTable(Request $request): JsonResponse
     {
+        if (LegacyDb::isConfigured()) {
+            $result = $this->tasks->legacyTable(TableQuery::fromRequest($request), $request->user()?->legacy_user_id);
+
+            return response()->json(['data' => ['columns' => TaskRepository::columns(), ...$result]]);
+        }
+
         $paginator = $this->tasks->table(TableQuery::fromRequest($request), $request->user()->id);
 
         return $this->tableResponse($paginator, TaskRepository::columns(), function (Task $task) {
@@ -524,6 +530,12 @@ class DashboardController extends Controller
      */
     public function smsPublishManualTable(Request $request): JsonResponse
     {
+        if (LegacyDb::isConfigured()) {
+            $result = $this->manualDocumentPublish->legacyTable(TableQuery::fromRequest($request));
+
+            return response()->json(['data' => ['columns' => ManualDocumentPublishRepository::columns(), ...$result]]);
+        }
+
         $paginator = $this->manualDocumentPublish->table(TableQuery::fromRequest($request));
 
         return $this->tableResponse($paginator, ManualDocumentPublishRepository::columns(), function (ManualDocument $doc) {
@@ -585,6 +597,12 @@ class DashboardController extends Controller
      */
     public function drillsTable(Request $request): JsonResponse
     {
+        if (LegacyDb::isConfigured()) {
+            $result = $this->drills->legacyTable(TableQuery::fromRequest($request), $request->user()?->legacy_user_id);
+
+            return response()->json(['data' => ['columns' => DrillRepository::columns(), ...$result]]);
+        }
+
         $paginator = $this->drills->table(TableQuery::fromRequest($request));
 
         return $this->tableResponse($paginator, DrillRepository::columns(), function (array $row) {
@@ -624,6 +642,12 @@ class DashboardController extends Controller
      */
     public function smsVersionMonitoringTable(Request $request): JsonResponse
     {
+        if (LegacyDb::isConfigured()) {
+            $result = $this->smsVersionMonitoring->legacyTable(TableQuery::fromRequest($request), $request->user()?->legacy_user_id);
+
+            return response()->json(['data' => ['columns' => SmsVersionMonitoringRepository::columns(), ...$result]]);
+        }
+
         $paginator = $this->smsVersionMonitoring->table(TableQuery::fromRequest($request));
 
         return $this->tableResponse($paginator, SmsVersionMonitoringRepository::columns(), function (array $row) {
@@ -640,6 +664,12 @@ class DashboardController extends Controller
      */
     public function vesselDocumentationTable(Request $request): JsonResponse
     {
+        if (LegacyDb::isConfigured()) {
+            $result = $this->vesselDocumentation->legacyTable(TableQuery::fromRequest($request), $request->user()?->legacy_user_id);
+
+            return response()->json(['data' => ['columns' => VesselDocumentationRepository::columns(), ...$result]]);
+        }
+
         $paginator = $this->vesselDocumentation->table(TableQuery::fromRequest($request));
 
         return $this->tableResponse($paginator, VesselDocumentationRepository::columns(), function (array $row) {

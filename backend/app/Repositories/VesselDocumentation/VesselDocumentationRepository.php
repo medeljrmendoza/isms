@@ -9,11 +9,13 @@ use App\Models\VesselDocumentation\VesselDocumentRecord;
 use App\Models\VesselDocumentation\VesselDocumentType;
 use App\Repositories\CompanyDocumentation\CompanyDocumentationRepository;
 use App\Repositories\Drills\DrillRepository;
+use App\Support\LegacyDb;
 use App\Support\TableQuery;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Ported from Controllers/Dashboard_vessel_documentation.php. Same
@@ -151,6 +153,127 @@ class VesselDocumentationRepository
             $query->page,
             ['path' => LengthAwarePaginator::resolveCurrentPath()],
         );
+    }
+
+    /**
+     * Ported from Controllers/Dashboard_vessel_documentation.php: same
+     * vessel list scoping as PmsRepository::legacyTable() (assigned AND
+     * active vessel AND active principal), then per-vessel expiring/
+     * expired/new-from-vessel/new-from-shore counts computed the same
+     * way as the local `summaries()` — see this class's docblock for why
+     * the file-hash comparison is simplified to the two latest-known
+     * hashes rather than full history tables. The MEMBER-only
+     * `is_external` gate is dropped per the no-roles-yet precedent used
+     * everywhere else in this migration.
+     */
+    public function legacyTable(TableQuery $query, ?string $legacyUserId): array
+    {
+        $vessels = LegacyDb::vesselNames();
+        $eligibleVesselIds = LegacyDb::assignedVesselIds($legacyUserId)
+            ->intersect(LegacyDb::activeVesselIdsWithActivePrincipal());
+
+        $numMonths = (int) (DB::connection('legacy')->table('tb_document_expiring')->where('expID', 1)->value('num_month') ?? 3);
+
+        $records = DB::connection('legacy')->table('tb_vessel_documentation')
+            ->join('pl_vessel_document', 'pl_vessel_document.vesDocID', '=', 'tb_vessel_documentation.docID')
+            ->join('pl_vessel_document_type', 'pl_vessel_document_type.vesDocTypeID', '=', 'pl_vessel_document.vesDocTypeID')
+            ->where('pl_vessel_document_type.status', '1')
+            ->where('pl_vessel_document_type.is_deleted', '0')
+            ->where('pl_vessel_document.status', '1')
+            ->where('pl_vessel_document.is_deleted', '0')
+            ->where('tb_vessel_documentation.status', '1')
+            ->where('tb_vessel_documentation.is_deleted', '0')
+            ->whereIn('tb_vessel_documentation.vesID', $eligibleVesselIds)
+            ->get([
+                'tb_vessel_documentation.vessel_docID',
+                'tb_vessel_documentation.vesID',
+                'tb_vessel_documentation.date_expired',
+                'tb_vessel_documentation.date_range_from',
+                'tb_vessel_documentation.date_range_to',
+                'tb_vessel_documentation.file_hash as shore_file_hash',
+            ]);
+
+        $vesselDocIds = $records->pluck('vessel_docID')->all();
+        $latestVesselHashes = $vesselDocIds === []
+            ? collect()
+            : DB::connection('legacy')->table('tb_vessel_documentation_history')
+                ->whereIn('vessel_docID', $vesselDocIds)
+                ->orderByDesc('arrangement')
+                ->get(['vessel_docID', 'file_hash'])
+                ->unique('vessel_docID')
+                ->keyBy('vessel_docID');
+
+        $today = Carbon::today();
+        $recordsByVessel = $records->groupBy('vesID');
+
+        $rows = collect($eligibleVesselIds)->map(function ($vesID) use ($recordsByVessel, $latestVesselHashes, $numMonths, $today, $vessels) {
+            $expiring = 0;
+            $expired = 0;
+            $newFromVessel = 0;
+            $newFromShore = 0;
+
+            foreach ($recordsByVessel->get($vesID, collect()) as $r) {
+                if ($r->date_expired !== '0000-00-00') {
+                    $expiredDate = Carbon::parse($r->date_expired);
+
+                    if ($expiredDate->lte($today)) {
+                        $expired++;
+                    } elseif ($r->date_range_from === '0000-00-00') {
+                        if ($today->gte($expiredDate->copy()->subMonths($numMonths))) {
+                            $expiring++;
+                        }
+                    } elseif ($today->between(Carbon::parse($r->date_range_from), Carbon::parse($r->date_range_to))) {
+                        $expiring++;
+                    }
+                }
+
+                $vesselFileHash = $latestVesselHashes->get($r->vessel_docID)?->file_hash ?? '';
+                $shoreFileHash = $r->shore_file_hash ?? '';
+
+                if ($vesselFileHash !== '' && $vesselFileHash !== $shoreFileHash) {
+                    $newFromVessel++;
+                }
+
+                if ($shoreFileHash !== '' && $shoreFileHash !== $vesselFileHash) {
+                    $newFromShore++;
+                }
+            }
+
+            $vesselName = $vessels[$vesID] ?? '';
+
+            return [
+                'vessel' => $vesselName,
+                'expiring' => $expiring,
+                'expired' => $expired,
+                'new_from_vessel' => $newFromVessel,
+                'new_from_shore' => $newFromShore,
+                '_sort_vessel' => $vesselName,
+            ];
+        });
+
+        if ($query->search !== null) {
+            $term = mb_strtolower($query->search);
+            $rows = $rows->filter(fn (array $row) => str_contains(mb_strtolower($row['vessel']), $term));
+        }
+
+        $sortMap = ['vessel' => '_sort_vessel', 'expiring' => 'expiring', 'expired' => 'expired', 'new_from_vessel' => 'new_from_vessel', 'new_from_shore' => 'new_from_shore'];
+        $sortKey = $sortMap[$query->sort ?? 'vessel'] ?? '_sort_vessel';
+
+        $sorted = $rows->sortBy($sortKey, SORT_REGULAR, $query->direction === 'desc')->values()
+            ->map(fn (array $r) => collect($r)->except('_sort_vessel')->all());
+
+        $total = $sorted->count();
+        $items = $sorted->slice(($query->page - 1) * $query->perPage, $query->perPage)->values()->all();
+
+        return [
+            'rows' => $items,
+            'meta' => [
+                'current_page' => $query->page,
+                'last_page' => (int) max(1, ceil($total / $query->perPage)),
+                'per_page' => $query->perPage,
+                'total' => $total,
+            ],
+        ];
     }
 
     /** @return array<int, array{id:int,label:string}> */
