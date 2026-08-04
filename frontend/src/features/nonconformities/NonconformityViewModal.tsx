@@ -46,7 +46,7 @@ export function NonconformityViewModal({ nonconformity, onClose }: { nonconformi
     .filter(([key]) => nonconformity[key as keyof typeof ATTACHMENT_LABELS])
     .map(([, label]) => label);
   if (nonconformity.attach_others) {
-    attachments.push(`Others — ${nonconformity.attach_others_details || ""}`.trim());
+    attachments.push(`Others - ${nonconformity.attach_others_details || ""}`.trim());
   }
 
   return (
@@ -55,7 +55,7 @@ export function NonconformityViewModal({ nonconformity, onClose }: { nonconformi
         <Section title="Header">
           <Row label="NCR No." value={nonconformity.ncr_no} />
           <Row label="Date of NC" value={nonconformity.date_of_nc} />
-          <Row label="Vessel/Company" value={nonconformity.vessel_company} />
+          <Row label="Vessel/Company" value={`${nonconformity.vessel_company_raw} - ${nonconformity.vessel_company}`} />
           <Row label="Department" value={nonconformity.department_name} />
           <Row label="Reporter" value={`${nonconformity.reported_by_raw ?? ""} - ${nonconformity.reporter_name ?? ""}`} />
         </Section>

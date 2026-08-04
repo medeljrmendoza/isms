@@ -2,19 +2,20 @@
 
 namespace App\Services;
 
-use App\Repositories\CompanyInspections\AuditReportRepository;
 use App\Repositories\Claims\ClaimRepository;
 use App\Repositories\CommitteeMeetings\CommitteeMeetingRepository;
 use App\Repositories\CompanyDocumentation\CompanyDocumentationRepository;
+use App\Repositories\CompanyInspections\AuditReportRepository;
 use App\Repositories\Defects\DefectRepository;
 use App\Repositories\Drills\DrillRepository;
 use App\Repositories\ExposureHours\ExposureHoursRepository;
 use App\Repositories\ExternalAudits\ExternalAuditReportRepository;
-use App\Repositories\ManualPublish\ManualDocumentPublishRepository;
 use App\Repositories\FlagState\FlagStateReportRepository;
 use App\Repositories\IncidentReports\IncidentReportRepository;
 use App\Repositories\InternalAudits\InternalAuditReportRepository;
 use App\Repositories\IspsReview\IspsReviewRepository;
+use App\Repositories\ManualPublish\ManualDocumentPublishRepository;
+use App\Repositories\ManualPublish\SmsVersionMonitoringRepository;
 use App\Repositories\MasterReview\MasterReviewRepository;
 use App\Repositories\Nonconformities\NonconformityRepository;
 use App\Repositories\NonSire\NonSireReportRepository;
@@ -22,7 +23,6 @@ use App\Repositories\Pms\PmsRepository;
 use App\Repositories\PscReports\PscReportRepository;
 use App\Repositories\RiskAssessment\RiskAssessmentRepository;
 use App\Repositories\Sire\SireReportRepository;
-use App\Repositories\ManualPublish\SmsVersionMonitoringRepository;
 use App\Repositories\Tasks\TaskRepository;
 use App\Repositories\VesselDocumentation\VesselDocumentationRepository;
 
@@ -123,7 +123,7 @@ class DashboardService
         return [
             'key' => $key,
             'title' => $title,
-            'span' => 'half',
+            'span' => 'full',
             'manual_load' => false,
             'extra_action' => $extraAction,
             'items' => [],
