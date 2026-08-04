@@ -6,10 +6,12 @@ use App\Models\ExternalAudits\ExternalAuditReport;
 use App\Models\FlagState\FlagStateReport;
 use App\Models\Nonconformities\Nonconformity;
 use App\Models\Vessel;
+use App\Support\LegacyDb;
 use App\Support\TableQuery;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
 
 class NonconformityRepository
 {
@@ -124,6 +126,79 @@ class NonconformityRepository
 
         return $builder->orderBy($sort, $query->direction)
             ->paginate($query->perPage, page: $query->page);
+    }
+
+    /**
+     * Reads the dashlet's "pending" set from the real legacy staging
+     * database instead of local seed data — see App\Support\LegacyDb.
+     * Same open-or-unapproved rule as pendingQuery(), replicated directly
+     * in SQL since tb_nonconformities' column names match 1:1.
+     */
+    public function legacyTable(TableQuery $query): array
+    {
+        $vessels = LegacyDb::vesselNames();
+
+        $builder = DB::connection('legacy')->table('tb_nonconformities')
+            ->where('is_inactive', 0)
+            ->where(function ($q) {
+                $q->where(function ($vessel) {
+                    $vessel->where('added_by', 'VESSEL')->where(fn ($q2) => $this->legacyOpenOrUnapproved($q2));
+                })->orWhere(function ($shore) {
+                    $shore->where('added_by', 'SHORE')->where(function ($publishBranch) {
+                        $publishBranch->where(function ($unpublished) {
+                            $unpublished->where('is_published', 0)->where('close_out_date', '0000-00-00');
+                        })->orWhere(function ($published) {
+                            $published->where('is_published', 1)->where(fn ($q2) => $this->legacyOpenOrUnapproved($q2));
+                        });
+                    });
+                });
+            });
+
+        if ($query->search !== null) {
+            $term = "%{$query->search}%";
+            $builder->where(function ($q) use ($term) {
+                $q->where('ncr_no', 'like', $term)
+                    ->orWhere('description', 'like', $term)
+                    ->orWhere('date_of_nc', 'like', $term)
+                    ->orWhere('company', 'like', $term);
+            });
+        }
+
+        $sortable = array_column(array_filter(self::COLUMNS, fn ($c) => $c['sortable']), 'key');
+        $sort = in_array($query->sort, $sortable, true) ? $query->sort : 'date_of_nc';
+
+        $paginator = $builder->orderBy($sort, $query->direction)->paginate($query->perPage, page: $query->page);
+
+        $rows = collect($paginator->items())->map(fn ($nc) => [
+            'ncr_no' => $nc->ncr_no,
+            'date_of_nc' => $nc->date_of_nc,
+            'vessel_company' => $nc->vessel_company === 'VESSEL' ? ($vessels[$nc->vesID] ?? '') : ($nc->company ?? ''),
+            'description' => $nc->description,
+        ])->all();
+
+        return [
+            'rows' => $rows,
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
+        ];
+    }
+
+    /**
+     * The legacy table stores an empty close_out_date as the zero-date
+     * sentinel '0000-00-00' (column is NOT NULL) rather than true NULL —
+     * matches the same convention seen throughout legacy's PHP source.
+     */
+    private function legacyOpenOrUnapproved($query)
+    {
+        return $query->where('close_out_date', '0000-00-00')
+            ->orWhere(function ($unapproved) {
+                $unapproved->where('is_approved', 0)
+                    ->whereNotIn('source_of_nc', self::SOURCES_APPROVED_ELSEWHERE);
+            });
     }
 
     private function openOrUnapproved(Builder $query): Builder

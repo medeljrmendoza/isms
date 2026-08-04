@@ -4,9 +4,11 @@ namespace App\Repositories\Defects;
 
 use App\Models\Defects\Defect;
 use App\Models\Vessel;
+use App\Support\LegacyDb;
 use App\Support\TableQuery;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
 
 /** Ported from Controllers/Defect_list.php. */
 class DefectRepository
@@ -65,6 +67,57 @@ class DefectRepository
 
         return $builder->orderBy($sort, $query->direction)
             ->paginate($query->perPage, page: $query->page);
+    }
+
+    /**
+     * Reads the dashlet's "pending" set from the real legacy staging
+     * database instead of local seed data — see App\Support\LegacyDb.
+     * Same not-yet-Complete rule as pendingQuery(); legacy's column
+     * names differ from the local model's (defect_priority/defect_cat
+     * vs priority/category), mapped 1:1 below.
+     */
+    public function legacyTable(TableQuery $query): array
+    {
+        $vessels = LegacyDb::vesselNames();
+
+        $builder = DB::connection('legacy')->table('tb_defect_list')
+            ->where('compl_code', '!=', 'C');
+
+        if ($query->search !== null) {
+            $term = "%{$query->search}%";
+            $builder->where(function ($q) use ($term) {
+                $q->where('sl_no', 'like', $term)
+                    ->orWhere('defect_date', 'like', $term)
+                    ->orWhere('defect_priority', 'like', $term)
+                    ->orWhere('defect_cat', 'like', $term);
+            });
+        }
+
+        $columnMap = ['priority' => 'defect_priority', 'category' => 'defect_cat'];
+        $sortable = array_column(array_filter(self::COLUMNS, fn ($c) => $c['sortable']), 'key');
+        $sort = in_array($query->sort, $sortable, true) ? $query->sort : 'defect_date';
+        $sort = $columnMap[$sort] ?? $sort;
+
+        $paginator = $builder->orderBy($sort, $query->direction)->paginate($query->perPage, page: $query->page);
+
+        $rows = collect($paginator->items())->map(fn ($d) => [
+            'sl_no' => $d->sl_no,
+            'vessel' => $vessels[$d->vesID] ?? '',
+            'defect_date' => $d->defect_date,
+            'priority' => $d->defect_priority,
+            'category' => $d->defect_cat,
+            'compl_code' => $d->compl_code,
+        ])->all();
+
+        return [
+            'rows' => $rows,
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
+        ];
     }
 
     /**

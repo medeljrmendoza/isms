@@ -46,6 +46,7 @@ use App\Repositories\Sire\SireReportRepository;
 use App\Repositories\Tasks\TaskRepository;
 use App\Repositories\VesselDocumentation\VesselDocumentationRepository;
 use App\Services\DashboardService;
+use App\Support\LegacyDb;
 use App\Support\TableQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -107,6 +108,12 @@ class DashboardController extends Controller
      */
     public function nonconformitiesTable(Request $request): JsonResponse
     {
+        if (LegacyDb::isConfigured()) {
+            $result = $this->nonconformities->legacyTable(TableQuery::fromRequest($request));
+
+            return response()->json(['data' => ['columns' => NonconformityRepository::columns(), ...$result]]);
+        }
+
         $paginator = $this->nonconformities->table(TableQuery::fromRequest($request));
 
         return $this->tableResponse($paginator, NonconformityRepository::columns(), function (Nonconformity $nc) {
@@ -388,6 +395,12 @@ class DashboardController extends Controller
      */
     public function defectsTable(Request $request): JsonResponse
     {
+        if (LegacyDb::isConfigured()) {
+            $result = $this->defects->legacyTable(TableQuery::fromRequest($request));
+
+            return response()->json(['data' => ['columns' => DefectRepository::columns(), ...$result]]);
+        }
+
         $paginator = $this->defects->table(TableQuery::fromRequest($request));
 
         return $this->tableResponse($paginator, DefectRepository::columns(), function (Defect $defect) {
@@ -484,6 +497,12 @@ class DashboardController extends Controller
      */
     public function pmsTable(Request $request): JsonResponse
     {
+        if (LegacyDb::isConfigured()) {
+            $result = $this->pms->legacyTable(TableQuery::fromRequest($request));
+
+            return response()->json(['data' => ['columns' => PmsRepository::columns(), ...$result]]);
+        }
+
         $paginator = $this->pms->table(TableQuery::fromRequest($request));
 
         return $this->tableResponse($paginator, PmsRepository::columns(), function (array $row) {

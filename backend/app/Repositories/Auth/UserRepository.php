@@ -27,4 +27,29 @@ class UserRepository
         $user->password = $plainPassword;
         $user->save();
     }
+
+    /**
+     * Mirrors a verified legacy tb_users row into the local `users` table
+     * so the rest of the Sanctum/session auth flow (Auth::login(), the
+     * `web` guard's user provider) works unchanged. The legacy password
+     * is already a bcrypt hash ($2y$...), so assigning it directly is
+     * safe — the `hashed` cast on User detects an already-hashed value
+     * and skips re-hashing it.
+     */
+    public function syncFromLegacy(object $legacyUser): User
+    {
+        $name = trim("{$legacyUser->first_name} {$legacyUser->last_name}") ?: $legacyUser->username;
+        $email = $legacyUser->email !== '' ? $legacyUser->email : "{$legacyUser->username}@legacy.local";
+
+        return User::query()->updateOrCreate(
+            ['username' => $legacyUser->username],
+            [
+                'name' => $name,
+                'email' => $email,
+                'password' => $legacyUser->password,
+                'status' => (bool) $legacyUser->status,
+                'force_password_change' => (bool) $legacyUser->force_password_change,
+            ],
+        );
+    }
 }
