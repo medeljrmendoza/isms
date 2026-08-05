@@ -27,7 +27,7 @@ export const committeeMeetingService = {
     return response.data.data;
   },
 
-  async show(id: number): Promise<CommitteeMeetingDetail> {
+  async show(id: number | string): Promise<CommitteeMeetingDetail> {
     const response = await axiosClient.get<ApiResource<CommitteeMeetingDetail>>(`/committee-meetings/${id}`);
     return response.data.data;
   },

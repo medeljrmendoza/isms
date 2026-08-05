@@ -1,7 +1,8 @@
 import type { DashletColumn, TableMeta } from "../dashboard/dashboard";
 
 export interface CommitteeMeetingRow {
-  id: number;
+  /** A local numeric id normally, but a legacy meetingID string when reading from the legacy connection. */
+  id: number | string;
   meeting_date: string;
   added_by: "SHORE" | "VESSEL";
   shore_vessel_meeting: "SHORE" | "VESSEL";
@@ -53,7 +54,7 @@ export interface CommitteeMeetingListResponse {
 }
 
 export interface CommitteeMeetingOption {
-  id: number;
+  id: number | string;
   label: string;
 }
 

@@ -204,6 +204,97 @@ class CommitteeMeetingRepository
     }
 
     /**
+     * Same as fullTable(), reading tb_committee_meeting directly from
+     * the legacy connection. Keeps the vesID-in-assigned-vessels
+     * scoping fullTable() drops (see its docblock); the "SHORE"
+     * company-wide filter sentinel is also kept. Read-only: can_edit/
+     * can_publish/can_approve/can_delete are always false.
+     */
+    public function legacyFullTable(TableQuery $query, ?string $vesselId, ?string $legacyUserId): array
+    {
+        $vessels = LegacyDb::vesselNames();
+        $assignedVesselIds = LegacyDb::assignedVesselIds($legacyUserId);
+
+        $typesSub = DB::raw("(SELECT cmt.meetingID,
+            GROUP_CONCAT(
+                CASE WHEN pmt.type_name = 'OTHERS' THEN CONCAT(pmt.type_name, ' (', cmt.type_other, ')') ELSE pmt.type_name END
+                SEPARATOR ', '
+            ) AS meeting_type
+            FROM tb_committee_meeting_type cmt
+            JOIN pl_committee_meeting_type pmt ON pmt.typeID = cmt.typeID
+            GROUP BY cmt.meetingID) as mt");
+
+        $builder = DB::connection('legacy')->table('tb_committee_meeting')
+            ->leftJoin($typesSub, 'mt.meetingID', '=', 'tb_committee_meeting.meetingID')
+            ->where('tb_committee_meeting.is_deleted', '0')
+            ->where(function ($q) use ($assignedVesselIds) {
+                $q->where('tb_committee_meeting.vesID', '')->orWhereIn('tb_committee_meeting.vesID', $assignedVesselIds);
+            })
+            ->select([
+                'tb_committee_meeting.meetingID', 'tb_committee_meeting.vesID', 'tb_committee_meeting.added_by',
+                'tb_committee_meeting.shore_vessel_meeting', 'tb_committee_meeting.meeting_date',
+                'tb_committee_meeting.chairman', 'tb_committee_meeting.incharge',
+                'tb_committee_meeting.shore_remarks', 'tb_committee_meeting.is_published', 'tb_committee_meeting.is_approved',
+                'mt.meeting_type',
+            ]);
+
+        if ($vesselId === 'SHORE') {
+            $builder->where(function ($q) {
+                $q->where('tb_committee_meeting.vesID', '')->orWhereNull('tb_committee_meeting.vesID');
+            });
+        } elseif ($vesselId !== null && $vesselId !== '' && $vesselId !== 'ALL') {
+            $builder->where('tb_committee_meeting.vesID', $vesselId);
+        }
+
+        if ($query->search !== null) {
+            $term = "%{$query->search}%";
+            $builder->where(function ($q) use ($term) {
+                $q->where('tb_committee_meeting.meeting_date', 'like', $term)
+                    ->orWhere('tb_committee_meeting.chairman', 'like', $term)
+                    ->orWhere('tb_committee_meeting.incharge', 'like', $term)
+                    ->orWhere('mt.meeting_type', 'like', $term);
+            });
+        }
+
+        $sortMap = ['meeting_date' => 'tb_committee_meeting.meeting_date', 'chairman' => 'tb_committee_meeting.chairman', 'incharge' => 'tb_committee_meeting.incharge'];
+        $sort = $sortMap[$query->sort ?? ''] ?? 'tb_committee_meeting.meeting_date';
+
+        $paginator = $builder->orderBy($sort, $query->direction)->paginate($query->perPage, page: $query->page);
+
+        $rows = collect($paginator->items())->map(function ($r) use ($vessels) {
+            $hasVessel = $r->vesID !== '' && $r->vesID !== null;
+
+            return [
+                'id' => $r->meetingID,
+                'meeting_date' => $r->meeting_date,
+                'added_by' => $r->added_by,
+                'shore_vessel_meeting' => $r->shore_vessel_meeting,
+                'vessel' => $hasVessel ? ($vessels[$r->vesID] ?? '') : 'SHORE',
+                'meeting_type' => $r->meeting_type ?? '',
+                'chairman' => $r->chairman,
+                'incharge' => $r->incharge,
+                'has_shore_remarks' => $r->shore_remarks !== '' && $r->shore_remarks !== null,
+                'published' => ($r->added_by === 'SHORE' && $hasVessel) ? $r->is_published === '1' : null,
+                'is_approved' => $hasVessel ? $r->is_approved === '1' : null,
+                'can_edit' => false,
+                'can_publish' => false,
+                'can_approve' => false,
+                'can_delete' => false,
+            ];
+        })->all();
+
+        return [
+            'rows' => $rows,
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
+        ];
+    }
+
+    /**
      * Ported from add_record()'s insert branch: new records are always
      * SHORE-added (there's no VESSEL-origin path reachable from this
      * admin). shore_vessel_meeting drives everything else: a SHORE-only
@@ -313,6 +404,12 @@ class CommitteeMeetingRepository
             ->all();
     }
 
+    /** @return array<int, array{id:string,label:string}> */
+    public function legacyVesselOptions(?string $legacyUserId): array
+    {
+        return LegacyDb::assignedVesselOptions($legacyUserId);
+    }
+
     private function syncMeetingTypes(CommitteeMeeting $meeting, array $rows): void
     {
         $meeting->meetingTypes()->sync(
@@ -381,6 +478,7 @@ class CommitteeMeetingRepository
         }
 
         return $this->toDetailArray([
+            'id' => $m->id,
             'meeting_date' => $m->meeting_date->format('Y-m-d'),
             'added_by' => $m->added_by,
             'shore_vessel_meeting' => $m->shore_vessel_meeting,
@@ -448,6 +546,7 @@ class CommitteeMeetingRepository
         $hasVessel = $m->vesID !== '' && $m->vesID !== null;
 
         return $this->toDetailArray([
+            'id' => $m->meetingID,
             'meeting_date' => $m->meeting_date,
             'added_by' => $m->added_by,
             'shore_vessel_meeting' => $m->shore_vessel_meeting,
@@ -473,7 +572,7 @@ class CommitteeMeetingRepository
     private function toDetailArray(array $r): array
     {
         return [
-            'id' => 0,
+            'id' => $r['id'],
             'meeting_date' => $r['meeting_date'],
             'added_by' => $r['added_by'],
             'shore_vessel_meeting' => $r['shore_vessel_meeting'],

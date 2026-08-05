@@ -116,13 +116,13 @@ export function CommitteeMeetingsPage() {
 
   const reload = () => setReloadKey((k) => k + 1);
 
-  const openView = async (id: number) => {
+  const openView = async (id: number | string) => {
     setActionError(null);
     const detail = await committeeMeetingService.show(id);
     setViewing(detail);
   };
 
-  const openEdit = async (id: number) => {
+  const openEdit = async (id: number | string) => {
     setActionError(null);
     const detail = await committeeMeetingService.show(id);
     setEditing(detail);
@@ -248,7 +248,8 @@ export function CommitteeMeetingsPage() {
                           type="button"
                           variant="secondary"
                           className="!px-1.5 !py-0.5 text-xs"
-                          onClick={() => runAction(() => committeeMeetingService.publish(row.id))}
+                          // row.id is always numeric here: can_publish is only true for local rows.
+                          onClick={() => runAction(() => committeeMeetingService.publish(row.id as number))}
                         >
                           {row.published ? "Unpublish" : "Publish"}
                         </Button>
@@ -258,7 +259,8 @@ export function CommitteeMeetingsPage() {
                           type="button"
                           variant="success"
                           className="!px-1.5 !py-0.5 text-xs"
-                          onClick={() => runAction(() => committeeMeetingService.approve(row.id))}
+                          // row.id is always numeric here: can_approve is only true for local rows.
+                          onClick={() => runAction(() => committeeMeetingService.approve(row.id as number))}
                         >
                           Approve
                         </Button>
@@ -270,7 +272,8 @@ export function CommitteeMeetingsPage() {
                           className="!px-1.5 !py-0.5 text-xs text-red-600"
                           onClick={() => {
                             if (window.confirm(`Delete this meeting for ${row.vessel}?`)) {
-                              runAction(() => committeeMeetingService.destroy(row.id));
+                              // row.id is always numeric here: can_delete is only true for local rows.
+                              runAction(() => committeeMeetingService.destroy(row.id as number));
                             }
                           }}
                         >

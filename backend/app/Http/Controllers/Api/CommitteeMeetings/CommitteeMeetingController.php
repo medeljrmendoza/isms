@@ -7,6 +7,7 @@ use App\Http\Requests\CommitteeMeetings\CommitteeMeetingRequest;
 use App\Models\CommitteeMeetings\CommitteeMeeting;
 use App\Models\CommitteeMeetings\CommitteeMeetingType;
 use App\Repositories\CommitteeMeetings\CommitteeMeetingRepository;
+use App\Support\LegacyDb;
 use App\Support\TableQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -38,11 +39,25 @@ class CommitteeMeetingController extends Controller
     public function index(Request $request): JsonResponse
     {
         $vesselId = $request->query('vessel_id');
+        $vesselId = $vesselId !== '' ? $vesselId : null;
 
-        $paginator = $this->committeeMeetings->fullTable(
-            TableQuery::fromRequest($request),
-            $vesselId !== '' ? $vesselId : null,
-        );
+        if (LegacyDb::isConfigured()) {
+            $result = $this->committeeMeetings->legacyFullTable(
+                TableQuery::fromRequest($request),
+                $vesselId,
+                $request->user()?->legacy_user_id,
+            );
+
+            return response()->json([
+                'data' => [
+                    'columns' => CommitteeMeetingRepository::moduleColumns(),
+                    'rows' => $result['rows'],
+                    'meta' => $result['meta'],
+                ],
+            ]);
+        }
+
+        $paginator = $this->committeeMeetings->fullTable(TableQuery::fromRequest($request), $vesselId);
 
         return response()->json([
             'data' => [
@@ -56,11 +71,13 @@ class CommitteeMeetingController extends Controller
     /**
      * GET /api/committee-meetings/options
      */
-    public function options(): JsonResponse
+    public function options(Request $request): JsonResponse
     {
         return response()->json([
             'data' => [
-                'vessels' => $this->committeeMeetings->vesselOptions(),
+                'vessels' => LegacyDb::isConfigured()
+                    ? $this->committeeMeetings->legacyVesselOptions($request->user()?->legacy_user_id)
+                    : $this->committeeMeetings->vesselOptions(),
                 'meeting_types' => $this->committeeMeetings->meetingTypeOptions(),
             ],
         ]);
@@ -69,11 +86,18 @@ class CommitteeMeetingController extends Controller
     /**
      * GET /api/committee-meetings/{committeeMeeting}
      */
-    public function show(CommitteeMeeting $committeeMeeting): JsonResponse
+    public function show(string $committeeMeeting): JsonResponse
     {
-        $committeeMeeting->load(['vessel', 'meetingTypes', 'attendees', 'members', 'topics']);
+        if (LegacyDb::isConfigured()) {
+            $detail = $this->committeeMeetings->legacyDetail($committeeMeeting);
+            abort_if($detail === null, 404);
 
-        return response()->json(['data' => $this->mapDetail($committeeMeeting)]);
+            return response()->json(['data' => $detail]);
+        }
+
+        $model = CommitteeMeeting::query()->with(['vessel', 'meetingTypes', 'attendees', 'members', 'topics'])->findOrFail((int) $committeeMeeting);
+
+        return response()->json(['data' => $this->mapDetail($model)]);
     }
 
     /**

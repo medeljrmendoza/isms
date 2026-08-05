@@ -123,7 +123,8 @@ export function CommitteeMeetingForm({ committeeMeeting, onSuccess, onCancel }: 
       if (isCreate) {
         await committeeMeetingService.create(values);
       } else {
-        await committeeMeetingService.update(committeeMeeting.id, values);
+        // committeeMeeting.id is always numeric here: the edit form only opens for can_edit rows (local-only).
+        await committeeMeetingService.update(committeeMeeting.id as number, values);
       }
       onSuccess();
     } catch (error) {
@@ -188,7 +189,12 @@ export function CommitteeMeetingForm({ committeeMeeting, onSuccess, onCancel }: 
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           {options.meeting_types.map((type) => (
             <label key={type.id} className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={selectedTypeIds.has(type.id)} onChange={() => toggleType(type.id, type.label)} />
+              {/* meeting_types options are always local-only (never legacy-sourced), so type.id is always numeric. */}
+              <input
+                type="checkbox"
+                checked={selectedTypeIds.has(type.id as number)}
+                onChange={() => toggleType(type.id as number, type.label)}
+              />
               {type.label}
             </label>
           ))}
