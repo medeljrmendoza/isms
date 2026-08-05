@@ -15,9 +15,11 @@ import { isNavGroup } from "../../types/navigation";
  */
 export function NavDropdownPanel({
   children,
+  activePath,
   onNavigate,
 }: {
   children: NavChild[];
+  activePath: string;
   onNavigate: () => void;
 }) {
   return (
@@ -27,9 +29,16 @@ export function NavDropdownPanel({
           <div key={child.label} className="group/submenu relative">
             <button
               type="button"
-              className="flex w-full items-center justify-between px-4 py-1.5 text-left text-sm text-slate-700 hover:bg-slate-100 group-hover/submenu:bg-slate-100"
+              className={`flex w-full items-center justify-between gap-2 px-4 py-1.5 text-left text-sm hover:bg-slate-100 group-hover/submenu:bg-slate-100 ${
+                child.children.some((leaf) => leaf.path === activePath) ? "font-semibold text-sky-700" : "text-slate-700"
+              }`}
             >
-              {child.label}
+              <span className="flex items-center gap-2">
+                {child.children.some((leaf) => leaf.path === activePath) && (
+                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-sky-500" aria-hidden="true" />
+                )}
+                {child.label}
+              </span>
               <span className="text-slate-400">▸</span>
             </button>
             <div className="absolute left-full top-0 z-30 hidden w-72 rounded-md border border-slate-200 bg-white py-2 shadow-xl group-hover/submenu:block">
@@ -38,8 +47,11 @@ export function NavDropdownPanel({
                   key={leaf.path}
                   to={leaf.path}
                   onClick={onNavigate}
-                  className="block px-4 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
+                  className={`flex items-center gap-2 px-4 py-1.5 text-sm hover:bg-slate-100 ${
+                    leaf.path === activePath ? "bg-sky-50 font-semibold text-sky-700" : "text-slate-700"
+                  }`}
                 >
+                  {leaf.path === activePath && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-sky-500" aria-hidden="true" />}
                   {leaf.label}
                 </Link>
               ))}
@@ -50,8 +62,11 @@ export function NavDropdownPanel({
             key={child.path}
             to={child.path}
             onClick={onNavigate}
-            className="block px-4 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
+            className={`flex items-center gap-2 px-4 py-1.5 text-sm hover:bg-slate-100 ${
+              child.path === activePath ? "bg-sky-50 font-semibold text-sky-700" : "text-slate-700"
+            }`}
           >
+            {child.path === activePath && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-sky-500" aria-hidden="true" />}
             {child.label}
           </Link>
         ),

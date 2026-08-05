@@ -4,8 +4,14 @@ import { useAuth } from "../../context/AuthContext";
 import { navigation } from "../../data/navigation";
 import { NavDropdownPanel } from "./NavDropdownPanel";
 import { GuideModal } from "./GuideModal";
+import { isNavGroup, type NavChild } from "../../types/navigation";
 
 const ENV_LABEL = import.meta.env.VITE_ENV_LABEL;
+
+/** Whether the current route is one of this dropdown's (possibly nested) leaves. */
+function containsActivePath(children: NavChild[], pathname: string): boolean {
+  return children.some((child) => (isNavGroup(child) ? containsActivePath(child.children, pathname) : child.path === pathname));
+}
 
 export function NavBar() {
   const { user, logout } = useAuth();
@@ -35,7 +41,7 @@ export function NavBar() {
   };
 
   return (
-    <nav ref={navRef} className="relative z-30 border-b border-gray-900 bg-gray-800 px-4 py-2.5">
+    <nav ref={navRef} className="sticky top-0 z-30 border-b border-gray-900 bg-gray-800 px-4 py-2.5">
       <div className="flex flex-wrap items-center gap-1">
         <div className="mr-3 flex items-center gap-2">
           <span className="text-sm font-bold uppercase tracking-widest text-white">ISMS</span>
@@ -46,32 +52,40 @@ export function NavBar() {
           )}
         </div>
 
-        {navigation.map((item) =>
-          item.children ? (
+        {navigation.map((item) => {
+          const isActive = item.children
+            ? containsActivePath(item.children, location.pathname)
+            : item.path === location.pathname;
+
+          return item.children ? (
             <div key={item.label} className="relative">
               <button
                 type="button"
                 onClick={() => setOpenMenu((prev) => (prev === item.label ? null : item.label))}
-                className={`rounded px-3 py-1.5 text-sm font-medium text-slate-200 hover:bg-white/10 hover:text-white ${
+                className={`flex items-center gap-1 rounded px-3 py-1.5 text-sm font-medium text-slate-200 hover:bg-white/10 hover:text-white ${
                   openMenu === item.label ? "bg-white/10 text-white" : ""
-                }`}
+                } ${isActive ? "text-white" : ""}`}
               >
+                {isActive && <span className="h-1.5 w-1.5 rounded-full bg-sky-400" aria-hidden="true" />}
                 {item.label} <span className="ml-0.5 text-[10px]">▾</span>
               </button>
               {openMenu === item.label && (
-                <NavDropdownPanel children={item.children} onNavigate={() => setOpenMenu(null)} />
+                <NavDropdownPanel children={item.children} activePath={location.pathname} onNavigate={() => setOpenMenu(null)} />
               )}
             </div>
           ) : (
             <Link
               key={item.label}
               to={item.path!}
-              className="rounded px-3 py-1.5 text-sm font-medium text-slate-200 hover:bg-white/10 hover:text-white"
+              className={`flex items-center gap-1 rounded px-3 py-1.5 text-sm font-medium hover:bg-white/10 hover:text-white ${
+                isActive ? "text-white" : "text-slate-200"
+              }`}
             >
+              {isActive && <span className="h-1.5 w-1.5 rounded-full bg-sky-400" aria-hidden="true" />}
               {item.label}
             </Link>
-          ),
-        )}
+          );
+        })}
 
         <div className="ml-auto flex items-center gap-2">
           <button
