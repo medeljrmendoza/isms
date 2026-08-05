@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Sire\SireReportRequest;
 use App\Models\Sire\SireReport;
 use App\Repositories\Sire\SireReportRepository;
+use App\Support\LegacyDb;
 use App\Support\TableQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -36,11 +37,25 @@ class SireReportController extends Controller
     public function index(Request $request): JsonResponse
     {
         $vesselId = $request->query('vessel_id');
+        $vesselId = $vesselId !== '' ? $vesselId : null;
 
-        $paginator = $this->sireReports->fullTable(
-            TableQuery::fromRequest($request),
-            $vesselId !== '' ? $vesselId : null,
-        );
+        if (LegacyDb::isConfigured()) {
+            $result = $this->sireReports->legacyFullTable(
+                TableQuery::fromRequest($request),
+                $vesselId,
+                $request->user()?->legacy_user_id,
+            );
+
+            return response()->json([
+                'data' => [
+                    'columns' => SireReportRepository::moduleColumns(),
+                    'rows' => $result['rows'],
+                    'meta' => $result['meta'],
+                ],
+            ]);
+        }
+
+        $paginator = $this->sireReports->fullTable(TableQuery::fromRequest($request), $vesselId);
 
         return response()->json([
             'data' => [
@@ -54,11 +69,13 @@ class SireReportController extends Controller
     /**
      * GET /api/sire-reports/options
      */
-    public function options(): JsonResponse
+    public function options(Request $request): JsonResponse
     {
         return response()->json([
             'data' => [
-                'vessels' => $this->sireReports->vesselOptions(),
+                'vessels' => LegacyDb::isConfigured()
+                    ? $this->sireReports->legacyVesselOptions($request->user()?->legacy_user_id)
+                    : $this->sireReports->vesselOptions(),
             ],
         ]);
     }
@@ -66,11 +83,18 @@ class SireReportController extends Controller
     /**
      * GET /api/sire-reports/{sireReport}
      */
-    public function show(SireReport $sireReport): JsonResponse
+    public function show(string $sireReport): JsonResponse
     {
-        $sireReport->load('vessel');
+        if (LegacyDb::isConfigured()) {
+            $detail = $this->sireReports->legacyDetail($sireReport);
+            abort_if($detail === null, 404);
 
-        return response()->json(['data' => $this->mapDetail($sireReport)]);
+            return response()->json(['data' => $detail]);
+        }
+
+        $model = SireReport::query()->with('vessel')->findOrFail((int) $sireReport);
+
+        return response()->json(['data' => $this->mapDetail($model)]);
     }
 
     /**

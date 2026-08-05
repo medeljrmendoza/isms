@@ -94,7 +94,8 @@ export function NonSireReportForm({ nonSireReport, onSuccess, onCancel }: NonSir
       if (isCreate) {
         await nonSireReportService.create(values);
       } else {
-        await nonSireReportService.update(nonSireReport.id, values);
+        // nonSireReport.id is always numeric here: the edit form only opens for can_edit rows (local-only).
+        await nonSireReportService.update(nonSireReport.id as number, values);
       }
       onSuccess();
     } catch (error) {

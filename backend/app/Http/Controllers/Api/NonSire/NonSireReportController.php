@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\NonSire\NonSireReportRequest;
 use App\Models\NonSire\NonSireReport;
 use App\Repositories\NonSire\NonSireReportRepository;
+use App\Support\LegacyDb;
 use App\Support\TableQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -32,11 +33,25 @@ class NonSireReportController extends Controller
     public function index(Request $request): JsonResponse
     {
         $vesselId = $request->query('vessel_id');
+        $vesselId = $vesselId !== '' ? $vesselId : null;
 
-        $paginator = $this->nonSireReports->fullTable(
-            TableQuery::fromRequest($request),
-            $vesselId !== '' ? $vesselId : null,
-        );
+        if (LegacyDb::isConfigured()) {
+            $result = $this->nonSireReports->legacyFullTable(
+                TableQuery::fromRequest($request),
+                $vesselId,
+                $request->user()?->legacy_user_id,
+            );
+
+            return response()->json([
+                'data' => [
+                    'columns' => NonSireReportRepository::moduleColumns(),
+                    'rows' => $result['rows'],
+                    'meta' => $result['meta'],
+                ],
+            ]);
+        }
+
+        $paginator = $this->nonSireReports->fullTable(TableQuery::fromRequest($request), $vesselId);
 
         return response()->json([
             'data' => [
@@ -50,11 +65,13 @@ class NonSireReportController extends Controller
     /**
      * GET /api/non-sire-reports/options
      */
-    public function options(): JsonResponse
+    public function options(Request $request): JsonResponse
     {
         return response()->json([
             'data' => [
-                'vessels' => $this->nonSireReports->vesselOptions(),
+                'vessels' => LegacyDb::isConfigured()
+                    ? $this->nonSireReports->legacyVesselOptions($request->user()?->legacy_user_id)
+                    : $this->nonSireReports->vesselOptions(),
             ],
         ]);
     }
@@ -62,11 +79,18 @@ class NonSireReportController extends Controller
     /**
      * GET /api/non-sire-reports/{nonSireReport}
      */
-    public function show(NonSireReport $nonSireReport): JsonResponse
+    public function show(string $nonSireReport): JsonResponse
     {
-        $nonSireReport->load('vessel');
+        if (LegacyDb::isConfigured()) {
+            $detail = $this->nonSireReports->legacyDetail($nonSireReport);
+            abort_if($detail === null, 404);
 
-        return response()->json(['data' => $this->mapDetail($nonSireReport)]);
+            return response()->json(['data' => $detail]);
+        }
+
+        $model = NonSireReport::query()->with('vessel')->findOrFail((int) $nonSireReport);
+
+        return response()->json(['data' => $this->mapDetail($model)]);
     }
 
     /**

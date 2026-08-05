@@ -230,6 +230,86 @@ class FlagStateReportRepository
     }
 
     /**
+     * Same as fullTable(), reading tb_flag_state directly from the
+     * legacy connection. Keeps the vesID-in-assigned-vessels scoping
+     * fullTable() drops (see its docblock). Read-only: can_edit/
+     * can_publish/can_approve/can_delete are always false.
+     */
+    public function legacyFullTable(TableQuery $query, ?string $vesselId, ?string $legacyUserId): array
+    {
+        $vessels = LegacyDb::vesselNames();
+        $assignedVesselIds = LegacyDb::assignedVesselIds($legacyUserId);
+
+        $pendingNcSub = fn ($q) => $q->from('tb_nonconformities')->selectRaw('COUNT(*)')
+            ->whereColumn('source_of_nc_ref_no', 'tb_flag_state.ref_no')
+            ->where('is_inactive', '!=', '1')
+            ->where(function ($qq) {
+                $qq->whereNull('close_out_date')->orWhere('close_out_date', '0000-00-00');
+            });
+        $totalNcSub = fn ($q) => $q->from('tb_nonconformities')->selectRaw('COUNT(*)')
+            ->whereColumn('source_of_nc_ref_no', 'tb_flag_state.ref_no')
+            ->where('is_inactive', '!=', '1');
+
+        $builder = DB::connection('legacy')->table('tb_flag_state')
+            ->where('is_deleted', '0')
+            ->whereIn('vesID', $assignedVesselIds)
+            ->select([
+                'tb_flag_state.flagID', 'tb_flag_state.ref_no', 'tb_flag_state.vesID', 'tb_flag_state.added_by',
+                'tb_flag_state.dateof_inspection', 'tb_flag_state.placeof_inspection', 'tb_flag_state.inspector',
+                'tb_flag_state.is_published', 'tb_flag_state.is_approved',
+            ])
+            ->selectSub($pendingNcSub, 'pending_nc')
+            ->selectSub($totalNcSub, 'total_nc');
+
+        if ($vesselId !== null && $vesselId !== '' && $vesselId !== 'ALL') {
+            $builder->where('tb_flag_state.vesID', $vesselId);
+        }
+
+        if ($query->search !== null) {
+            $term = "%{$query->search}%";
+            $builder->where(function ($q) use ($term) {
+                $q->where('tb_flag_state.ref_no', 'like', $term)
+                    ->orWhere('tb_flag_state.dateof_inspection', 'like', $term)
+                    ->orWhere('tb_flag_state.inspector', 'like', $term)
+                    ->orWhere('tb_flag_state.placeof_inspection', 'like', $term);
+            });
+        }
+
+        $sortMap = ['ref_no' => 'tb_flag_state.ref_no', 'dateof_inspection' => 'tb_flag_state.dateof_inspection'];
+        $sort = $sortMap[$query->sort ?? ''] ?? 'tb_flag_state.dateof_inspection';
+
+        $paginator = $builder->orderBy($sort, $query->direction)->paginate($query->perPage, page: $query->page);
+
+        $rows = collect($paginator->items())->map(fn ($r) => [
+            'id' => $r->flagID,
+            'ref_no' => $r->ref_no,
+            'vessel' => $vessels[$r->vesID] ?? '',
+            'added_by' => $r->added_by,
+            'dateof_inspection' => $r->dateof_inspection,
+            'placeof_inspection' => $r->placeof_inspection,
+            'inspector' => $r->inspector,
+            'published' => $r->added_by === 'SHORE' ? $r->is_published === '1' : null,
+            'is_approved' => $r->is_published === '1' ? $r->is_approved === '1' : null,
+            'pending_nc_count' => $r->pending_nc,
+            'total_nc_count' => $r->total_nc,
+            'can_edit' => false,
+            'can_publish' => false,
+            'can_approve' => false,
+            'can_delete' => false,
+        ])->all();
+
+        return [
+            'rows' => $rows,
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
+        ];
+    }
+
+    /**
      * Ported from add_flag_state_report()'s insert branch: new records
      * are always SHORE-added (there's no VESSEL-origin path reachable
      * from this admin) and start unpublished/unapproved.
@@ -337,6 +417,7 @@ class FlagStateReportRepository
         }
 
         return $this->toDetailArray([
+            'id' => $r->id,
             'ref_no' => $r->ref_no,
             'vessel' => $r->vessel?->display_name ?? '',
             'added_by' => $r->added_by,
@@ -376,6 +457,7 @@ class FlagStateReportRepository
             ->count();
 
         return $this->toDetailArray([
+            'id' => $r->flagID,
             'ref_no' => $r->ref_no,
             'vessel' => $vessels[$r->vesID] ?? '',
             'added_by' => $r->added_by,
@@ -396,7 +478,7 @@ class FlagStateReportRepository
     private function toDetailArray(array $r): array
     {
         return [
-            'id' => 0,
+            'id' => $r['id'],
             'ref_no' => $r['ref_no'],
             'vessel' => $r['vessel'],
             'added_by' => $r['added_by'],
@@ -424,5 +506,11 @@ class FlagStateReportRepository
         return Vessel::query()->orderBy('name')->get()
             ->map(fn (Vessel $v) => ['id' => $v->id, 'label' => $v->display_name])
             ->all();
+    }
+
+    /** @return array<int, array{id:string,label:string}> */
+    public function legacyVesselOptions(?string $legacyUserId): array
+    {
+        return LegacyDb::assignedVesselOptions($legacyUserId);
     }
 }

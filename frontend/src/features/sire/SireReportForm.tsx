@@ -92,7 +92,8 @@ export function SireReportForm({ sireReport, onSuccess, onCancel }: SireReportFo
       if (isCreate) {
         await sireReportService.create(values);
       } else {
-        await sireReportService.update(sireReport.id, values);
+        // sireReport.id is always numeric here: the edit form only opens for can_edit rows (local-only).
+        await sireReportService.update(sireReport.id as number, values);
       }
       onSuccess();
     } catch (error) {

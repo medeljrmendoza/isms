@@ -27,7 +27,7 @@ export const sireReportService = {
     return response.data.data;
   },
 
-  async show(id: number): Promise<SireReportDetail> {
+  async show(id: number | string): Promise<SireReportDetail> {
     const response = await axiosClient.get<ApiResource<SireReportDetail>>(`/sire-reports/${id}`);
     return response.data.data;
   },

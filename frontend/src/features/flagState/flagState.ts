@@ -1,7 +1,8 @@
 import type { DashletColumn, TableMeta } from "../dashboard/dashboard";
 
 export interface FlagStateReportRow {
-  id: number;
+  /** A local numeric id normally, but a legacy flagID string when reading from the legacy connection. */
+  id: number | string;
   ref_no: string;
   vessel: string;
   added_by: "SHORE" | "VESSEL";
@@ -32,7 +33,7 @@ export interface FlagStateReportListResponse {
 }
 
 export interface FlagStateReportOption {
-  id: number;
+  id: number | string;
   label: string;
 }
 

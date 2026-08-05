@@ -27,7 +27,7 @@ export const flagStateReportService = {
     return response.data.data;
   },
 
-  async show(id: number): Promise<FlagStateReportDetail> {
+  async show(id: number | string): Promise<FlagStateReportDetail> {
     const response = await axiosClient.get<ApiResource<FlagStateReportDetail>>(`/flag-state-reports/${id}`);
     return response.data.data;
   },

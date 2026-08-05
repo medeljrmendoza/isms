@@ -117,13 +117,13 @@ export function NonSireReportsPage() {
 
   const reload = () => setReloadKey((k) => k + 1);
 
-  const openView = async (id: number) => {
+  const openView = async (id: number | string) => {
     setActionError(null);
     const detail = await nonSireReportService.show(id);
     setViewing(detail);
   };
 
-  const openEdit = async (id: number) => {
+  const openEdit = async (id: number | string) => {
     setActionError(null);
     const detail = await nonSireReportService.show(id);
     setEditing(detail);
@@ -247,7 +247,8 @@ export function NonSireReportsPage() {
                           type="button"
                           variant="secondary"
                           className="!px-1.5 !py-0.5 text-xs"
-                          onClick={() => runAction(() => nonSireReportService.publish(row.id))}
+                          // row.id is always numeric here: can_publish is only true for local rows.
+                          onClick={() => runAction(() => nonSireReportService.publish(row.id as number))}
                         >
                           {row.published ? "Unpublish" : "Publish"}
                         </Button>
@@ -257,7 +258,8 @@ export function NonSireReportsPage() {
                           type="button"
                           variant="success"
                           className="!px-1.5 !py-0.5 text-xs"
-                          onClick={() => runAction(() => nonSireReportService.approve(row.id))}
+                          // row.id is always numeric here: can_approve is only true for local rows.
+                          onClick={() => runAction(() => nonSireReportService.approve(row.id as number))}
                         >
                           Approve
                         </Button>
@@ -269,7 +271,8 @@ export function NonSireReportsPage() {
                           className="!px-1.5 !py-0.5 text-xs text-red-600"
                           onClick={() => {
                             if (window.confirm(`Delete this report for ${row.vessel}?`)) {
-                              runAction(() => nonSireReportService.destroy(row.id));
+                              // row.id is always numeric here: can_delete is only true for local rows.
+                              runAction(() => nonSireReportService.destroy(row.id as number));
                             }
                           }}
                         >

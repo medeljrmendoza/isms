@@ -1,7 +1,8 @@
 import type { DashletColumn, TableMeta } from "../dashboard/dashboard";
 
 export interface NonSireReportRow {
-  id: number;
+  /** A local numeric id normally, but a legacy nonsireID string when reading from the legacy connection. */
+  id: number | string;
   vessel: string;
   added_by: "SHORE" | "VESSEL";
   dateof_inspection: string;
@@ -32,7 +33,7 @@ export interface NonSireReportListResponse {
 }
 
 export interface NonSireReportOption {
-  id: number;
+  id: number | string;
   label: string;
 }
 

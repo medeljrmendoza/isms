@@ -1,7 +1,8 @@
 import type { DashletColumn, TableMeta } from "../dashboard/dashboard";
 
 export interface SireReportRow {
-  id: number;
+  /** A local numeric id normally, but a legacy sireID string when reading from the legacy connection. */
+  id: number | string;
   vessel: string;
   added_by: "SHORE" | "VESSEL";
   dateof_inspection: string;
@@ -31,7 +32,7 @@ export interface SireReportListResponse {
 }
 
 export interface SireReportOption {
-  id: number;
+  id: number | string;
   label: string;
 }
 

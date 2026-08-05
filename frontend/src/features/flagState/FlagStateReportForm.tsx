@@ -84,7 +84,8 @@ export function FlagStateReportForm({ flagStateReport, onSuccess, onCancel }: Fl
       if (isCreate) {
         await flagStateReportService.create(values);
       } else {
-        await flagStateReportService.update(flagStateReport.id, values);
+        // flagStateReport.id is always numeric here: the edit form only opens for can_edit rows (local-only).
+        await flagStateReportService.update(flagStateReport.id as number, values);
       }
       onSuccess();
     } catch (error) {

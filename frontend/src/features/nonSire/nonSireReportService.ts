@@ -27,7 +27,7 @@ export const nonSireReportService = {
     return response.data.data;
   },
 
-  async show(id: number): Promise<NonSireReportDetail> {
+  async show(id: number | string): Promise<NonSireReportDetail> {
     const response = await axiosClient.get<ApiResource<NonSireReportDetail>>(`/non-sire-reports/${id}`);
     return response.data.data;
   },
