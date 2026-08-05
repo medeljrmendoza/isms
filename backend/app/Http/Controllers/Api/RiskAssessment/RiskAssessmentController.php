@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\RiskAssessment\RiskAssessmentApprovalRequest;
 use App\Models\RiskAssessment\RiskAssessment;
 use App\Repositories\RiskAssessment\RiskAssessmentRepository;
+use App\Support\LegacyDb;
 use App\Support\TableQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -33,12 +34,16 @@ class RiskAssessmentController extends Controller
     /**
      * GET /api/risk-assessments/options
      */
-    public function options(): JsonResponse
+    public function options(Request $request): JsonResponse
     {
         return response()->json([
             'data' => [
-                'vessels' => $this->riskAssessments->vesselOptions(),
-                'years' => $this->riskAssessments->years(),
+                'vessels' => LegacyDb::isConfigured()
+                    ? $this->riskAssessments->legacyVesselOptions($request->user()?->legacy_user_id)
+                    : $this->riskAssessments->vesselOptions(),
+                'years' => LegacyDb::isConfigured()
+                    ? $this->riskAssessments->legacyYears($request->user()?->legacy_user_id)
+                    : $this->riskAssessments->years(),
             ],
         ]);
     }
@@ -48,9 +53,29 @@ class RiskAssessmentController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $vesselId = $request->query('vessel_id') !== null ? (int) $request->query('vessel_id') : null;
         $year = $request->query('year') !== null ? (int) $request->query('year') : null;
 
+        if (LegacyDb::isConfigured()) {
+            $vesselId = $request->query('vessel_id');
+            $vesselId = $vesselId !== '' ? $vesselId : null;
+
+            $result = $this->riskAssessments->legacyFullTable(
+                $vesselId,
+                $year,
+                TableQuery::fromRequest($request),
+                $request->user()?->legacy_user_id,
+            );
+
+            return response()->json([
+                'data' => [
+                    'columns' => RiskAssessmentRepository::fullColumns(),
+                    'rows' => $result['rows'],
+                    'meta' => $result['meta'],
+                ],
+            ]);
+        }
+
+        $vesselId = $request->query('vessel_id') !== null ? (int) $request->query('vessel_id') : null;
         $paginator = $this->riskAssessments->fullTable($vesselId, $year, TableQuery::fromRequest($request));
 
         return response()->json([
@@ -65,11 +90,18 @@ class RiskAssessmentController extends Controller
     /**
      * GET /api/risk-assessments/{riskAssessment}
      */
-    public function show(RiskAssessment $riskAssessment): JsonResponse
+    public function show(string $riskAssessment): JsonResponse
     {
-        $riskAssessment->load(['vessel', 'riskCategory', 'riskOperation', 'hazards', 'people']);
+        if (LegacyDb::isConfigured()) {
+            $detail = $this->riskAssessments->legacyDetail($riskAssessment);
+            abort_if($detail === null, 404);
 
-        return response()->json(['data' => $this->mapDetail($riskAssessment)]);
+            return response()->json(['data' => $detail]);
+        }
+
+        $model = RiskAssessment::query()->with(['vessel', 'riskCategory', 'riskOperation', 'hazards', 'people'])->findOrFail((int) $riskAssessment);
+
+        return response()->json(['data' => $this->mapDetail($model)]);
     }
 
     /**

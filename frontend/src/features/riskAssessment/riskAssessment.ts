@@ -1,5 +1,6 @@
 export interface RiskAssessmentRow {
-  id: number;
+  /** A local numeric id normally, but a legacy riskID string when reading from the legacy connection. */
+  id: number | string;
   report_no: string;
   vessel: string;
   risk_date: string | null;
@@ -58,7 +59,7 @@ export interface RiskAssessmentDetail extends RiskAssessmentRow {
 }
 
 export interface RiskAssessmentOption {
-  id: number;
+  id: number | string;
   label: string;
 }
 

@@ -23,7 +23,7 @@ export function RiskAssessmentListPage() {
   const [years, setYears] = useState<number[]>([]);
   const [vesselId, setVesselId] = useState<string>("");
   const [year, setYear] = useState<string>("");
-  const [appliedVesselId, setAppliedVesselId] = useState<number | null>(null);
+  const [appliedVesselId, setAppliedVesselId] = useState<number | string | null>(null);
   const [appliedYear, setAppliedYear] = useState<number | null>(null);
 
   const [rows, setRows] = useState<RiskAssessmentRow[]>([]);
@@ -62,15 +62,15 @@ export function RiskAssessmentListPage() {
 
   const applyFilter = () => {
     if (!vesselId || !year) return;
-    setAppliedVesselId(Number(vesselId));
+    setAppliedVesselId(vesselId);
     setAppliedYear(Number(year));
     setPage(1);
   };
 
   const reload = () => setReloadKey((k) => k + 1);
 
-  const openView = async (id: number) => setViewing(await riskAssessmentService.show(id));
-  const openEdit = async (id: number) => setEditing(await riskAssessmentService.show(id));
+  const openView = async (id: number | string) => setViewing(await riskAssessmentService.show(id));
+  const openEdit = async (id: number | string) => setEditing(await riskAssessmentService.show(id));
 
   return (
     <div className="p-6">

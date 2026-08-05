@@ -167,6 +167,12 @@ class RiskAssessmentRepository
             ->all();
     }
 
+    /** @return array<int, array{id:string,label:string}> */
+    public function legacyVesselOptions(?string $legacyUserId): array
+    {
+        return LegacyDb::assignedVesselOptions($legacyUserId);
+    }
+
     /**
      * Ported from Risk_assessment_vessel.php's view_report(), surfaced via
      * the dashboard's clickable report_no column. Read-only — see
@@ -181,6 +187,7 @@ class RiskAssessmentRepository
         }
 
         return $this->toDetailArray([
+            'id' => $r->id,
             'report_no' => $r->report_no,
             'vessel' => $r->vessel?->display_name ?? '',
             'risk_date' => $r->risk_date?->format('Y-m-d'),
@@ -256,6 +263,7 @@ class RiskAssessmentRepository
             ->get();
 
         return $this->toDetailArray([
+            'id' => $r->riskID,
             'report_no' => $r->report_no,
             'vessel' => $vessels[$r->vesid] ?? '',
             'risk_date' => $zeroDateToNull($r->risk_date),
@@ -307,7 +315,7 @@ class RiskAssessmentRepository
     private function toDetailArray(array $r): array
     {
         return [
-            'id' => 0,
+            'id' => $r['id'],
             'report_no' => $r['report_no'],
             'vessel' => $r['vessel'],
             'risk_date' => $r['risk_date'],
@@ -393,6 +401,108 @@ class RiskAssessmentRepository
 
         return $builder->orderBy($sort, $query->direction)
             ->paginate($query->perPage, page: $query->page);
+    }
+
+    /**
+     * Ported from get_riskassessment_report_year(), reading tb_risk_assessment
+     * directly from the legacy connection. MySQL's YEAR() replaces the
+     * local years()'s SQLite strftime() call.
+     */
+    public function legacyYears(?string $legacyUserId): array
+    {
+        $assignedVesselIds = LegacyDb::assignedVesselIds($legacyUserId);
+
+        return DB::connection('legacy')->table('tb_risk_assessment')
+            ->whereIn('vesid', $assignedVesselIds)
+            ->where('risk_date', '!=', '0000-00-00')
+            ->selectRaw('DISTINCT YEAR(risk_date) as year')
+            ->orderByDesc('year')
+            ->pluck('year')
+            ->filter()
+            ->map(fn ($y) => (int) $y)
+            ->all();
+    }
+
+    /**
+     * Same as fullTable(), reading tb_risk_assessment directly from the
+     * legacy connection. Keeps the same vessel+year-required gate (an
+     * empty result set until both filters are applied) and adds the
+     * vesid-in-assigned-vessels scoping fullTable() drops (see its
+     * docblock). Read-only: can_edit is always false.
+     */
+    public function legacyFullTable(?string $vesselId, ?int $year, TableQuery $query, ?string $legacyUserId): array
+    {
+        $empty = [
+            'rows' => [],
+            'meta' => ['current_page' => 1, 'last_page' => 1, 'per_page' => $query->perPage, 'total' => 0],
+        ];
+
+        if ($vesselId === null || $vesselId === '' || $year === null) {
+            return $empty;
+        }
+
+        $vessels = LegacyDb::vesselNames();
+        $assignedVesselIds = LegacyDb::assignedVesselIds($legacyUserId);
+
+        $builder = DB::connection('legacy')->table('tb_risk_assessment')
+            ->leftJoin('tb_risk_category', 'tb_risk_category.categoryID', '=', 'tb_risk_assessment.categoryID')
+            ->leftJoin('tb_risk_operation', 'tb_risk_operation.operationID', '=', 'tb_risk_assessment.operationID')
+            ->where('tb_risk_assessment.vesid', $vesselId)
+            ->whereIn('tb_risk_assessment.vesid', $assignedVesselIds)
+            ->whereRaw('YEAR(tb_risk_assessment.risk_date) = ?', [$year])
+            ->select([
+                'tb_risk_assessment.riskID', 'tb_risk_assessment.report_no', 'tb_risk_assessment.vesid',
+                'tb_risk_assessment.risk_date', 'tb_risk_assessment.port', 'tb_risk_assessment.categoryID',
+                'tb_risk_assessment.other_category_name', 'tb_risk_category.category', 'tb_risk_assessment.operationID',
+                'tb_risk_assessment.other_operation_name', 'tb_risk_operation.operation',
+                'tb_risk_assessment.approval_from_shore', 'tb_risk_assessment.shore_is_approved',
+                'tb_risk_assessment.approval_from_marine', 'tb_risk_assessment.marine_shore_is_approved',
+            ])
+            ->selectSub(
+                fn ($q) => $q->from('tb_risk_assessment_hazzards')->selectRaw('COUNT(*)')->whereColumn('riskID', 'tb_risk_assessment.riskID'),
+                'hazard_count',
+            );
+
+        if ($query->search !== null) {
+            $term = "%{$query->search}%";
+            $builder->where(function ($q) use ($term) {
+                $q->where('tb_risk_assessment.report_no', 'like', $term)
+                    ->orWhere('tb_risk_assessment.port', 'like', $term)
+                    ->orWhere('tb_risk_assessment.other_category_name', 'like', $term)
+                    ->orWhere('tb_risk_assessment.other_operation_name', 'like', $term);
+            });
+        }
+
+        $sortMap = ['report_no' => 'tb_risk_assessment.report_no', 'risk_date' => 'tb_risk_assessment.risk_date'];
+        $sort = $sortMap[$query->sort ?? ''] ?? 'tb_risk_assessment.risk_date';
+
+        $paginator = $builder->orderBy($sort, $query->direction)->paginate($query->perPage, page: $query->page);
+
+        $rows = collect($paginator->items())->map(fn ($r) => [
+            'id' => $r->riskID,
+            'report_no' => $r->report_no,
+            'vessel' => $vessels[$r->vesid] ?? '',
+            'risk_date' => $r->risk_date,
+            'port' => $r->port,
+            'category' => $r->categoryID === 'OTHER' ? $r->other_category_name : $r->category,
+            'task' => $r->operationID === 'OTHER' ? $r->other_operation_name : $r->operation,
+            'approval_from_shore' => (bool) $r->approval_from_shore,
+            'shore_is_approved' => (bool) $r->shore_is_approved,
+            'approval_from_marine' => (bool) $r->approval_from_marine,
+            'marine_is_approved' => (bool) $r->marine_shore_is_approved,
+            'hazard_count' => $r->hazard_count,
+            'can_edit' => false,
+        ])->all();
+
+        return [
+            'rows' => $rows,
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
+        ];
     }
 
     /**

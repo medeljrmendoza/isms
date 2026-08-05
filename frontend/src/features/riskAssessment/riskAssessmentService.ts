@@ -8,7 +8,7 @@ import type {
 } from "./riskAssessment";
 
 export interface RiskAssessmentListParams {
-  vessel_id: number;
+  vessel_id: number | string;
   year: number;
   page: number;
   per_page: number;
@@ -34,7 +34,7 @@ export const riskAssessmentService = {
     return response.data.data;
   },
 
-  async show(id: number): Promise<RiskAssessmentDetail> {
+  async show(id: number | string): Promise<RiskAssessmentDetail> {
     const response = await axiosClient.get<ApiResource<RiskAssessmentDetail>>(`/risk-assessments/${id}`);
     return response.data.data;
   },

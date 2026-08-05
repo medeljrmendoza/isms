@@ -58,7 +58,8 @@ export function RiskAssessmentApprovalForm({ report, onSuccess, onCancel }: Risk
 
       if (report.approval_from_shore) {
         calls.push(
-          riskAssessmentService.approveShore(report.id, {
+          // report.id is always numeric here: this form only opens for can_edit rows (local-only).
+          riskAssessmentService.approveShore(report.id as number, {
             approved: values.shore_approved === "YES",
             date_approved: values.shore_date_approved || null,
             remarks: values.shore_remarks || null,
@@ -68,7 +69,7 @@ export function RiskAssessmentApprovalForm({ report, onSuccess, onCancel }: Risk
 
       if (report.approval_from_marine) {
         calls.push(
-          riskAssessmentService.approveMarine(report.id, {
+          riskAssessmentService.approveMarine(report.id as number, {
             approved: values.marine_approved === "YES",
             date_approved: values.marine_date_approved || null,
             remarks: values.marine_remarks || null,
