@@ -18,8 +18,7 @@ final class TableQuery
         public readonly ?string $search,
         public readonly ?string $sort,
         public readonly string $direction,
-    ) {
-    }
+    ) {}
 
     public static function fromRequest(Request $request): self
     {

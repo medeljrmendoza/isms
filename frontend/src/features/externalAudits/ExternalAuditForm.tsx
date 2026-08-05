@@ -97,7 +97,8 @@ export function ExternalAuditForm({ externalAudit, onSuccess, onCancel }: Extern
       if (isCreate) {
         await externalAuditService.create(values);
       } else {
-        await externalAuditService.update(externalAudit.id, values);
+        // externalAudit.id is always numeric here: the edit form only opens for can_edit rows (local-only).
+        await externalAuditService.update(externalAudit.id as number, values);
       }
       onSuccess();
     } catch (error) {

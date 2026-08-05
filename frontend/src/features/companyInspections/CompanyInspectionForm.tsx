@@ -113,7 +113,8 @@ export function CompanyInspectionForm({ companyInspection, onSuccess, onCancel }
       if (isCreate) {
         await companyInspectionService.create(values);
       } else {
-        await companyInspectionService.update(companyInspection.id, values);
+        // companyInspection.id is always numeric here: the edit form only opens for can_edit rows (local-only).
+        await companyInspectionService.update(companyInspection.id as number, values);
       }
       onSuccess();
     } catch (error) {

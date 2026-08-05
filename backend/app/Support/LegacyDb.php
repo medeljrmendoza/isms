@@ -73,6 +73,25 @@ class LegacyDb
     }
 
     /**
+     * The vessel filter dropdown for a module's full list page, scoped
+     * to the vessels this legacy user is assigned to — the legacy
+     * counterpart of each repository's local `vesselOptions()` (which
+     * lists every local Vessel row unscoped).
+     *
+     * @return array<int, array{id:string,label:string}>
+     */
+    public static function assignedVesselOptions(?string $legacyUserId): array
+    {
+        $names = self::vesselNames();
+
+        return self::assignedVesselIds($legacyUserId)
+            ->map(fn ($vesID) => ['id' => $vesID, 'label' => $names[$vesID] ?? ''])
+            ->sortBy('label')
+            ->values()
+            ->all();
+    }
+
+    /**
      * tb_address_book is a shared contacts table — some modules (SIRE,
      * Non-SIRE) store a "company"/"inspector" column as an FK into it
      * rather than free text (unlike e.g. Flag State's plain-text

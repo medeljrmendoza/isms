@@ -1,7 +1,8 @@
 import type { DashletColumn, TableMeta } from "../dashboard/dashboard";
 
 export interface NonconformityRow {
-  id: number;
+  /** A local numeric id normally, but a legacy ncID string when reading from the legacy connection. */
+  id: number | string;
   ncr_no: string;
   date_of_nc: string;
   added_by: "SHORE" | "VESSEL";
@@ -64,7 +65,7 @@ export interface NonconformityListResponse {
 }
 
 export interface NonconformityOption {
-  id: number;
+  id: number | string;
   label: string;
 }
 

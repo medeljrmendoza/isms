@@ -249,6 +249,115 @@ class IncidentReportRepository
     }
 
     /**
+     * Same as fullTable(), reading tb_incident_report directly from the
+     * legacy connection. Keeps the vesid-in-assigned-vessels scoping
+     * fullTable() drops (see its docblock) — a real legacy user should
+     * only see their own fleet's reports. Read-only: can_* are always
+     * false, since there's no legacy write path or local int PK to bind to.
+     */
+    public function legacyFullTable(TableQuery $query, ?string $vesselId, ?string $year, ?string $legacyUserId): array
+    {
+        $vessels = LegacyDb::vesselNames();
+        $assignedVesselIds = LegacyDb::assignedVesselIds($legacyUserId);
+
+        $builder = DB::connection('legacy')->table('tb_incident_report')
+            ->leftJoin('tb_natureof_incident', 'tb_natureof_incident.natureID', '=', 'tb_incident_report.natureof_incidentid')
+            ->whereIn('tb_incident_report.vesid', $assignedVesselIds)
+            ->select([
+                'tb_incident_report.incidentid',
+                'tb_incident_report.vesid',
+                'tb_incident_report.dateof_report',
+                'tb_incident_report.report_no',
+                'tb_incident_report.nature_type',
+                'tb_incident_report.natureof_incidentid',
+                'tb_incident_report.hazardous_occurrence_type',
+                'tb_incident_report.others',
+                'tb_incident_report.accident_collision',
+                'tb_incident_report.added_by',
+                'tb_incident_report.published',
+                'tb_incident_report.is_approved',
+                'tb_incident_report.closing_date',
+                'tb_natureof_incident.name as nature_name',
+            ]);
+
+        if ($vesselId !== null && $vesselId !== '' && $vesselId !== 'ALL') {
+            $builder->where('tb_incident_report.vesid', $vesselId);
+        }
+
+        if ($year !== null && $year !== '') {
+            $builder->whereRaw('YEAR(tb_incident_report.dateof_report) = ?', [$year]);
+        }
+
+        if ($query->search !== null) {
+            $term = "%{$query->search}%";
+            $builder->where(function ($q) use ($term) {
+                $q->where('tb_incident_report.dateof_report', 'like', $term)
+                    ->orWhere('tb_incident_report.report_no', 'like', $term)
+                    ->orWhere('tb_incident_report.nature_type', 'like', $term)
+                    ->orWhere('tb_incident_report.hazardous_occurrence_type', 'like', $term)
+                    ->orWhere('tb_incident_report.added_by', 'like', $term)
+                    ->orWhere('tb_natureof_incident.name', 'like', $term);
+            });
+        }
+
+        $sortMap = [
+            'dateof_report' => 'tb_incident_report.dateof_report',
+            'report_no' => 'tb_incident_report.report_no',
+            'nature' => 'tb_incident_report.nature_type',
+            'added_by' => 'tb_incident_report.added_by',
+        ];
+        $sort = $sortMap[$query->sort ?? ''] ?? 'tb_incident_report.dateof_report';
+
+        $paginator = $builder->orderBy($sort, $query->direction)->paginate($query->perPage, page: $query->page);
+
+        $rows = collect($paginator->items())->map(fn ($r) => $this->legacyRow($r, $vessels))->all();
+
+        return [
+            'rows' => $rows,
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
+        ];
+    }
+
+    /** @param array<string, string> $vessels */
+    private function legacyRow(object $r, array $vessels): array
+    {
+        $isClosed = $r->closing_date !== '0000-00-00' && $r->closing_date !== null && $r->closing_date !== '';
+        $isPublished = $r->published === '1';
+        $isApproved = $r->is_approved === '1';
+        $published = $r->added_by === 'SHORE' ? $isPublished : null;
+
+        $statusColor = match (true) {
+            ! $isClosed => 'yellow',
+            $published && ! $isApproved => 'yellow',
+            default => 'green',
+        };
+
+        return [
+            'id' => $r->incidentid,
+            'vessel' => $vessels[$r->vesid] ?? '',
+            'dateof_report' => $r->dateof_report,
+            'report_no' => $r->report_no,
+            'nature' => $r->nature_type === 'accident' ? 'ACCIDENT' : 'HAZARDOUS OCCURRENCE',
+            'type' => $this->legacyIncidentTypeLabel($r),
+            'added_by' => $r->added_by,
+            'published' => $published,
+            'is_approved' => $isApproved,
+            'status' => $isClosed ? 'CLOSED' : 'IN PROGRESS',
+            'status_color' => $statusColor,
+            'can_edit' => false,
+            'can_publish' => false,
+            'can_approve' => false,
+            'can_reopen' => false,
+            'can_delete' => false,
+        ];
+    }
+
+    /**
      * Ported from add_incident_report()'s insert branch: new records
      * are SHORE-added and immediately auto-approved (unlike
      * Nonconformities, where new records start unapproved — this is a
@@ -389,6 +498,28 @@ class IncidentReportRepository
     {
         return Vessel::query()->orderBy('name')->get()
             ->map(fn (Vessel $v) => ['id' => $v->id, 'label' => $v->display_name])
+            ->all();
+    }
+
+    /** @return array<int, array{id:string,label:string}> */
+    public function legacyVesselOptions(?string $legacyUserId): array
+    {
+        return LegacyDb::assignedVesselOptions($legacyUserId);
+    }
+
+    /** @return array<int, int> years with at least one report, newest first, scoped to assigned vessels. */
+    public function legacyYears(?string $legacyUserId): array
+    {
+        $assignedVesselIds = LegacyDb::assignedVesselIds($legacyUserId);
+
+        return DB::connection('legacy')->table('tb_incident_report')
+            ->whereIn('vesid', $assignedVesselIds)
+            ->where('dateof_report', '!=', '0000-00-00')
+            ->selectRaw('DISTINCT YEAR(dateof_report) as year')
+            ->orderByDesc('year')
+            ->pluck('year')
+            ->filter()
+            ->map(fn ($y) => (int) $y)
             ->all();
     }
 

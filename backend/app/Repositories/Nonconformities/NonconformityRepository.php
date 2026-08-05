@@ -470,6 +470,122 @@ class NonconformityRepository
     }
 
     /**
+     * Same as fullTable(), reading tb_nonconformities directly from the
+     * legacy connection. Unlike fullTable() (which drops legacy's
+     * vesID-in-assigned-vessels scoping for lack of a Vessels module),
+     * this keeps it — a real legacy user should only see their own
+     * fleet's non-conformities, same as every dashlet's legacy path.
+     * Read-only: can_edit/can_publish/can_approve/can_reopen are always
+     * false, since there's no legacy write path and no local integer PK
+     * for the mutation routes to bind to.
+     */
+    public function legacyFullTable(TableQuery $query, ?string $vesselOrCompany, ?string $dateFrom, ?string $dateTo, ?string $legacyUserId): array
+    {
+        $vessels = LegacyDb::vesselNames();
+        $assignedVesselIds = LegacyDb::assignedVesselIds($legacyUserId);
+
+        $builder = DB::connection('legacy')->table('tb_nonconformities')
+            ->where('is_inactive', '!=', '1')
+            ->where(function ($q) use ($assignedVesselIds) {
+                $q->where('vesID', '')->orWhereIn('vesID', $assignedVesselIds);
+            });
+
+        if ($vesselOrCompany === 'COMPANY') {
+            $builder->where('vessel_company', 'COMPANY');
+        } elseif ($vesselOrCompany !== null && $vesselOrCompany !== 'ALL' && $vesselOrCompany !== '') {
+            $builder->where('vesID', $vesselOrCompany);
+        }
+
+        if ($dateFrom !== null && $dateTo !== null) {
+            $builder->whereBetween('date_of_nc', [$dateFrom, $dateTo]);
+        }
+
+        if ($query->search !== null) {
+            $term = "%{$query->search}%";
+            $builder->where(function ($q) use ($term) {
+                $q->where('ncr_no', 'like', $term)
+                    ->orWhere('date_of_nc', 'like', $term)
+                    ->orWhere('added_by', 'like', $term)
+                    ->orWhere('source_of_nc', 'like', $term)
+                    ->orWhere('description', 'like', $term)
+                    ->orWhere('company', 'like', $term);
+            });
+        }
+
+        $sortMap = [
+            'ncr_no' => 'ncr_no',
+            'date_of_nc' => 'date_of_nc',
+            'added_by' => 'added_by',
+            'source_of_nc' => 'source_of_nc',
+            'description' => 'description',
+        ];
+        $sort = $sortMap[$query->sort ?? ''] ?? 'date_of_nc';
+
+        $paginator = $builder->orderBy($sort, $query->direction)->paginate($query->perPage, page: $query->page);
+
+        $rows = collect($paginator->items())->map(fn ($nc) => $this->legacyRow($nc, $vessels))->all();
+
+        return [
+            'rows' => $rows,
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
+        ];
+    }
+
+    /** @param array<string, string> $vessels */
+    private function legacyRow(object $nc, array $vessels): array
+    {
+        $approvedElsewhere = in_array($nc->source_of_nc, self::SOURCES_APPROVED_ELSEWHERE, true);
+        $hasVessel = $nc->vesID !== '';
+        $isPublished = $nc->is_published === '1';
+        $isApproved = $nc->is_approved === '1';
+        $isClosed = $nc->close_out_date !== '0000-00-00' && $nc->close_out_date !== null && $nc->close_out_date !== '';
+
+        $publishedDisplay = match (true) {
+            $approvedElsewhere => null,
+            $nc->added_by === 'SHORE' => $hasVessel ? $isPublished : null,
+            default => true,
+        };
+
+        $approvedDisplay = ($approvedElsewhere || ! $hasVessel || ! $isPublished) ? null : $isApproved;
+
+        $statusColor = match (true) {
+            ! $isClosed => 'yellow',
+            $hasVessel && $isPublished && ! $isApproved => 'yellow',
+            default => 'green',
+        };
+
+        $sourceLabel = match ($nc->source_of_nc) {
+            'OPERATIONAL' => 'NC - OPERATIONAL',
+            'OTHERS' => "NC - OTHERS ({$nc->source_of_nc_others})",
+            default => $nc->source_of_nc,
+        };
+
+        return [
+            'id' => $nc->ncID,
+            'ncr_no' => $nc->ncr_no,
+            'date_of_nc' => $nc->date_of_nc,
+            'added_by' => $nc->added_by,
+            'source_of_nc' => $sourceLabel,
+            'reported_by' => trim("{$nc->reported_by} - {$nc->reporter_name}", ' -'),
+            'vessel_company' => $nc->vessel_company === 'VESSEL' ? ($vessels[$nc->vesID] ?? '') : ($nc->company ?? ''),
+            'description' => $nc->description,
+            'is_published' => $publishedDisplay,
+            'is_approved' => $approvedDisplay,
+            'status' => $isClosed ? 'CLOSED' : 'IN PROGRESS',
+            'status_color' => $statusColor,
+            'can_edit' => false,
+            'can_publish' => false,
+            'can_approve' => false,
+            'can_reopen' => false,
+        ];
+    }
+
+    /**
      * Ported from save_item()'s edit branch: vessel/company attribution
      * and added_by are frozen at creation time and not accepted from the
      * update payload; every edit resets is_approved back to false
@@ -566,5 +682,11 @@ class NonconformityRepository
         return Vessel::query()->orderBy('name')->get()
             ->map(fn (Vessel $v) => ['id' => $v->id, 'label' => $v->display_name])
             ->all();
+    }
+
+    /** @return array<int, array{id:string,label:string}> */
+    public function legacyVesselOptions(?string $legacyUserId): array
+    {
+        return LegacyDb::assignedVesselOptions($legacyUserId);
     }
 }

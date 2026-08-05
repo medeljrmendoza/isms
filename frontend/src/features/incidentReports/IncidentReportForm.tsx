@@ -331,7 +331,10 @@ export function IncidentReportForm({ incidentReport, onSuccess, onCancel }: Inci
       if (isCreate) {
         await incidentReportService.create(values);
       } else {
-        await incidentReportService.update(incidentReport.id, values);
+        // Editing is only ever reachable for local records (can_edit is
+        // always false for legacy-sourced rows, so the Edit button that
+        // leads here never renders for a legacy string id).
+        await incidentReportService.update(incidentReport.id as number, values);
       }
       onSuccess();
     } catch (error) {

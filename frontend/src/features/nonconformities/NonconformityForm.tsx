@@ -154,7 +154,10 @@ export function NonconformityForm({ nonconformity, onSuccess, onCancel }: Noncon
       if (isCreate) {
         await nonconformityService.create(values);
       } else {
-        await nonconformityService.update(nonconformity.id, values);
+        // Editing is only ever reachable for local records (can_edit is
+        // always false for legacy-sourced rows, so the Edit button that
+        // leads here never renders for a legacy string id).
+        await nonconformityService.update(nonconformity.id as number, values);
       }
       onSuccess();
     } catch (error) {

@@ -1,7 +1,8 @@
 import type { DashletColumn, TableMeta } from "../dashboard/dashboard";
 
 export interface CompanyInspectionRow {
-  id: number;
+  /** A local numeric id normally, but a legacy auditID string when reading from the legacy connection. */
+  id: number | string;
   audit_ref: string;
   /** Already resolved to the vessel's display name or the company name. */
   vessel_company: string;
@@ -35,7 +36,7 @@ export interface CompanyInspectionListResponse {
 }
 
 export interface CompanyInspectionOption {
-  id: number;
+  id: number | string;
   label: string;
 }
 

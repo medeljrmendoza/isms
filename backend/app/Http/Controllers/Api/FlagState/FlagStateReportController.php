@@ -31,9 +31,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
  */
 class FlagStateReportController extends Controller
 {
-    public function __construct(private readonly FlagStateReportRepository $flagStateReports)
-    {
-    }
+    public function __construct(private readonly FlagStateReportRepository $flagStateReports) {}
 
     /**
      * GET /api/flag-state-reports

@@ -1,7 +1,8 @@
 import type { DashletColumn, TableMeta } from "../dashboard/dashboard";
 
 export interface IncidentReportRow {
-  id: number;
+  /** A local numeric id normally, but a legacy incidentid string when reading from the legacy connection. */
+  id: number | string;
   vessel: string;
   dateof_report: string;
   report_no: string | null;
@@ -150,7 +151,7 @@ export interface IncidentReportListResponse {
 }
 
 export interface IncidentReportOption {
-  id: number;
+  id: number | string;
   label: string;
 }
 

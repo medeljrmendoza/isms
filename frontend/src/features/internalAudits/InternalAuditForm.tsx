@@ -97,7 +97,8 @@ export function InternalAuditForm({ internalAudit, onSuccess, onCancel }: Intern
       if (isCreate) {
         await internalAuditService.create(values);
       } else {
-        await internalAuditService.update(internalAudit.id, values);
+        // internalAudit.id is always numeric here: the edit form only opens for can_edit rows (local-only).
+        await internalAuditService.update(internalAudit.id as number, values);
       }
       onSuccess();
     } catch (error) {

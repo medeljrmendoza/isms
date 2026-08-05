@@ -30,9 +30,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
  */
 class CommitteeMeetingController extends Controller
 {
-    public function __construct(private readonly CommitteeMeetingRepository $committeeMeetings)
-    {
-    }
+    public function __construct(private readonly CommitteeMeetingRepository $committeeMeetings) {}
 
     /**
      * GET /api/committee-meetings

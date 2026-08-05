@@ -22,9 +22,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
  */
 class ExposureHoursController extends Controller
 {
-    public function __construct(private readonly ExposureHoursRepository $exposureHours)
-    {
-    }
+    public function __construct(private readonly ExposureHoursRepository $exposureHours) {}
 
     /**
      * GET /api/exposure-hours/options

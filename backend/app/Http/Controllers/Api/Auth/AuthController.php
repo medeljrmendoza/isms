@@ -13,8 +13,7 @@ class AuthController extends Controller
 {
     public function __construct(
         private readonly AuthService $authService,
-    ) {
-    }
+    ) {}
 
     /**
      * POST /api/login

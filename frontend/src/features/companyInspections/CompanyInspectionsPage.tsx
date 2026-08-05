@@ -113,13 +113,13 @@ export function CompanyInspectionsPage() {
 
   const reload = () => setReloadKey((k) => k + 1);
 
-  const openView = async (id: number) => {
+  const openView = async (id: number | string) => {
     setActionError(null);
     const detail = await companyInspectionService.show(id);
     setViewing(detail);
   };
 
-  const openEdit = async (id: number) => {
+  const openEdit = async (id: number | string) => {
     setActionError(null);
     const detail = await companyInspectionService.show(id);
     setEditing(detail);
@@ -242,7 +242,8 @@ export function CompanyInspectionsPage() {
                           className="!px-1.5 !py-0.5 text-xs text-red-600"
                           onClick={() => {
                             if (window.confirm(`Delete this report for ${row.vessel_company}?`)) {
-                              runAction(() => companyInspectionService.destroy(row.id));
+                              // row.id is always numeric here: can_delete is only true for local rows.
+                              runAction(() => companyInspectionService.destroy(row.id as number));
                             }
                           }}
                         >

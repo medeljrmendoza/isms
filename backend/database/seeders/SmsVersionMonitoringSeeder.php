@@ -5,9 +5,9 @@ namespace Database\Seeders;
 use App\Models\ManualPublish\ManualChapter;
 use App\Models\ManualPublish\ManualDocument;
 use App\Models\ManualPublish\ManualForm;
-use App\Models\Vessel;
 use App\Models\ManualPublish\VesselFormSync;
 use App\Models\ManualPublish\VesselManualSync;
+use App\Models\Vessel;
 use Illuminate\Database\Seeder;
 
 class SmsVersionMonitoringSeeder extends Seeder

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\InternalAudits\InternalAuditRequest;
 use App\Models\InternalAudits\InternalAuditReport;
 use App\Repositories\InternalAudits\InternalAuditReportRepository;
+use App\Support\LegacyDb;
 use App\Support\TableQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -27,9 +28,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
  */
 class InternalAuditController extends Controller
 {
-    public function __construct(private readonly InternalAuditReportRepository $internalAudits)
-    {
-    }
+    public function __construct(private readonly InternalAuditReportRepository $internalAudits) {}
 
     /**
      * GET /api/internal-audits
@@ -37,11 +36,25 @@ class InternalAuditController extends Controller
     public function index(Request $request): JsonResponse
     {
         $vesselId = $request->query('vessel_id');
+        $vesselId = $vesselId !== '' ? $vesselId : null;
 
-        $paginator = $this->internalAudits->fullTable(
-            TableQuery::fromRequest($request),
-            $vesselId !== '' ? $vesselId : null,
-        );
+        if (LegacyDb::isConfigured()) {
+            $result = $this->internalAudits->legacyFullTable(
+                TableQuery::fromRequest($request),
+                $vesselId,
+                $request->user()?->legacy_user_id,
+            );
+
+            return response()->json([
+                'data' => [
+                    'columns' => InternalAuditReportRepository::moduleColumns(),
+                    'rows' => $result['rows'],
+                    'meta' => $result['meta'],
+                ],
+            ]);
+        }
+
+        $paginator = $this->internalAudits->fullTable(TableQuery::fromRequest($request), $vesselId);
 
         return response()->json([
             'data' => [
@@ -55,11 +68,13 @@ class InternalAuditController extends Controller
     /**
      * GET /api/internal-audits/options
      */
-    public function options(): JsonResponse
+    public function options(Request $request): JsonResponse
     {
         return response()->json([
             'data' => [
-                'vessels' => $this->internalAudits->vesselOptions(),
+                'vessels' => LegacyDb::isConfigured()
+                    ? $this->internalAudits->legacyVesselOptions($request->user()?->legacy_user_id)
+                    : $this->internalAudits->vesselOptions(),
             ],
         ]);
     }
@@ -67,17 +82,22 @@ class InternalAuditController extends Controller
     /**
      * GET /api/internal-audits/{internalAuditReport}
      */
-    public function show(InternalAuditReport $internalAuditReport): JsonResponse
+    public function show(string $internalAuditReport): JsonResponse
     {
-        $internalAuditReport->load('vessel');
-        // mapRow reads these counts; route-model binding doesn't run the
-        // list query's withCount, so they have to be loaded explicitly.
-        $internalAuditReport->loadCount([
+        if (LegacyDb::isConfigured()) {
+            $detail = $this->internalAudits->legacyDetail($internalAuditReport);
+            abort_if($detail === null, 404);
+
+            return response()->json(['data' => $detail]);
+        }
+
+        $model = InternalAuditReport::query()->with('vessel')->findOrFail((int) $internalAuditReport);
+        $model->loadCount([
             'nonconformities as pending_nc_count' => fn ($q) => $q->where('is_inactive', false)->whereNull('close_out_date'),
             'nonconformities as total_nc_count' => fn ($q) => $q->where('is_inactive', false),
         ]);
 
-        return response()->json(['data' => $this->mapDetail($internalAuditReport)]);
+        return response()->json(['data' => $this->mapDetail($model)]);
     }
 
     /**

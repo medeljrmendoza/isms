@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\PscReports\PscReportRequest;
 use App\Models\PscReports\PscReport;
 use App\Repositories\PscReports\PscReportRepository;
+use App\Support\LegacyDb;
 use App\Support\TableQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -21,9 +22,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
  */
 class PscReportController extends Controller
 {
-    public function __construct(private readonly PscReportRepository $pscReports)
-    {
-    }
+    public function __construct(private readonly PscReportRepository $pscReports) {}
 
     /**
      * GET /api/psc-reports
@@ -31,11 +30,25 @@ class PscReportController extends Controller
     public function index(Request $request): JsonResponse
     {
         $vesselId = $request->query('vessel_id');
+        $vesselId = $vesselId !== '' ? $vesselId : null;
 
-        $paginator = $this->pscReports->fullTable(
-            TableQuery::fromRequest($request),
-            $vesselId !== '' ? $vesselId : null,
-        );
+        if (LegacyDb::isConfigured()) {
+            $result = $this->pscReports->legacyFullTable(
+                TableQuery::fromRequest($request),
+                $vesselId,
+                $request->user()?->legacy_user_id,
+            );
+
+            return response()->json([
+                'data' => [
+                    'columns' => PscReportRepository::moduleColumns(),
+                    'rows' => $result['rows'],
+                    'meta' => $result['meta'],
+                ],
+            ]);
+        }
+
+        $paginator = $this->pscReports->fullTable(TableQuery::fromRequest($request), $vesselId);
 
         return response()->json([
             'data' => [
@@ -49,11 +62,13 @@ class PscReportController extends Controller
     /**
      * GET /api/psc-reports/options
      */
-    public function options(): JsonResponse
+    public function options(Request $request): JsonResponse
     {
         return response()->json([
             'data' => [
-                'vessels' => $this->pscReports->vesselOptions(),
+                'vessels' => LegacyDb::isConfigured()
+                    ? $this->pscReports->legacyVesselOptions($request->user()?->legacy_user_id)
+                    : $this->pscReports->vesselOptions(),
                 'mou_authorities' => $this->pscReports->mouOptions(),
             ],
         ]);
@@ -62,17 +77,22 @@ class PscReportController extends Controller
     /**
      * GET /api/psc-reports/{pscReport}
      */
-    public function show(PscReport $pscReport): JsonResponse
+    public function show(string $pscReport): JsonResponse
     {
-        $pscReport->load(['vessel', 'mou']);
-        // mapRow reads these counts; route-model binding doesn't run the
-        // list query's withCount, so they have to be loaded explicitly.
-        $pscReport->loadCount([
+        if (LegacyDb::isConfigured()) {
+            $detail = $this->pscReports->legacyDetail($pscReport);
+            abort_if($detail === null, 404);
+
+            return response()->json(['data' => $detail]);
+        }
+
+        $model = PscReport::query()->with(['vessel', 'mou'])->findOrFail((int) $pscReport);
+        $model->loadCount([
             'nonconformities as pending_nc_count' => fn ($q) => $q->where('is_inactive', false)->whereNull('close_out_date'),
             'nonconformities as total_nc_count' => fn ($q) => $q->where('is_inactive', false),
         ]);
 
-        return response()->json(['data' => $this->mapDetail($pscReport)]);
+        return response()->json(['data' => $this->mapDetail($model)]);
     }
 
     /**

@@ -24,9 +24,7 @@ use Illuminate\Http\Request;
  */
 class DrillReportController extends Controller
 {
-    public function __construct(private readonly DrillRepository $drills)
-    {
-    }
+    public function __construct(private readonly DrillRepository $drills) {}
 
     /**
      * GET /api/drill-lists/options

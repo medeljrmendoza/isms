@@ -121,13 +121,13 @@ export function NonconformitiesPage() {
 
   const reload = () => setReloadKey((k) => k + 1);
 
-  const openView = async (id: number) => {
+  const openView = async (id: number | string) => {
     setActionError(null);
     const detail = await nonconformityService.show(id);
     setViewing(detail);
   };
 
-  const openEdit = async (id: number) => {
+  const openEdit = async (id: number | string) => {
     setActionError(null);
     const detail = await nonconformityService.show(id);
     setEditing(detail);
@@ -280,7 +280,7 @@ export function NonconformitiesPage() {
                           type="button"
                           variant="secondary"
                           className="!px-1.5 !py-0.5 text-xs"
-                          onClick={() => runAction(() => nonconformityService.publish(row.id))}
+                          onClick={() => runAction(() => nonconformityService.publish(row.id as number))}
                         >
                           {row.is_published ? "Unpublish" : "Publish"}
                         </Button>
@@ -290,7 +290,7 @@ export function NonconformitiesPage() {
                           type="button"
                           variant="success"
                           className="!px-1.5 !py-0.5 text-xs"
-                          onClick={() => runAction(() => nonconformityService.approve(row.id))}
+                          onClick={() => runAction(() => nonconformityService.approve(row.id as number))}
                         >
                           Approve
                         </Button>
@@ -300,18 +300,21 @@ export function NonconformitiesPage() {
                           type="button"
                           variant="secondary"
                           className="!px-1.5 !py-0.5 text-xs"
-                          onClick={() => runAction(() => nonconformityService.reopen(row.id))}
+                          onClick={() => runAction(() => nonconformityService.reopen(row.id as number))}
                         >
                           Re-open
                         </Button>
                       )}
+                      {/* No can_delete gate exists on this row (legacy has none either) — a legacy row's
+                          string id will safely 404 rather than delete anything, since the write routes
+                          only ever resolve local records. */}
                       <Button
                         type="button"
                         variant="secondary"
                         className="!px-1.5 !py-0.5 text-xs text-red-600"
                         onClick={() => {
                           if (window.confirm(`Delete ${row.ncr_no}?`)) {
-                            runAction(() => nonconformityService.destroy(row.id));
+                            runAction(() => nonconformityService.destroy(row.id as number));
                           }
                         }}
                       >

@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api\IncidentReports;
 
 use App\Http\Controllers\Api\Nonconformities\NonconformityController;
-
 use App\Http\Controllers\Controller;
 use App\Http\Requests\IncidentReports\IncidentReportRequest;
 use App\Models\IncidentReports\IncidentLocation;
@@ -14,6 +13,7 @@ use App\Models\IncidentReports\NatureOfIncident;
 use App\Models\IncidentReports\RootCauseCategory;
 use App\Models\IncidentReports\TypeOfInjury;
 use App\Repositories\IncidentReports\IncidentReportRepository;
+use App\Support\LegacyDb;
 use App\Support\TableQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -28,9 +28,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
  */
 class IncidentReportController extends Controller
 {
-    public function __construct(private readonly IncidentReportRepository $incidentReports)
-    {
-    }
+    public function __construct(private readonly IncidentReportRepository $incidentReports) {}
 
     /**
      * GET /api/incident-reports
@@ -39,6 +37,17 @@ class IncidentReportController extends Controller
     {
         $vesselId = $request->query('vessel_id');
         $year = $request->query('year');
+
+        if (LegacyDb::isConfigured()) {
+            $result = $this->incidentReports->legacyFullTable(
+                TableQuery::fromRequest($request),
+                $vesselId !== '' ? $vesselId : null,
+                $year !== '' ? $year : null,
+                $request->user()?->legacy_user_id,
+            );
+
+            return response()->json(['data' => ['columns' => IncidentReportRepository::moduleColumns(), ...$result]]);
+        }
 
         $paginator = $this->incidentReports->fullTable(
             TableQuery::fromRequest($request),
@@ -58,8 +67,39 @@ class IncidentReportController extends Controller
     /**
      * GET /api/incident-reports/options
      */
-    public function options(): JsonResponse
+    public function options(Request $request): JsonResponse
     {
+        if (LegacyDb::isConfigured()) {
+            $legacyUserId = $request->user()?->legacy_user_id;
+            $years = $this->incidentReports->legacyYears($legacyUserId);
+            if (! in_array((int) date('Y'), $years, true)) {
+                array_unshift($years, (int) date('Y'));
+            }
+
+            return response()->json([
+                'data' => [
+                    'vessels' => $this->incidentReports->legacyVesselOptions($legacyUserId),
+                    'years' => array_map(fn ($y) => (string) $y, $years),
+                    'nature_of_incidents' => NatureOfIncident::query()->orderBy('name')
+                        ->get()->map(fn ($n) => ['id' => $n->id, 'label' => $n->name])->all(),
+                    'incident_locations' => IncidentLocation::query()->orderBy('name')
+                        ->get()->map(fn ($l) => ['id' => $l->id, 'label' => $l->name])->all(),
+                    'incident_operations' => IncidentOperation::query()->orderBy('name')
+                        ->get()->map(fn ($o) => ['id' => $o->id, 'label' => $o->name])->all(),
+                    'types_of_injury' => TypeOfInjury::query()->orderBy('name')
+                        ->get()->map(fn ($t) => ['id' => $t->id, 'label' => $t->name])->all(),
+                    'locations_of_injury' => LocationOfInjury::query()->orderBy('body_part')
+                        ->get()->map(fn ($l) => ['id' => $l->id, 'label' => $l->body_part])->all(),
+                    'root_cause_categories' => RootCauseCategory::query()->with('rootCauses')->orderBy('name')->get()
+                        ->map(fn (RootCauseCategory $c) => [
+                            'id' => $c->id,
+                            'label' => $c->name,
+                            'root_causes' => $c->rootCauses->map(fn ($rc) => ['id' => $rc->id, 'label' => $rc->name])->all(),
+                        ])->all(),
+                ],
+            ]);
+        }
+
         $years = IncidentReport::query()->get('dateof_report')
             ->map(fn (IncidentReport $r) => $r->dateof_report->format('Y'))->unique()->sortDesc()->values()->all();
         if (! in_array(date('Y'), $years, true)) {
@@ -91,13 +131,23 @@ class IncidentReportController extends Controller
     }
 
     /**
-     * GET /api/incident-reports/{incidentReport}
+     * GET /api/incident-reports/{incidentReport} — a raw string since
+     * {incidentReport} is a local int id normally, but a legacy
+     * incidentid string when reading from the legacy connection.
      */
-    public function show(IncidentReport $incidentReport): JsonResponse
+    public function show(string $incidentReport): JsonResponse
     {
-        $this->loadRelations($incidentReport);
+        if (LegacyDb::isConfigured()) {
+            $detail = $this->incidentReports->legacyDetail($incidentReport);
+            abort_if($detail === null, 404);
 
-        return response()->json(['data' => $this->mapDetail($incidentReport)]);
+            return response()->json(['data' => $detail]);
+        }
+
+        $model = IncidentReport::query()->findOrFail((int) $incidentReport);
+        $this->loadRelations($model);
+
+        return response()->json(['data' => $this->mapDetail($model)]);
     }
 
     /**

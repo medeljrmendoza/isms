@@ -3,7 +3,6 @@
 namespace App\Models\NonSire;
 
 use App\Models\Vessel;
-
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 

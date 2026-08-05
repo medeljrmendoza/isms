@@ -204,6 +204,77 @@ class PscReportRepository
             ->paginate($query->perPage, page: $query->page);
     }
 
+    /**
+     * Same as fullTable(), reading tb_psc_report directly from the
+     * legacy connection. Keeps the vesid-in-assigned-vessels scoping
+     * fullTable() drops (see its docblock). Read-only: can_edit/
+     * can_delete/can_reopen are always false, since there's no legacy
+     * write path or local int PK for the mutation routes to bind to.
+     */
+    public function legacyFullTable(TableQuery $query, ?string $vesselId, ?string $legacyUserId): array
+    {
+        $vessels = LegacyDb::vesselNames();
+        $assignedVesselIds = LegacyDb::assignedVesselIds($legacyUserId);
+
+        $pendingNcSub = fn ($q) => $q->from('tb_nonconformities')->selectRaw('COUNT(*)')
+            ->whereColumn('source_of_nc_ref_no', 'tb_psc_report.ref_no')
+            ->where('is_inactive', '!=', '1')
+            ->where(function ($qq) {
+                $qq->whereNull('close_out_date')->orWhere('close_out_date', '0000-00-00');
+            });
+        $totalNcSub = fn ($q) => $q->from('tb_nonconformities')->selectRaw('COUNT(*)')
+            ->whereColumn('source_of_nc_ref_no', 'tb_psc_report.ref_no')
+            ->where('is_inactive', '!=', '1');
+
+        $builder = DB::connection('legacy')->table('tb_psc_report')
+            ->leftJoin('tb_psc_mou', 'tb_psc_mou.mouID', '=', 'tb_psc_report.mouID')
+            ->where('tb_psc_report.is_deleted', '0')
+            ->whereIn('tb_psc_report.vesid', $assignedVesselIds)
+            ->select(['tb_psc_report.pscreportid', 'tb_psc_report.ref_no', 'tb_psc_report.vesid', 'tb_psc_report.dateof_inspection', 'tb_psc_report.mou_others', 'tb_psc_mou.mou_name'])
+            ->selectSub($pendingNcSub, 'pending_nc')
+            ->selectSub($totalNcSub, 'total_nc');
+
+        if ($vesselId !== null && $vesselId !== '' && $vesselId !== 'ALL') {
+            $builder->where('tb_psc_report.vesid', $vesselId);
+        }
+
+        if ($query->search !== null) {
+            $term = "%{$query->search}%";
+            $builder->where(function ($q) use ($term) {
+                $q->where('tb_psc_report.ref_no', 'like', $term)
+                    ->orWhere('tb_psc_report.placeof_inspection', 'like', $term);
+            });
+        }
+
+        $sortMap = ['ref_no' => 'tb_psc_report.ref_no', 'date' => 'tb_psc_report.dateof_inspection'];
+        $sort = $sortMap[$query->sort ?? ''] ?? 'tb_psc_report.dateof_inspection';
+
+        $paginator = $builder->orderBy($sort, $query->direction)->paginate($query->perPage, page: $query->page);
+
+        $rows = collect($paginator->items())->map(fn ($r) => [
+            'id' => $r->pscreportid,
+            'ref_no' => $r->ref_no,
+            'vessel' => $vessels[$r->vesid] ?? '',
+            'dateof_inspection' => $r->dateof_inspection,
+            'mou' => $r->mou_name === null ? null : ($r->mou_name === 'Others' ? "MOU - {$r->mou_others}" : $r->mou_name),
+            'pending_nc_count' => $r->pending_nc,
+            'total_nc_count' => $r->total_nc,
+            'can_edit' => false,
+            'can_delete' => false,
+            'can_reopen' => false,
+        ])->all();
+
+        return [
+            'rows' => $rows,
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
+        ];
+    }
+
     /** Ported from add_psc_report()'s insert branch. */
     public function create(array $data): PscReport
     {
@@ -294,6 +365,7 @@ class PscReportRepository
         $mouName = $r->mou === null ? null : ($r->mou->name === 'Others' ? "MOU - {$r->mou_others}" : $r->mou->name);
 
         return $this->toDetailArray([
+            'id' => $r->id,
             'ref_no' => $r->ref_no,
             'vessel' => $r->vessel?->display_name ?? '',
             'dateof_inspection' => $r->dateof_inspection->format('Y-m-d'),
@@ -341,6 +413,7 @@ class PscReportRepository
             ->where('source_of_nc_ref_no', $r->ref_no)->where('is_inactive', '!=', '1')->count();
 
         return $this->toDetailArray([
+            'id' => $r->pscreportid,
             'ref_no' => $r->ref_no,
             'vessel' => $vessels[$r->vesid] ?? '',
             'dateof_inspection' => $r->dateof_inspection,
@@ -366,7 +439,7 @@ class PscReportRepository
     private function toDetailArray(array $r): array
     {
         return [
-            'id' => 0,
+            'id' => $r['id'],
             'ref_no' => $r['ref_no'],
             'vessel' => $r['vessel'],
             'dateof_inspection' => $r['dateof_inspection'],
@@ -408,5 +481,11 @@ class PscReportRepository
         return PscMouAuthority::query()->orderBy('name')->get()
             ->map(fn (PscMouAuthority $m) => ['id' => $m->id, 'label' => $m->name])
             ->all();
+    }
+
+    /** @return array<int, array{id:string,label:string}> */
+    public function legacyVesselOptions(?string $legacyUserId): array
+    {
+        return LegacyDb::assignedVesselOptions($legacyUserId);
     }
 }

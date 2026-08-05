@@ -24,9 +24,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
  */
 class NonSireReportController extends Controller
 {
-    public function __construct(private readonly NonSireReportRepository $nonSireReports)
-    {
-    }
+    public function __construct(private readonly NonSireReportRepository $nonSireReports) {}
 
     /**
      * GET /api/non-sire-reports

@@ -112,7 +112,8 @@ export function PscReportForm({ pscReport, onSuccess, onCancel }: PscReportFormP
       if (isCreate) {
         await pscReportService.create(values);
       } else {
-        await pscReportService.update(pscReport.id, values);
+        // pscReport.id is always numeric here: the edit form only opens for can_edit rows (local-only).
+        await pscReportService.update(pscReport.id as number, values);
       }
       onSuccess();
     } catch (error) {

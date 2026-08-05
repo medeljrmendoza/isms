@@ -28,9 +28,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
  */
 class SireReportController extends Controller
 {
-    public function __construct(private readonly SireReportRepository $sireReports)
-    {
-    }
+    public function __construct(private readonly SireReportRepository $sireReports) {}
 
     /**
      * GET /api/sire-reports

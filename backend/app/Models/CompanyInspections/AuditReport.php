@@ -4,7 +4,6 @@ namespace App\Models\CompanyInspections;
 
 use App\Models\Nonconformities\Nonconformity;
 use App\Models\Vessel;
-
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;

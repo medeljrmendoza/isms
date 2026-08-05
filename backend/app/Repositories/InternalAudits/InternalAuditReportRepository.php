@@ -206,6 +206,79 @@ class InternalAuditReportRepository
             ->paginate($query->perPage, page: $query->page);
     }
 
+    /**
+     * Same as fullTable(), reading tb_internal_audit_report directly
+     * from the legacy connection. Keeps the vesID-in-assigned-vessels
+     * scoping fullTable() drops (see its docblock). Read-only: can_edit/
+     * can_delete are always false.
+     */
+    public function legacyFullTable(TableQuery $query, ?string $vesselId, ?string $legacyUserId): array
+    {
+        $vessels = LegacyDb::vesselNames();
+        $assignedVesselIds = LegacyDb::assignedVesselIds($legacyUserId);
+
+        $pendingNcSub = fn ($q) => $q->from('tb_nonconformities')->selectRaw('COUNT(*)')
+            ->whereColumn('source_of_nc_ref_no', 'tb_internal_audit_report.audit_ref')
+            ->where('is_inactive', '!=', '1')
+            ->where(function ($qq) {
+                $qq->whereNull('close_out_date')->orWhere('close_out_date', '0000-00-00');
+            });
+        $totalNcSub = fn ($q) => $q->from('tb_nonconformities')->selectRaw('COUNT(*)')
+            ->whereColumn('source_of_nc_ref_no', 'tb_internal_audit_report.audit_ref')
+            ->where('is_inactive', '!=', '1');
+
+        $builder = DB::connection('legacy')->table('tb_internal_audit_report')
+            ->where('is_deleted', '0')
+            ->whereIn('vesID', $assignedVesselIds)
+            ->select(['tb_internal_audit_report.auditID', 'tb_internal_audit_report.audit_ref', 'tb_internal_audit_report.vesID', 'tb_internal_audit_report.this_date', 'tb_internal_audit_report.placeof_audit', 'tb_internal_audit_report.typeof_audit', 'tb_internal_audit_report.audit_auditor'])
+            ->selectSub($pendingNcSub, 'pending_nc')
+            ->selectSub($totalNcSub, 'total_nc');
+
+        if ($vesselId !== null && $vesselId !== '' && $vesselId !== 'ALL') {
+            $builder->where('tb_internal_audit_report.vesID', $vesselId);
+        }
+
+        if ($query->search !== null) {
+            $term = "%{$query->search}%";
+            $builder->where(function ($q) use ($term) {
+                $q->where('tb_internal_audit_report.audit_ref', 'like', $term)
+                    ->orWhere('tb_internal_audit_report.this_date', 'like', $term)
+                    ->orWhere('tb_internal_audit_report.placeof_audit', 'like', $term)
+                    ->orWhere('tb_internal_audit_report.typeof_audit', 'like', $term)
+                    ->orWhere('tb_internal_audit_report.audit_auditor', 'like', $term);
+            });
+        }
+
+        $sortMap = ['audit_ref' => 'tb_internal_audit_report.audit_ref', 'this_date' => 'tb_internal_audit_report.this_date'];
+        $sort = $sortMap[$query->sort ?? ''] ?? 'tb_internal_audit_report.this_date';
+
+        $paginator = $builder->orderBy($sort, $query->direction)->paginate($query->perPage, page: $query->page);
+
+        $rows = collect($paginator->items())->map(fn ($r) => [
+            'id' => $r->auditID,
+            'audit_ref' => $r->audit_ref,
+            'vessel' => $vessels[$r->vesID] ?? '',
+            'this_date' => $r->this_date,
+            'placeof_audit' => $r->placeof_audit,
+            'typeof_audit' => $r->typeof_audit,
+            'auditor_name' => $r->audit_auditor,
+            'pending_nc_count' => $r->pending_nc,
+            'total_nc_count' => $r->total_nc,
+            'can_edit' => false,
+            'can_delete' => false,
+        ])->all();
+
+        return [
+            'rows' => $rows,
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
+        ];
+    }
+
     /** Ported from add_internal_report()'s insert branch. */
     public function create(array $data): InternalAuditReport
     {
@@ -268,6 +341,7 @@ class InternalAuditReportRepository
         }
 
         return $this->toDetailArray([
+            'id' => $r->id,
             'audit_ref' => $r->audit_ref,
             'vessel' => $r->vessel?->display_name ?? '',
             'this_date' => $r->this_date->format('Y-m-d'),
@@ -303,6 +377,7 @@ class InternalAuditReportRepository
             ->where('source_of_nc_ref_no', $r->audit_ref)->where('is_inactive', '!=', '1')->count();
 
         return $this->toDetailArray([
+            'id' => $r->auditID,
             'audit_ref' => $r->audit_ref,
             'vessel' => $vessels[$r->vesID] ?? '',
             'this_date' => $r->this_date,
@@ -322,7 +397,7 @@ class InternalAuditReportRepository
     private function toDetailArray(array $r): array
     {
         return [
-            'id' => 0,
+            'id' => $r['id'],
             'audit_ref' => $r['audit_ref'],
             'vessel' => $r['vessel'],
             'this_date' => $r['this_date'],
@@ -347,5 +422,11 @@ class InternalAuditReportRepository
         return Vessel::query()->orderBy('name')->get()
             ->map(fn (Vessel $v) => ['id' => $v->id, 'label' => $v->display_name])
             ->all();
+    }
+
+    /** @return array<int, array{id:string,label:string}> */
+    public function legacyVesselOptions(?string $legacyUserId): array
+    {
+        return LegacyDb::assignedVesselOptions($legacyUserId);
     }
 }

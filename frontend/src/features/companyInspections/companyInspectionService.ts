@@ -28,7 +28,7 @@ export const companyInspectionService = {
     return response.data.data;
   },
 
-  async show(id: number): Promise<CompanyInspectionDetail> {
+  async show(id: number | string): Promise<CompanyInspectionDetail> {
     const response = await axiosClient.get<ApiResource<CompanyInspectionDetail>>(`/company-inspections/${id}`);
     return response.data.data;
   },

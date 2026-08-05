@@ -1,7 +1,8 @@
 import type { DashletColumn, TableMeta } from "../dashboard/dashboard";
 
 export interface InternalAuditRow {
-  id: number;
+  /** A local numeric id normally, but a legacy auditID string when reading from the legacy connection. */
+  id: number | string;
   audit_ref: string;
   vessel: string;
   this_date: string;
@@ -29,7 +30,7 @@ export interface InternalAuditListResponse {
 }
 
 export interface InternalAuditOption {
-  id: number;
+  id: number | string;
   label: string;
 }
 

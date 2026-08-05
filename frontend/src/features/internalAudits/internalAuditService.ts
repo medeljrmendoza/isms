@@ -27,7 +27,7 @@ export const internalAuditService = {
     return response.data.data;
   },
 
-  async show(id: number): Promise<InternalAuditDetail> {
+  async show(id: number | string): Promise<InternalAuditDetail> {
     const response = await axiosClient.get<ApiResource<InternalAuditDetail>>(`/internal-audits/${id}`);
     return response.data.data;
   },

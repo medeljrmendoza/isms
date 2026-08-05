@@ -1,7 +1,8 @@
 import type { DashletColumn, TableMeta } from "../dashboard/dashboard";
 
 export interface PscReportRow {
-  id: number;
+  /** A local numeric id normally, but a legacy pscreportid string when reading from the legacy connection. */
+  id: number | string;
   ref_no: string;
   vessel: string;
   dateof_inspection: string;
@@ -38,7 +39,7 @@ export interface PscReportListResponse {
 }
 
 export interface PscReportOption {
-  id: number;
+  id: number | string;
   label: string;
 }
 

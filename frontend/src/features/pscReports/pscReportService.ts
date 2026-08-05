@@ -23,7 +23,7 @@ export const pscReportService = {
     return response.data.data;
   },
 
-  async show(id: number): Promise<PscReportDetail> {
+  async show(id: number | string): Promise<PscReportDetail> {
     const response = await axiosClient.get<ApiResource<PscReportDetail>>(`/psc-reports/${id}`);
     return response.data.data;
   },

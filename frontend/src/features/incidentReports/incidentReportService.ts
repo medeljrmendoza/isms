@@ -28,7 +28,7 @@ export const incidentReportService = {
     return response.data.data;
   },
 
-  async show(id: number): Promise<IncidentReportDetail> {
+  async show(id: number | string): Promise<IncidentReportDetail> {
     const response = await axiosClient.get<ApiResource<IncidentReportDetail>>(`/incident-reports/${id}`);
     return response.data.data;
   },

@@ -3,7 +3,6 @@
 namespace App\Http\Requests\Nonconformities;
 
 use App\Repositories\Nonconformities\NonconformityRepository;
-
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\Validator;

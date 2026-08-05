@@ -29,7 +29,7 @@ export const nonconformityService = {
     return response.data.data;
   },
 
-  async show(id: number): Promise<NonconformityDetail> {
+  async show(id: number | string): Promise<NonconformityDetail> {
     const response = await axiosClient.get<ApiResource<NonconformityDetail>>(`/nonconformities/${id}`);
     return response.data.data;
   },

@@ -3,8 +3,8 @@
 namespace Database\Seeders;
 
 use App\Models\FlagState\FlagStateReport;
-use App\Models\NonSire\NonSireReport;
 use App\Models\Nonconformities\Nonconformity;
+use App\Models\NonSire\NonSireReport;
 use App\Models\Vessel;
 use Illuminate\Database\Seeder;
 

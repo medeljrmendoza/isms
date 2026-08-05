@@ -2,12 +2,12 @@
 
 namespace App\Http\Controllers\Api\Nonconformities;
 
-use App\Models\ManualPublish\ManualChapter;
-
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Nonconformities\NonconformityRequest;
+use App\Models\ManualPublish\ManualChapter;
 use App\Models\Nonconformities\Nonconformity;
 use App\Repositories\Nonconformities\NonconformityRepository;
+use App\Support\LegacyDb;
 use App\Support\TableQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -26,9 +26,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
  */
 class NonconformityController extends Controller
 {
-    public function __construct(private readonly NonconformityRepository $nonconformities)
-    {
-    }
+    public function __construct(private readonly NonconformityRepository $nonconformities) {}
 
     /**
      * GET /api/nonconformities
@@ -38,6 +36,18 @@ class NonconformityController extends Controller
         $vesselOrCompany = $request->query('vessel_company');
         $dateFrom = $request->query('date_from');
         $dateTo = $request->query('date_to');
+
+        if (LegacyDb::isConfigured()) {
+            $result = $this->nonconformities->legacyFullTable(
+                TableQuery::fromRequest($request),
+                $vesselOrCompany !== '' ? $vesselOrCompany : null,
+                $dateFrom !== '' ? $dateFrom : null,
+                $dateTo !== '' ? $dateTo : null,
+                $request->user()?->legacy_user_id,
+            );
+
+            return response()->json(['data' => ['columns' => NonconformityRepository::moduleColumns(), ...$result]]);
+        }
 
         $paginator = $this->nonconformities->fullTable(
             TableQuery::fromRequest($request),
@@ -58,25 +68,37 @@ class NonconformityController extends Controller
     /**
      * GET /api/nonconformities/options — vessel list + SMS chapter list for the add/edit form.
      */
-    public function options(): JsonResponse
+    public function options(Request $request): JsonResponse
     {
         return response()->json([
             'data' => [
-                'vessels' => $this->nonconformities->vesselOptions(),
-                'manual_chapters' => \App\Models\ManualPublish\ManualChapter::query()->orderBy('reference_no')
+                'vessels' => LegacyDb::isConfigured()
+                    ? $this->nonconformities->legacyVesselOptions($request->user()?->legacy_user_id)
+                    : $this->nonconformities->vesselOptions(),
+                'manual_chapters' => ManualChapter::query()->orderBy('reference_no')
                     ->get()->map(fn ($c) => ['id' => $c->id, 'label' => "({$c->reference_no}) {$c->chapter_name}"])->all(),
             ],
         ]);
     }
 
     /**
-     * GET /api/nonconformities/{nonconformity}
+     * GET /api/nonconformities/{nonconformity} — {nonconformity} is a
+     * local int id normally, but a legacy ncID string when reading from
+     * the legacy connection (see legacyFullTable()'s row `id`), so this
+     * takes a raw string rather than relying on route-model binding.
      */
-    public function show(Nonconformity $nonconformity): JsonResponse
+    public function show(string $nonconformity): JsonResponse
     {
-        $nonconformity->load(['vessel', 'manualChapter']);
+        if (LegacyDb::isConfigured()) {
+            $detail = $this->nonconformities->legacyDetail($nonconformity);
+            abort_if($detail === null, 404);
 
-        return response()->json(['data' => $this->mapDetail($nonconformity)]);
+            return response()->json(['data' => $detail]);
+        }
+
+        $model = Nonconformity::query()->with(['vessel', 'manualChapter'])->findOrFail((int) $nonconformity);
+
+        return response()->json(['data' => $this->mapDetail($model)]);
     }
 
     /**
