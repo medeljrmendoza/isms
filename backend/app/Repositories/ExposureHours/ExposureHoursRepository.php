@@ -205,6 +205,12 @@ class ExposureHoursRepository
             ->all();
     }
 
+    /** @return array<int, array{id:string,label:string}> */
+    public function legacyVesselOptions(?string $legacyUserId): array
+    {
+        return LegacyDb::assignedVesselOptions($legacyUserId);
+    }
+
     /**
      * Ported from Controllers/Exposure_hours.php's index(): one row per
      * vessel with summed FAT/PTD/PPD/LWC/RWC/MTC/total hours and the
@@ -270,6 +276,183 @@ class ExposureHoursRepository
         $totals['trcf'] = $this->frequencyRate($totals['trc'], $totals['total_hours']);
 
         return ['rows' => $rows, 'totals' => $totals];
+    }
+
+    /**
+     * Same as summary(), reading tb_exposure_hours_records directly
+     * from the legacy connection. Keeps the vesID-in-assigned-vessels
+     * scoping the local queries drop project-wide (see other
+     * repositories' same docblock note).
+     */
+    public function legacySummary(?string $vesselId, ?string $dateFrom, ?string $dateTo, ?string $legacyUserId): array
+    {
+        $vessels = LegacyDb::vesselNames();
+        $assignedVesselIds = LegacyDb::assignedVesselIds($legacyUserId);
+
+        $vesselIds = ($vesselId !== null && $vesselId !== '' && $vesselId !== 'ALL')
+            ? $assignedVesselIds->filter(fn ($id) => $id === $vesselId)
+            : $assignedVesselIds;
+
+        $totals = ['fat' => 0, 'ptd' => 0, 'ppd' => 0, 'lwc' => 0, 'rwc' => 0, 'mtc' => 0, 'total_hours' => 0.0, 'lti' => 0, 'trc' => 0];
+        $rows = [];
+
+        foreach ($vesselIds->sort(fn ($a, $b) => ($vessels[$a] ?? '') <=> ($vessels[$b] ?? '')) as $vesID) {
+            $records = $this->legacyRecordsQuery($vesID, $dateFrom, $dateTo)->get();
+
+            $fat = (int) $records->sum('no_of_fat');
+            $ptd = (int) $records->sum('no_of_ptd');
+            $ppd = (int) $records->sum('no_of_ppd');
+            $lwc = (int) $records->sum('no_of_lwc');
+            $rwc = (int) $records->sum('no_of_rwc');
+            $mtc = (int) $records->sum('no_of_mtc');
+            $totalHours = (float) $records->sum('total_hours');
+
+            $lti = $fat + $lwc + $ptd + $ppd;
+            $trc = $lti + $rwc + $mtc;
+
+            $rows[] = [
+                'vessel_id' => $vesID,
+                'vessel' => $vessels[$vesID] ?? '',
+                'no_of_fat' => $fat,
+                'no_of_ptd' => $ptd,
+                'no_of_ppd' => $ppd,
+                'no_of_lwc' => $lwc,
+                'no_of_rwc' => $rwc,
+                'no_of_mtc' => $mtc,
+                'total_hours' => $totalHours,
+                'lti' => $lti,
+                'trc' => $trc,
+                'ltif' => $this->frequencyRate($lti, $totalHours),
+                'trcf' => $this->frequencyRate($trc, $totalHours),
+            ];
+
+            $totals['fat'] += $fat;
+            $totals['ptd'] += $ptd;
+            $totals['ppd'] += $ppd;
+            $totals['lwc'] += $lwc;
+            $totals['rwc'] += $rwc;
+            $totals['mtc'] += $mtc;
+            $totals['total_hours'] += $totalHours;
+            $totals['lti'] += $lti;
+            $totals['trc'] += $trc;
+        }
+
+        $totals['ltif'] = $this->frequencyRate($totals['lti'], $totals['total_hours']);
+        $totals['trcf'] = $this->frequencyRate($totals['trc'], $totals['total_hours']);
+
+        return ['rows' => $rows, 'totals' => $totals];
+    }
+
+    /**
+     * Same as fullTable(), reading tb_exposure_hours_records directly
+     * from the legacy connection. Read-only: can_edit/can_delete are
+     * always false.
+     */
+    public function legacyFullTable(string $vesselId, ?string $dateFrom, ?string $dateTo, TableQuery $query, ?string $legacyUserId): array
+    {
+        $assignedVesselIds = LegacyDb::assignedVesselIds($legacyUserId);
+
+        if (! $assignedVesselIds->contains($vesselId)) {
+            return ['rows' => [], 'meta' => ['current_page' => 1, 'last_page' => 1, 'per_page' => $query->perPage, 'total' => 0]];
+        }
+
+        $builder = $this->legacyRecordsQuery($vesselId, $dateFrom, $dateTo);
+
+        if ($query->search !== null) {
+            $term = "%{$query->search}%";
+            $builder->where(function ($q) use ($term) {
+                $q->where('date_from', 'like', $term)
+                    ->orWhere('date_to', 'like', $term)
+                    ->orWhere('vessel_remarks', 'like', $term)
+                    ->orWhere('shore_remarks', 'like', $term);
+            });
+        }
+
+        $sortMap = [
+            'added_by' => 'added_by', 'date_from' => 'date_from', 'date_to' => 'date_to',
+            'no_of_crew' => 'no_of_crew', 'no_of_fat' => 'no_of_fat', 'no_of_ptd' => 'no_of_ptd',
+            'no_of_ppd' => 'no_of_ppd', 'no_of_lwc' => 'no_of_lwc', 'no_of_rwc' => 'no_of_rwc',
+            'no_of_mtc' => 'no_of_mtc', 'total_hours' => 'total_hours',
+        ];
+        $sort = $sortMap[$query->sort ?? ''] ?? 'date_from';
+
+        $paginator = $builder->orderBy($sort, $query->direction)->paginate($query->perPage, page: $query->page);
+
+        $rows = collect($paginator->items())->map(fn ($r) => [
+            'id' => $r->ehRecordID,
+            'added_by' => $r->added_by,
+            'date_from' => $r->date_from,
+            'date_to' => $r->date_to,
+            'no_of_crew' => $r->no_of_crew,
+            'no_of_fat' => $r->no_of_fat,
+            'no_of_ptd' => $r->no_of_ptd,
+            'no_of_ppd' => $r->no_of_ppd,
+            'no_of_lwc' => $r->no_of_lwc,
+            'no_of_rwc' => $r->no_of_rwc,
+            'no_of_mtc' => $r->no_of_mtc,
+            'total_hours' => $r->total_hours,
+            'vessel_remarks' => $r->vessel_remarks,
+            'shore_remarks' => $r->shore_remarks,
+            'can_edit' => false,
+            'can_delete' => false,
+        ])->all();
+
+        return [
+            'rows' => $rows,
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
+        ];
+    }
+
+    /**
+     * Same as show()'s mapDetail(), reading tb_exposure_hours_records
+     * directly from the legacy connection.
+     */
+    public function legacyDetail(string $ehRecordID): ?array
+    {
+        $r = DB::connection('legacy')->table('tb_exposure_hours_records')->where('ehRecordID', $ehRecordID)->first();
+
+        if ($r === null) {
+            return null;
+        }
+
+        $vessels = LegacyDb::vesselNames();
+
+        return [
+            'id' => $r->ehRecordID,
+            'added_by' => $r->added_by,
+            'date_from' => $r->date_from,
+            'date_to' => $r->date_to,
+            'no_of_crew' => $r->no_of_crew,
+            'no_of_fat' => $r->no_of_fat,
+            'no_of_ptd' => $r->no_of_ptd,
+            'no_of_ppd' => $r->no_of_ppd,
+            'no_of_lwc' => $r->no_of_lwc,
+            'no_of_rwc' => $r->no_of_rwc,
+            'no_of_mtc' => $r->no_of_mtc,
+            'total_hours' => $r->total_hours,
+            'vessel_remarks' => $r->vessel_remarks,
+            'shore_remarks' => $r->shore_remarks,
+            'can_edit' => false,
+            'can_delete' => false,
+            'vessel_id' => $r->vesID,
+            'vessel' => $vessels[$r->vesID] ?? '',
+        ];
+    }
+
+    private function legacyRecordsQuery(string $vesselId, ?string $dateFrom, ?string $dateTo)
+    {
+        $builder = DB::connection('legacy')->table('tb_exposure_hours_records')->where('vesID', $vesselId);
+
+        if ($dateFrom !== null && $dateFrom !== '') {
+            $builder->where('date_from', '>=', $dateFrom)->where('date_to', '<=', $dateTo);
+        }
+
+        return $builder;
     }
 
     /**

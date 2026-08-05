@@ -1,7 +1,8 @@
 import type { DashletColumn, TableMeta } from "../dashboard/dashboard";
 
 export interface ExposureHoursSummaryRow {
-  vessel_id: number;
+  /** A local numeric vessel id normally, but a legacy vesID string when reading from the legacy connection. */
+  vessel_id: number | string;
   vessel: string;
   no_of_fat: number;
   no_of_ptd: number;
@@ -36,7 +37,8 @@ export interface ExposureHoursSummaryResponse {
 }
 
 export interface ExposureHoursRecordRow {
-  id: number;
+  /** A local numeric id normally, but a legacy ehRecordID string when reading from the legacy connection. */
+  id: number | string;
   added_by: "SHORE" | "VESSEL";
   date_from: string;
   date_to: string;
@@ -55,7 +57,7 @@ export interface ExposureHoursRecordRow {
 }
 
 export interface ExposureHoursRecordDetail extends ExposureHoursRecordRow {
-  vessel_id: number;
+  vessel_id: number | string;
   vessel: string;
 }
 
@@ -66,10 +68,11 @@ export interface ExposureHoursRecordListResponse {
 }
 
 export interface ExposureHoursOption {
-  id: number;
+  id: number | string;
   label: string;
 }
 
 export interface ExposureHoursOptions {
   vessels: ExposureHoursOption[];
+  can_create_record: boolean;
 }

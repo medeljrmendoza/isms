@@ -27,7 +27,8 @@ const COLUMNS = [
 export function ExposureHoursRecordsPage() {
   const { vesselId: vesselIdParam } = useParams<{ vesselId: string }>();
   const navigate = useNavigate();
-  const vesselId = Number(vesselIdParam);
+  // A local numeric vessel id normally, but a legacy vesID string when reading from the legacy connection.
+  const vesselId = vesselIdParam ?? "";
 
   const [rows, setRows] = useState<ExposureHoursRecordRow[]>([]);
   const [page, setPage] = useState(1);
@@ -48,11 +49,13 @@ export function ExposureHoursRecordsPage() {
   const [viewing, setViewing] = useState<ExposureHoursRecordDetail | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [vesselName, setVesselName] = useState<string | null>(null);
+  const [canCreateRecord, setCanCreateRecord] = useState(false);
 
   useEffect(() => {
     exposureHoursService.options().then((opts) => {
-      const match = opts.vessels.find((v) => v.id === vesselId);
+      const match = opts.vessels.find((v) => String(v.id) === vesselId);
       setVesselName(match?.label ?? null);
+      setCanCreateRecord(opts.can_create_record);
     });
   }, [vesselId]);
 
@@ -115,12 +118,12 @@ export function ExposureHoursRecordsPage() {
 
   const reload = () => setReloadKey((k) => k + 1);
 
-  const openView = async (id: number) => {
+  const openView = async (id: number | string) => {
     setActionError(null);
     setViewing(await exposureHoursService.show(id));
   };
 
-  const openEdit = async (id: number) => {
+  const openEdit = async (id: number | string) => {
     setActionError(null);
     const detail = await exposureHoursService.show(id);
     setEditing(detail);
@@ -147,17 +150,19 @@ export function ExposureHoursRecordsPage() {
             </Button>
             <h1 className="text-base font-semibold text-slate-800">Exposure Hours — Records{vesselName ? ` — ${vesselName}` : ""}</h1>
           </div>
-          <Button
-            type="button"
-            variant="success"
-            className="!px-3 !py-1.5 text-sm"
-            onClick={() => {
-              setEditing(null);
-              setFormOpen(true);
-            }}
-          >
-            + Add Record
-          </Button>
+          {canCreateRecord && (
+            <Button
+              type="button"
+              variant="success"
+              className="!px-3 !py-1.5 text-sm"
+              onClick={() => {
+                setEditing(null);
+                setFormOpen(true);
+              }}
+            >
+              + Add Record
+            </Button>
+          )}
         </div>
 
         <div className="flex flex-wrap items-end gap-3 border-b border-slate-100 px-4 py-3">
@@ -240,7 +245,8 @@ export function ExposureHoursRecordsPage() {
                           className="!px-1.5 !py-0.5 text-xs text-red-600"
                           onClick={() => {
                             if (window.confirm(`Delete this record (${row.date_from} – ${row.date_to})?`)) {
-                              runAction(() => exposureHoursService.destroy(row.id));
+                              // row.id is always numeric here: can_delete is only true for local rows.
+                              runAction(() => exposureHoursService.destroy(row.id as number));
                             }
                           }}
                         >
@@ -301,7 +307,9 @@ export function ExposureHoursRecordsPage() {
       {formOpen && (
         <Modal title={editing ? "Edit Exposure Hours Record" : "Add Exposure Hours Record"} onClose={() => setFormOpen(false)}>
           <ExposureHoursRecordForm
-            vesselId={vesselId}
+            // vesselId is always numeric here: the "+ Add Record" button that opens this form for
+            // create is only rendered when canCreateRecord is true (local mode).
+            vesselId={Number(vesselId)}
             record={editing ?? undefined}
             onCancel={() => setFormOpen(false)}
             onSuccess={() => {

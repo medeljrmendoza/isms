@@ -36,7 +36,8 @@ function emptyValues(vesselId: number): ExposureHoursRecordFormValues {
 
 function detailToFormValues(r: ExposureHoursRecordDetail): ExposureHoursRecordFormValues {
   return {
-    vessel_id: r.vessel_id,
+    // r.vessel_id is always numeric here: this form only opens for can_edit records (local-only).
+    vessel_id: r.vessel_id as number,
     date_from: r.date_from,
     date_to: r.date_to,
     no_of_crew: r.no_of_crew,
@@ -71,7 +72,8 @@ export function ExposureHoursRecordForm({ vesselId, record, onSuccess, onCancel 
       if (isCreate) {
         await exposureHoursService.create(values);
       } else {
-        await exposureHoursService.update(record.id, values);
+        // record.id is always numeric here: this form only opens for can_edit records (local-only).
+        await exposureHoursService.update(record.id as number, values);
       }
       onSuccess();
     } catch (error) {

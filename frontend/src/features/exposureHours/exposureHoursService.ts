@@ -14,7 +14,7 @@ export interface DateRangeParams {
 }
 
 export interface ExposureHoursRecordListParams extends DateRangeParams {
-  vessel_id: number;
+  vessel_id: number | string;
   page: number;
   per_page: number;
   search?: string;
@@ -40,7 +40,7 @@ export const exposureHoursService = {
     return response.data.data;
   },
 
-  async show(id: number): Promise<ExposureHoursRecordDetail> {
+  async show(id: number | string): Promise<ExposureHoursRecordDetail> {
     const response = await axiosClient.get<ApiResource<ExposureHoursRecordDetail>>(`/exposure-hours-records/${id}`);
     return response.data.data;
   },
