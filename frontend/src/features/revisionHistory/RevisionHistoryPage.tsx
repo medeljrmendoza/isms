@@ -42,16 +42,20 @@ export function RevisionHistoryPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<RevisionHistoryDetail | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [canCreateRecord, setCanCreateRecord] = useState(false);
 
   useEffect(() => {
-    revisionHistoryService.options().then((data) => setChapters(data.chapters)).catch(() => undefined);
+    revisionHistoryService.options().then((data) => {
+      setChapters(data.chapters);
+      setCanCreateRecord(data.can_create_record);
+    }).catch(() => undefined);
   }, []);
 
   useEffect(() => {
     setLoading(true);
     revisionHistoryService
       .list({
-        chapter_id: applied.chapterId ? Number(applied.chapterId) : undefined,
+        chapter_id: applied.chapterId || undefined,
         date_from: applied.dateFrom || undefined,
         date_to: applied.dateTo || undefined,
         page,
@@ -100,7 +104,7 @@ export function RevisionHistoryPage() {
 
   const reload = () => setReloadKey((k) => k + 1);
 
-  const openEdit = async (id: number) => {
+  const openEdit = async (id: number | string) => {
     setActionError(null);
     const detail = await revisionHistoryService.show(id);
     setEditing(detail);
@@ -111,7 +115,8 @@ export function RevisionHistoryPage() {
     if (!window.confirm("Are you sure you want to delete this item?")) return;
     setActionError(null);
     try {
-      await revisionHistoryService.destroy(row.id);
+      // row.id is always numeric here: this action is only reachable for can_delete records (local-only).
+      await revisionHistoryService.destroy(row.id as number);
       reload();
     } catch {
       setActionError("Action failed. Please try again.");
@@ -123,17 +128,19 @@ export function RevisionHistoryPage() {
       <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
           <h1 className="text-base font-semibold text-slate-800">SMS Revision History</h1>
-          <Button
-            type="button"
-            variant="success"
-            className="!px-3 !py-1.5 text-sm"
-            onClick={() => {
-              setEditing(null);
-              setFormOpen(true);
-            }}
-          >
-            + Add Item
-          </Button>
+          {canCreateRecord && (
+            <Button
+              type="button"
+              variant="success"
+              className="!px-3 !py-1.5 text-sm"
+              onClick={() => {
+                setEditing(null);
+                setFormOpen(true);
+              }}
+            >
+              + Add Item
+            </Button>
+          )}
         </div>
 
         <div className="flex flex-wrap items-end gap-3 border-b border-slate-100 px-4 py-3">
@@ -211,17 +218,21 @@ export function RevisionHistoryPage() {
                   <td className="px-2 py-1.5 text-slate-700">{row.approved_by}</td>
                   <td className="px-2 py-1.5">
                     <div className="flex flex-wrap gap-1">
-                      <Button type="button" variant="secondary" className="!px-1.5 !py-0.5 text-xs" onClick={() => openEdit(row.id)}>
-                        Edit
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        className="!px-1.5 !py-0.5 text-xs text-red-600"
-                        onClick={() => handleDelete(row)}
-                      >
-                        Delete
-                      </Button>
+                      {row.can_edit && (
+                        <Button type="button" variant="secondary" className="!px-1.5 !py-0.5 text-xs" onClick={() => openEdit(row.id)}>
+                          Edit
+                        </Button>
+                      )}
+                      {row.can_delete && (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          className="!px-1.5 !py-0.5 text-xs text-red-600"
+                          onClick={() => handleDelete(row)}
+                        >
+                          Delete
+                        </Button>
+                      )}
                     </div>
                   </td>
                 </tr>

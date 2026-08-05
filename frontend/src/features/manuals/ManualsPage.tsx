@@ -18,7 +18,7 @@ export function ManualsPage() {
   const [appliedVesselId, setAppliedVesselId] = useState("");
 
   const [chapters, setChapters] = useState<ManualChapterNode[]>([]);
-  const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  const [expanded, setExpanded] = useState<Set<number | string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filterError, setFilterError] = useState<string | null>(null);
@@ -40,7 +40,7 @@ export function ManualsPage() {
     }
     setLoading(true);
     manualsService
-      .tree(appliedSmsType, appliedVesselId ? Number(appliedVesselId) : undefined)
+      .tree(appliedSmsType, appliedVesselId || undefined)
       .then((data) => {
         setChapters(data);
         setExpanded(new Set(data.map((c) => c.id)));
@@ -66,7 +66,7 @@ export function ManualsPage() {
     setAppliedVesselId(smsType === "VESSEL" ? vesselId : "");
   };
 
-  const toggleChapter = (id: number) => {
+  const toggleChapter = (id: number | string) => {
     setExpanded((prev) => {
       const next = new Set(prev);
       if (next.has(id)) {
@@ -90,7 +90,7 @@ export function ManualsPage() {
     if (!searchTerm.trim()) return;
     setSearching(true);
     manualsService
-      .search(searchTerm.trim(), appliedSmsType || "ALL", appliedVesselId ? Number(appliedVesselId) : undefined)
+      .search(searchTerm.trim(), appliedSmsType || "ALL", appliedVesselId || undefined)
       .then((results) => {
         setSearchResults(results);
         setSelected(null);

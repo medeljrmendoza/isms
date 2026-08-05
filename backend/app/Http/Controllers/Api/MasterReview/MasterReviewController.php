@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\MasterReview\MasterReviewRequest;
 use App\Models\MasterReview\MasterReview;
 use App\Repositories\MasterReview\MasterReviewRepository;
+use App\Support\LegacyDb;
 use App\Support\TableQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -28,12 +29,22 @@ class MasterReviewController extends Controller
     /**
      * GET /api/master-review/options
      */
-    public function options(): JsonResponse
+    public function options(Request $request): JsonResponse
     {
         return response()->json([
             'data' => [
-                'vessels' => $this->masterReviews->vesselOptions(),
-                'chapters' => $this->masterReviews->chapterOptions(),
+                ...(LegacyDb::isConfigured() ? [
+                    'vessels' => $this->masterReviews->legacyVesselOptions($request->user()?->legacy_user_id),
+                    'chapters' => $this->masterReviews->legacyChapterOptions(),
+                ] : [
+                    'vessels' => $this->masterReviews->vesselOptions(),
+                    'chapters' => $this->masterReviews->chapterOptions(),
+                ]),
+                // A new record's manual_chapter_id/manual_document_id are
+                // local ManualChapter/ManualDocument foreign keys — legacy
+                // chapter/document ids don't have a matching local row, so
+                // creation is only offered when reading locally.
+                'can_create_record' => ! LegacyDb::isConfigured(),
             ],
         ]);
     }
@@ -43,6 +54,12 @@ class MasterReviewController extends Controller
      */
     public function documentOptions(Request $request): JsonResponse
     {
+        if (LegacyDb::isConfigured()) {
+            return response()->json([
+                'data' => $this->masterReviews->legacyDocumentOptionsForChapter((string) $request->query('chapter_id')),
+            ]);
+        }
+
         return response()->json([
             'data' => $this->masterReviews->documentOptionsForChapter((int) $request->query('chapter_id')),
         ]);
@@ -53,6 +70,22 @@ class MasterReviewController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        if (LegacyDb::isConfigured()) {
+            $result = $this->masterReviews->legacyFullTable(
+                $this->stringOrNull($request->query('vessel_id')),
+                $this->intOrNull($request->query('start_quarter')),
+                $this->intOrNull($request->query('start_year')),
+                $this->intOrNull($request->query('end_quarter')),
+                $this->intOrNull($request->query('end_year')),
+                $request->query('record_status') ?: null,
+                $this->stringOrNull($request->query('chapter_id')),
+                TableQuery::fromRequest($request),
+                $request->user()?->legacy_user_id,
+            );
+
+            return response()->json(['data' => ['columns' => MasterReviewRepository::moduleColumns(), 'rows' => $result['rows'], 'meta' => $result['meta']]]);
+        }
+
         $paginator = $this->masterReviews->fullTable(
             $this->intOrNull($request->query('vessel_id')),
             $this->intOrNull($request->query('start_quarter')),
@@ -76,11 +109,18 @@ class MasterReviewController extends Controller
     /**
      * GET /api/master-review/{masterReview}
      */
-    public function show(MasterReview $masterReview): JsonResponse
+    public function show(string $masterReview): JsonResponse
     {
-        $masterReview->load(['vessel', 'manualChapter', 'manualDocument', 'present']);
+        if (LegacyDb::isConfigured()) {
+            $detail = $this->masterReviews->legacyDetail($masterReview);
+            abort_if($detail === null, 404);
 
-        return response()->json(['data' => $this->mapDetail($masterReview)]);
+            return response()->json(['data' => $detail]);
+        }
+
+        $model = MasterReview::query()->with(['vessel', 'manualChapter', 'manualDocument', 'present'])->findOrFail((int) $masterReview);
+
+        return response()->json(['data' => $this->mapDetail($model)]);
     }
 
     /**
@@ -170,6 +210,11 @@ class MasterReviewController extends Controller
     private function intOrNull(mixed $value): ?int
     {
         return $value === null || $value === '' ? null : (int) $value;
+    }
+
+    private function stringOrNull(mixed $value): ?string
+    {
+        return $value === null || $value === '' ? null : (string) $value;
     }
 
     /** @return array{0: array, 1: array} */

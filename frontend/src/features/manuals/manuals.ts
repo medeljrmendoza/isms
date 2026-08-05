@@ -1,5 +1,5 @@
 export interface ManualOption {
-  id: number;
+  id: number | string;
   label: string;
 }
 
@@ -8,13 +8,13 @@ export interface ManualsOptions {
 }
 
 export interface ManualFormNode {
-  id: number;
+  id: number | string;
   reference_no: string;
   file_name: string;
 }
 
 export interface ManualDocumentNode {
-  id: number;
+  id: number | string;
   reference_no: string;
   manual_name: string;
   date_of_revision: string;
@@ -22,13 +22,13 @@ export interface ManualDocumentNode {
 }
 
 export interface ManualChapterNode {
-  id: number;
+  id: number | string;
   label: string;
   documents: ManualDocumentNode[];
 }
 
 export interface ManualSearchResult {
   type: "document" | "form";
-  id: number;
+  id: number | string;
   label: string;
 }

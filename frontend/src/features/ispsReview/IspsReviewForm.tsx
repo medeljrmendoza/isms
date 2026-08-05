@@ -18,7 +18,7 @@ interface IspsReviewFormProps {
   onCancel: () => void;
 }
 
-const emptyOptions: IspsReviewOptions = { vessels: [], chapters: [] };
+const emptyOptions: IspsReviewOptions = { vessels: [], chapters: [], can_create_record: true };
 
 const QUARTER_HINTS: Record<string, string[]> = {
   "1": ["Deck Operations – Vol. III", "Navigation Procedures – Vol. IV", "Cargo Operations as per Ship Type – Vol. V"],
@@ -109,7 +109,8 @@ export function IspsReviewForm({ review, onSuccess, onCancel }: IspsReviewFormPr
       if (isCreate) {
         await ispsReviewService.create(values);
       } else {
-        await ispsReviewService.update(review.id, values);
+        // review.id is always numeric here: this form only opens for can_edit records (local-only).
+        await ispsReviewService.update(review.id as number, values);
       }
       onSuccess();
     } catch (error) {

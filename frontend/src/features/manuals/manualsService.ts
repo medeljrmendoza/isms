@@ -8,14 +8,14 @@ export const manualsService = {
     return response.data.data;
   },
 
-  async tree(smsType: string, vesselId?: number): Promise<ManualChapterNode[]> {
+  async tree(smsType: string, vesselId?: number | string): Promise<ManualChapterNode[]> {
     const response = await axiosClient.get<ApiResource<ManualChapterNode[]>>("/manuals/tree", {
       params: { sms_type: smsType, vessel_id: vesselId },
     });
     return response.data.data;
   },
 
-  async search(term: string, smsType: string, vesselId?: number): Promise<ManualSearchResult[]> {
+  async search(term: string, smsType: string, vesselId?: number | string): Promise<ManualSearchResult[]> {
     const response = await axiosClient.get<ApiResource<ManualSearchResult[]>>("/manuals/search", {
       params: { q: term, sms_type: smsType, vessel_id: vesselId },
     });

@@ -70,11 +70,13 @@ export function IspsReviewPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<IspsReviewDetail | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [canCreateRecord, setCanCreateRecord] = useState(false);
 
   useEffect(() => {
     ispsReviewService.options().then((data) => {
       setVessels(data.vessels);
       setChapters(data.chapters);
+      setCanCreateRecord(data.can_create_record);
     }).catch(() => undefined);
   }, []);
 
@@ -82,13 +84,13 @@ export function IspsReviewPage() {
     setLoading(true);
     ispsReviewService
       .list({
-        vessel_id: applied.vesselId ? Number(applied.vesselId) : undefined,
+        vessel_id: applied.vesselId || undefined,
         start_quarter: applied.startQuarter ? Number(applied.startQuarter) : undefined,
         start_year: applied.startYear ? Number(applied.startYear) : undefined,
         end_quarter: applied.endQuarter ? Number(applied.endQuarter) : undefined,
         end_year: applied.endYear ? Number(applied.endYear) : undefined,
         record_status: applied.recordStatus || undefined,
-        chapter_id: applied.chapterId ? Number(applied.chapterId) : undefined,
+        chapter_id: applied.chapterId || undefined,
         page,
         per_page: PER_PAGE,
         sort,
@@ -139,7 +141,7 @@ export function IspsReviewPage() {
 
   const reload = () => setReloadKey((k) => k + 1);
 
-  const openEdit = async (id: number) => {
+  const openEdit = async (id: number | string) => {
     setActionError(null);
     const detail = await ispsReviewService.show(id);
     setEditing(detail);
@@ -161,17 +163,19 @@ export function IspsReviewPage() {
       <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
           <h1 className="text-base font-semibold text-slate-800">SMS ISPS Review</h1>
-          <Button
-            type="button"
-            variant="success"
-            className="!px-3 !py-1.5 text-sm"
-            onClick={() => {
-              setEditing(null);
-              setFormOpen(true);
-            }}
-          >
-            + Add Record
-          </Button>
+          {canCreateRecord && (
+            <Button
+              type="button"
+              variant="success"
+              className="!px-3 !py-1.5 text-sm"
+              onClick={() => {
+                setEditing(null);
+                setFormOpen(true);
+              }}
+            >
+              + Add Record
+            </Button>
+          )}
         </div>
 
         <div className="flex flex-wrap items-end gap-3 border-b border-slate-100 px-4 py-3">
@@ -307,7 +311,7 @@ export function IspsReviewPage() {
                           type="button"
                           variant="success"
                           className="!px-1.5 !py-0.5 text-xs"
-                          onClick={() => runAction(() => ispsReviewService.approve(row.id))}
+                          onClick={() => runAction(() => ispsReviewService.approve(row.id as number))}
                         >
                           Approve
                         </Button>
@@ -317,7 +321,7 @@ export function IspsReviewPage() {
                           type="button"
                           variant="success"
                           className="!px-1.5 !py-0.5 text-xs"
-                          onClick={() => runAction(() => ispsReviewService.recommendApproval(row.id))}
+                          onClick={() => runAction(() => ispsReviewService.recommendApproval(row.id as number))}
                         >
                           Recommend
                         </Button>
@@ -327,7 +331,7 @@ export function IspsReviewPage() {
                           type="button"
                           variant="secondary"
                           className="!px-1.5 !py-0.5 text-xs text-red-600"
-                          onClick={() => runAction(() => ispsReviewService.disapprove(row.id))}
+                          onClick={() => runAction(() => ispsReviewService.disapprove(row.id as number))}
                         >
                           Disapprove
                         </Button>
@@ -337,7 +341,7 @@ export function IspsReviewPage() {
                           type="button"
                           variant="secondary"
                           className="!px-1.5 !py-0.5 text-xs text-red-600"
-                          onClick={() => runAction(() => ispsReviewService.disregard(row.id))}
+                          onClick={() => runAction(() => ispsReviewService.disregard(row.id as number))}
                         >
                           Disregard
                         </Button>
@@ -347,7 +351,7 @@ export function IspsReviewPage() {
                           type="button"
                           variant="secondary"
                           className="!px-1.5 !py-0.5 text-xs"
-                          onClick={() => runAction(() => ispsReviewService.reopen(row.id))}
+                          onClick={() => runAction(() => ispsReviewService.reopen(row.id as number))}
                         >
                           Re-open
                         </Button>
@@ -359,7 +363,7 @@ export function IspsReviewPage() {
                           className="!px-1.5 !py-0.5 text-xs text-red-600"
                           onClick={() => {
                             if (window.confirm(`Delete this review (${row.sms || row.review_date})?`)) {
-                              runAction(() => ispsReviewService.destroy(row.id));
+                              runAction(() => ispsReviewService.destroy(row.id as number));
                             }
                           }}
                         >

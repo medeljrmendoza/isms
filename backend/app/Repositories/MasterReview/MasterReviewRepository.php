@@ -176,6 +176,167 @@ class MasterReviewRepository
     }
 
     /**
+     * Ported from Master_review.php's loadData(): the module's own full
+     * list, reading tb_master_review directly from the legacy
+     * connection. Same SHORE-auto-include / VESSEL-approved-only
+     * visibility gate as legacyTable() (see its docblock), but without
+     * the shore_status='' restriction — every status is shown here,
+     * filterable via $recordStatus, matching fullTable()'s local
+     * counterpart. review_quarter is compared as the raw "Q1".."Q4"
+     * string, same as legacy's own query (single-digit quarters compare
+     * correctly lexically).
+     */
+    public function legacyFullTable(
+        ?string $vesselId,
+        ?int $startQuarter,
+        ?int $startYear,
+        ?int $endQuarter,
+        ?int $endYear,
+        ?string $recordStatus,
+        ?string $chapterId,
+        TableQuery $query,
+        ?string $legacyUserId,
+    ): array {
+        $vessels = LegacyDb::vesselNames();
+        $assignedVesselIds = LegacyDb::assignedVesselIds($legacyUserId);
+
+        $builder = DB::connection('legacy')->table('tb_master_review')
+            ->leftJoin('tb_manual_documents', 'tb_manual_documents.manDocID', '=', 'tb_master_review.manDocID')
+            ->leftJoin('tb_manual_chapter as chapter_from_doc', 'chapter_from_doc.chapterID', '=', 'tb_manual_documents.chapterID')
+            ->leftJoin('tb_manual_chapter as chapter_direct', 'chapter_direct.chapterID', '=', 'tb_master_review.chapterID')
+            ->where('tb_master_review.is_deleted', '0')
+            ->where(function ($q) use ($assignedVesselIds) {
+                $q->where('tb_master_review.added_by', 'SHORE')
+                    ->orWhere(function ($vessel) use ($assignedVesselIds) {
+                        $vessel->where('tb_master_review.added_by', 'VESSEL')
+                            ->where('tb_master_review.is_vessel_approved', '1')
+                            ->whereIn('tb_master_review.vesID', $assignedVesselIds);
+                    });
+            })
+            ->select([
+                'tb_master_review.reviewID',
+                'tb_master_review.vesID',
+                'tb_master_review.review_date',
+                'tb_master_review.added_by',
+                'tb_master_review.review_quarter',
+                'tb_master_review.review_year',
+                'tb_master_review.manDocID',
+                'tb_master_review.manual_section',
+                'tb_master_review.review_recommendation',
+                'tb_master_review.vessel_remarks',
+                'tb_master_review.shore_remarks',
+                'tb_master_review.shore_status',
+                'tb_manual_documents.reference_no',
+                'chapter_from_doc.reference_no as chapter_ref_from_doc',
+                'chapter_direct.reference_no as chapter_ref_direct',
+            ]);
+
+        if ($vesselId !== null && $vesselId !== '' && $vesselId !== 'ALL') {
+            $builder->where('tb_master_review.vesID', $vesselId);
+        }
+
+        if ($startQuarter !== null && $startYear !== null && $endQuarter !== null && $endYear !== null) {
+            $builder->where(function ($q) use ($startQuarter, $startYear, $endQuarter, $endYear) {
+                $q->where(function ($q2) use ($startQuarter, $startYear, $endQuarter, $endYear) {
+                    $q2->where('tb_master_review.review_year', $startYear)
+                        ->where('tb_master_review.review_year', $endYear)
+                        ->where('tb_master_review.review_quarter', '>=', "Q{$startQuarter}")
+                        ->where('tb_master_review.review_quarter', '<=', "Q{$endQuarter}");
+                })->orWhere(function ($q2) use ($startQuarter, $startYear, $endYear) {
+                    $q2->where('tb_master_review.review_year', $startYear)
+                        ->where('tb_master_review.review_year', '!=', $endYear)
+                        ->where('tb_master_review.review_quarter', '>=', "Q{$startQuarter}");
+                })->orWhere(function ($q2) use ($startYear, $endYear) {
+                    $q2->where('tb_master_review.review_year', '>', $startYear)->where('tb_master_review.review_year', '<', $endYear);
+                })->orWhere(function ($q2) use ($endQuarter, $startYear, $endYear) {
+                    $q2->where('tb_master_review.review_year', $endYear)
+                        ->where('tb_master_review.review_year', '!=', $startYear)
+                        ->where('tb_master_review.review_quarter', '<=', "Q{$endQuarter}");
+                });
+            });
+        }
+
+        if ($recordStatus !== null && $recordStatus !== '' && $recordStatus !== 'ALL') {
+            $builder->where('tb_master_review.shore_status', $recordStatus);
+        }
+
+        if ($chapterId !== null && $chapterId !== '' && $chapterId !== 'ALL') {
+            $builder->where(function ($q) use ($chapterId) {
+                $q->where(function ($q2) use ($chapterId) {
+                    $q2->where('tb_master_review.manDocID', '!=', '')->where('tb_manual_documents.chapterID', $chapterId);
+                })->orWhere(function ($q2) use ($chapterId) {
+                    $q2->where('tb_master_review.manDocID', '')->where('tb_master_review.chapterID', $chapterId);
+                });
+            });
+        }
+
+        if ($query->search !== null) {
+            $term = "%{$query->search}%";
+            $builder->where(function ($q) use ($term) {
+                $q->where('tb_master_review.review_date', 'like', $term)
+                    ->orWhere('tb_master_review.added_by', 'like', $term)
+                    ->orWhere('tb_master_review.review_year', 'like', $term)
+                    ->orWhere('tb_master_review.shore_status', 'like', $term)
+                    ->orWhere('tb_master_review.review_recommendation', 'like', $term)
+                    ->orWhere('tb_manual_documents.reference_no', 'like', $term);
+            });
+        }
+
+        $sortMap = [
+            'review_date' => 'tb_master_review.review_date',
+            'added_by' => 'tb_master_review.added_by',
+            'review_quarter' => 'tb_master_review.review_quarter',
+            'review_year' => 'tb_master_review.review_year',
+            'shore_status' => 'tb_master_review.shore_status',
+        ];
+        $sort = $sortMap[$query->sort ?? ''] ?? 'tb_master_review.review_date';
+
+        $paginator = $builder->orderBy($sort, $query->direction)->paginate($query->perPage, page: $query->page);
+
+        $rows = collect($paginator->items())->map(function ($r) use ($vessels) {
+            $isOpen = $r->shore_status === '';
+            $chapterRef = $r->manDocID !== '' ? $r->chapter_ref_from_doc : $r->chapter_ref_direct;
+            $docRef = $r->manDocID !== '' ? $r->reference_no : null;
+            $sms = trim(implode(' / ', array_filter([$chapterRef, $docRef])));
+            if ($r->manual_section) {
+                $sms .= " ({$r->manual_section})";
+            }
+
+            return [
+                'id' => $r->reviewID,
+                'vessel' => $vessels[$r->vesID] ?? '',
+                'review_date' => $r->review_date,
+                'added_by' => $r->added_by,
+                'review_quarter' => (int) ltrim((string) $r->review_quarter, 'Q'),
+                'review_year' => $r->review_year,
+                'sms' => trim($sms),
+                'review_recommendation' => $r->review_recommendation,
+                'has_vessel_remarks' => filled($r->vessel_remarks),
+                'has_shore_remarks' => filled($r->shore_remarks),
+                'shore_status' => $r->shore_status,
+                'can_edit' => false,
+                'can_approve' => false,
+                'can_recommend_approval' => false,
+                'can_under_review' => false,
+                'can_disapprove' => false,
+                'can_disregard' => false,
+                'can_delete' => false,
+                'can_reopen' => false,
+            ];
+        })->all();
+
+        return [
+            'rows' => $rows,
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
+        ];
+    }
+
+    /**
      * Ported from Master_review.php's view_record(), surfaced via the
      * dashboard's clickable review_date column. Read-only — see
      * SireReportRepository::detail()'s docblock for the convention.
@@ -191,6 +352,7 @@ class MasterReviewRepository
         $reference = $r->manualDocument?->reference_no ?? $r->manualChapter?->reference_no ?? '';
 
         return $this->toDetailArray([
+            'id' => $r->id,
             'vessel' => $r->vessel?->display_name ?? '',
             'review_date' => $r->review_date?->format('Y-m-d'),
             'added_by' => $r->added_by,
@@ -223,8 +385,10 @@ class MasterReviewRepository
     {
         $r = DB::connection('legacy')->table('tb_master_review')
             ->leftJoin('tb_manual_documents', 'tb_manual_documents.manDocID', '=', 'tb_master_review.manDocID')
+            ->leftJoin('tb_manual_chapter as chapter_from_doc', 'chapter_from_doc.chapterID', '=', 'tb_manual_documents.chapterID')
+            ->leftJoin('tb_manual_chapter as chapter_direct', 'chapter_direct.chapterID', '=', 'tb_master_review.chapterID')
             ->where('tb_master_review.reviewID', $reviewID)
-            ->select(['tb_master_review.*', 'tb_manual_documents.reference_no'])
+            ->select(['tb_master_review.*', 'tb_manual_documents.reference_no', 'chapter_from_doc.reference_no as chapter_ref_from_doc', 'chapter_direct.reference_no as chapter_ref_direct'])
             ->first();
 
         if ($r === null) {
@@ -248,13 +412,21 @@ class MasterReviewRepository
             }
         }
 
+        $chapterRef = $r->manDocID !== '' ? $r->chapter_ref_from_doc : $r->chapter_ref_direct;
+        $docRef = $r->manDocID !== '' ? $r->reference_no : null;
+        $sms = trim(implode(' / ', array_filter([$chapterRef, $docRef])));
+        if ($r->manual_section) {
+            $sms .= " ({$r->manual_section})";
+        }
+
         return $this->toDetailArray([
+            'id' => $r->reviewID,
             'vessel' => $vessels[$r->vesID] ?? '',
             'review_date' => $zeroDateToNull($r->review_date),
             'added_by' => $r->added_by,
             'review_quarter' => (int) ltrim((string) $r->review_quarter, 'Q'),
             'review_year' => $r->review_year,
-            'sms' => $r->reference_no !== null ? trim("{$r->reference_no} ({$r->manual_section})") : '',
+            'sms' => trim($sms),
             'review_recommendation' => $r->review_recommendation,
             'has_vessel_remarks' => filled($r->vessel_remarks),
             'has_shore_remarks' => filled($r->shore_remarks),
@@ -280,7 +452,7 @@ class MasterReviewRepository
     private function toDetailArray(array $r): array
     {
         return [
-            'id' => 0,
+            'id' => $r['id'],
             'vessel' => $r['vessel'],
             'review_date' => $r['review_date'],
             'added_by' => $r['added_by'],
@@ -333,6 +505,28 @@ class MasterReviewRepository
     {
         return ManualDocument::query()->where('manual_chapter_id', $chapterId)->orderBy('reference_no')->get()
             ->map(fn (ManualDocument $d) => ['id' => $d->id, 'label' => "({$d->reference_no}) {$d->manual_name}"])
+            ->all();
+    }
+
+    /** @return array<int, array{id:string,label:string}> */
+    public function legacyVesselOptions(?string $legacyUserId): array
+    {
+        return LegacyDb::assignedVesselOptions($legacyUserId);
+    }
+
+    /** @return array<int, array{id:string,label:string}> */
+    public function legacyChapterOptions(): array
+    {
+        return DB::connection('legacy')->table('tb_manual_chapter')->orderBy('reference_no')->get()
+            ->map(fn ($c) => ['id' => $c->chapterID, 'label' => "({$c->reference_no}) {$c->chapter_name}"])
+            ->all();
+    }
+
+    /** @return array<int, array{id:string,label:string}> */
+    public function legacyDocumentOptionsForChapter(string $chapterId): array
+    {
+        return DB::connection('legacy')->table('tb_manual_documents')->where('chapterID', $chapterId)->orderBy('reference_no')->get()
+            ->map(fn ($d) => ['id' => $d->manDocID, 'label' => "({$d->reference_no}) {$d->manual_name}"])
             ->all();
     }
 

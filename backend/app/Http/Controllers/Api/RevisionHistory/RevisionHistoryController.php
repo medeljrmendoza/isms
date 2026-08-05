@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\RevisionHistory\RevisionHistoryRequest;
 use App\Models\RevisionHistory\ManualRevision;
 use App\Repositories\RevisionHistory\RevisionHistoryRepository;
+use App\Support\LegacyDb;
 use App\Support\TableQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -35,7 +36,12 @@ class RevisionHistoryController extends Controller
     {
         return response()->json([
             'data' => [
-                'chapters' => $this->revisions->chapterOptions(),
+                'chapters' => LegacyDb::isConfigured() ? $this->revisions->legacyChapterOptions() : $this->revisions->chapterOptions(),
+                // A new record's manual_document_id is a local
+                // ManualDocument foreign key — legacy document ids don't
+                // have a matching local row, so creation is only offered
+                // when reading locally.
+                'can_create_record' => ! LegacyDb::isConfigured(),
             ],
         ]);
     }
@@ -45,6 +51,12 @@ class RevisionHistoryController extends Controller
      */
     public function documentOptions(Request $request): JsonResponse
     {
+        if (LegacyDb::isConfigured()) {
+            return response()->json([
+                'data' => $this->revisions->legacyDocumentOptionsForChapter((string) $request->query('chapter_id')),
+            ]);
+        }
+
         return response()->json([
             'data' => $this->revisions->documentOptionsForChapter((int) $request->query('chapter_id')),
         ]);
@@ -55,6 +67,17 @@ class RevisionHistoryController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        if (LegacyDb::isConfigured()) {
+            $result = $this->revisions->legacyFullTable(
+                $this->stringOrNull($request->query('chapter_id')),
+                $request->query('date_from') ?: null,
+                $request->query('date_to') ?: null,
+                TableQuery::fromRequest($request),
+            );
+
+            return response()->json(['data' => ['columns' => RevisionHistoryRepository::columns(), 'rows' => $result['rows'], 'meta' => $result['meta']]]);
+        }
+
         $paginator = $this->revisions->fullTable(
             $this->intOrNull($request->query('chapter_id')),
             $request->query('date_from') ?: null,
@@ -74,11 +97,18 @@ class RevisionHistoryController extends Controller
     /**
      * GET /api/revision-history/{manualRevision}
      */
-    public function show(ManualRevision $manualRevision): JsonResponse
+    public function show(string $manualRevision): JsonResponse
     {
-        $manualRevision->load('manualDocument.manualChapter');
+        if (LegacyDb::isConfigured()) {
+            $detail = $this->revisions->legacyDetail($manualRevision);
+            abort_if($detail === null, 404);
 
-        return response()->json(['data' => $this->mapDetail($manualRevision)]);
+            return response()->json(['data' => $detail]);
+        }
+
+        $model = ManualRevision::query()->with('manualDocument.manualChapter')->findOrFail((int) $manualRevision);
+
+        return response()->json(['data' => $this->mapDetail($model)]);
     }
 
     /**
@@ -142,6 +172,11 @@ class RevisionHistoryController extends Controller
         return $value === null || $value === '' ? null : (int) $value;
     }
 
+    private function stringOrNull(mixed $value): ?string
+    {
+        return $value === null || $value === '' ? null : (string) $value;
+    }
+
     private function mapRow(ManualRevision $r): array
     {
         return [
@@ -154,6 +189,8 @@ class RevisionHistoryController extends Controller
             'reason_revision' => $r->reason_revision,
             'reviewed_by' => $r->reviewed_by,
             'approved_by' => $r->approved_by,
+            'can_edit' => true,
+            'can_delete' => true,
         ];
     }
 

@@ -18,7 +18,7 @@ interface MasterReviewFormProps {
   onCancel: () => void;
 }
 
-const emptyOptions: MasterReviewOptions = { vessels: [], chapters: [] };
+const emptyOptions: MasterReviewOptions = { vessels: [], chapters: [], can_create_record: true };
 
 function emptyValues(): MasterReviewFormValues {
   return {
@@ -101,7 +101,8 @@ export function MasterReviewForm({ review, onSuccess, onCancel }: MasterReviewFo
       if (isCreate) {
         await masterReviewService.create(values);
       } else {
-        await masterReviewService.update(review.id, values);
+        // review.id is always numeric here: this form only opens for can_edit records (local-only).
+        await masterReviewService.update(review.id as number, values);
       }
       onSuccess();
     } catch (error) {

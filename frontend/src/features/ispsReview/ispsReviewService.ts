@@ -4,13 +4,13 @@ import type { IspsReviewDetail, IspsReviewListResponse, IspsReviewOption, IspsRe
 import type { IspsReviewFormValues } from "./ispsReviewSchema";
 
 export interface IspsReviewListParams {
-  vessel_id?: number;
+  vessel_id?: number | string;
   start_quarter?: number;
   start_year?: number;
   end_quarter?: number;
   end_year?: number;
   record_status?: string;
-  chapter_id?: number;
+  chapter_id?: number | string;
   page: number;
   per_page: number;
   search?: string;
@@ -24,7 +24,7 @@ export const ispsReviewService = {
     return response.data.data;
   },
 
-  async documentOptions(chapterId: number): Promise<IspsReviewOption[]> {
+  async documentOptions(chapterId: number | string): Promise<IspsReviewOption[]> {
     const response = await axiosClient.get<ApiResource<IspsReviewOption[]>>("/isps-review/document-options", {
       params: { chapter_id: chapterId },
     });
@@ -36,7 +36,7 @@ export const ispsReviewService = {
     return response.data.data;
   },
 
-  async show(id: number): Promise<IspsReviewDetail> {
+  async show(id: number | string): Promise<IspsReviewDetail> {
     const response = await axiosClient.get<ApiResource<IspsReviewDetail>>(`/isps-review/${id}`);
     return response.data.data;
   },

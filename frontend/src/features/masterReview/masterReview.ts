@@ -1,13 +1,15 @@
 import type { DashletColumn, TableMeta } from "../dashboard/dashboard";
 
 export interface MasterReviewOption {
-  id: number;
+  /** A local numeric id normally, but a legacy string id when reading from the legacy connection. */
+  id: number | string;
   label: string;
 }
 
 export interface MasterReviewOptions {
   vessels: MasterReviewOption[];
   chapters: MasterReviewOption[];
+  can_create_record: boolean;
 }
 
 export interface MasterReviewPresentDetail {
@@ -17,7 +19,8 @@ export interface MasterReviewPresentDetail {
 }
 
 export interface MasterReviewRow {
-  id: number;
+  /** A local numeric id normally, but a legacy string id when reading from the legacy connection. */
+  id: number | string;
   vessel: string;
   review_date: string;
   added_by: "SHORE" | "VESSEL";

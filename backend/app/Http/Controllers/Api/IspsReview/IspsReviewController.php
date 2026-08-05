@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\IspsReview\IspsReviewRequest;
 use App\Models\IspsReview\IspsReview;
 use App\Repositories\IspsReview\IspsReviewRepository;
+use App\Support\LegacyDb;
 use App\Support\TableQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -26,12 +27,18 @@ class IspsReviewController extends Controller
     /**
      * GET /api/isps-review/options
      */
-    public function options(): JsonResponse
+    public function options(Request $request): JsonResponse
     {
         return response()->json([
             'data' => [
-                'vessels' => $this->ispsReviews->vesselOptions(),
-                'chapters' => $this->ispsReviews->chapterOptions(),
+                ...(LegacyDb::isConfigured() ? [
+                    'vessels' => $this->ispsReviews->legacyVesselOptions($request->user()?->legacy_user_id),
+                    'chapters' => $this->ispsReviews->legacyChapterOptions(),
+                ] : [
+                    'vessels' => $this->ispsReviews->vesselOptions(),
+                    'chapters' => $this->ispsReviews->chapterOptions(),
+                ]),
+                'can_create_record' => ! LegacyDb::isConfigured(),
             ],
         ]);
     }
@@ -41,6 +48,12 @@ class IspsReviewController extends Controller
      */
     public function documentOptions(Request $request): JsonResponse
     {
+        if (LegacyDb::isConfigured()) {
+            return response()->json([
+                'data' => $this->ispsReviews->legacyDocumentOptionsForChapter((string) $request->query('chapter_id')),
+            ]);
+        }
+
         return response()->json([
             'data' => $this->ispsReviews->documentOptionsForChapter((int) $request->query('chapter_id')),
         ]);
@@ -51,6 +64,22 @@ class IspsReviewController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        if (LegacyDb::isConfigured()) {
+            $result = $this->ispsReviews->legacyFullTable(
+                $this->stringOrNull($request->query('vessel_id')),
+                $this->intOrNull($request->query('start_quarter')),
+                $this->intOrNull($request->query('start_year')),
+                $this->intOrNull($request->query('end_quarter')),
+                $this->intOrNull($request->query('end_year')),
+                $request->query('record_status') ?: null,
+                $this->stringOrNull($request->query('chapter_id')),
+                TableQuery::fromRequest($request),
+                $request->user()?->legacy_user_id,
+            );
+
+            return response()->json(['data' => ['columns' => IspsReviewRepository::moduleColumns(), 'rows' => $result['rows'], 'meta' => $result['meta']]]);
+        }
+
         $paginator = $this->ispsReviews->fullTable(
             $this->intOrNull($request->query('vessel_id')),
             $this->intOrNull($request->query('start_quarter')),
@@ -74,11 +103,18 @@ class IspsReviewController extends Controller
     /**
      * GET /api/isps-review/{ispsReview}
      */
-    public function show(IspsReview $ispsReview): JsonResponse
+    public function show(string $ispsReview): JsonResponse
     {
-        $ispsReview->load(['vessel', 'manualChapter', 'manualDocument', 'present']);
+        if (LegacyDb::isConfigured()) {
+            $detail = $this->ispsReviews->legacyDetail($ispsReview);
+            abort_if($detail === null, 404);
 
-        return response()->json(['data' => $this->mapDetail($ispsReview)]);
+            return response()->json(['data' => $detail]);
+        }
+
+        $model = IspsReview::query()->with(['vessel', 'manualChapter', 'manualDocument', 'present'])->findOrFail((int) $ispsReview);
+
+        return response()->json(['data' => $this->mapDetail($model)]);
     }
 
     /**
@@ -160,6 +196,11 @@ class IspsReviewController extends Controller
     private function intOrNull(mixed $value): ?int
     {
         return $value === null || $value === '' ? null : (int) $value;
+    }
+
+    private function stringOrNull(mixed $value): ?string
+    {
+        return $value === null || $value === '' ? null : (string) $value;
     }
 
     /** @return array{0: array, 1: array} */

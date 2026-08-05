@@ -18,7 +18,7 @@ interface RevisionHistoryFormProps {
   onCancel: () => void;
 }
 
-const emptyOptions: RevisionHistoryOptions = { chapters: [] };
+const emptyOptions: RevisionHistoryOptions = { chapters: [], can_create_record: true };
 
 function emptyValues(): RevisionHistoryFormValues {
   return {
@@ -100,7 +100,8 @@ export function RevisionHistoryForm({ revision, onSuccess, onCancel }: RevisionH
       if (isCreate) {
         await revisionHistoryService.create(values);
       } else {
-        await revisionHistoryService.update(revision.id, values);
+        // revision.id is always numeric here: this form only opens for can_edit records (local-only).
+        await revisionHistoryService.update(revision.id as number, values);
       }
       onSuccess();
     } catch (error) {

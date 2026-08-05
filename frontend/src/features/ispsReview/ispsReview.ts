@@ -1,11 +1,13 @@
 export interface IspsReviewOption {
-  id: number;
+  /** A local numeric id normally, but a legacy string id when reading from the legacy connection. */
+  id: number | string;
   label: string;
 }
 
 export interface IspsReviewOptions {
   vessels: IspsReviewOption[];
   chapters: IspsReviewOption[];
+  can_create_record: boolean;
 }
 
 export interface IspsReviewPresentRow {
@@ -15,7 +17,8 @@ export interface IspsReviewPresentRow {
 }
 
 export interface IspsReviewRow {
-  id: number;
+  /** A local numeric id normally, but a legacy string id when reading from the legacy connection. */
+  id: number | string;
   vessel: string;
   review_date: string;
   added_by: "SHORE" | "VESSEL";

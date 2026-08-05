@@ -4,13 +4,13 @@ import type { MasterReviewDetail, MasterReviewListResponse, MasterReviewOption, 
 import type { MasterReviewFormValues } from "./masterReviewSchema";
 
 export interface MasterReviewListParams {
-  vessel_id?: number;
+  vessel_id?: number | string;
   start_quarter?: number;
   start_year?: number;
   end_quarter?: number;
   end_year?: number;
   record_status?: string;
-  chapter_id?: number;
+  chapter_id?: number | string;
   page: number;
   per_page: number;
   search?: string;
@@ -24,7 +24,7 @@ export const masterReviewService = {
     return response.data.data;
   },
 
-  async documentOptions(chapterId: number): Promise<MasterReviewOption[]> {
+  async documentOptions(chapterId: number | string): Promise<MasterReviewOption[]> {
     const response = await axiosClient.get<ApiResource<MasterReviewOption[]>>("/master-review/document-options", {
       params: { chapter_id: chapterId },
     });
@@ -36,7 +36,7 @@ export const masterReviewService = {
     return response.data.data;
   },
 
-  async show(id: number): Promise<MasterReviewDetail> {
+  async show(id: number | string): Promise<MasterReviewDetail> {
     const response = await axiosClient.get<ApiResource<MasterReviewDetail>>(`/master-review/${id}`);
     return response.data.data;
   },

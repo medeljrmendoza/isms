@@ -9,7 +9,7 @@ import type {
 import type { RevisionHistoryFormValues } from "./revisionHistorySchema";
 
 export interface RevisionHistoryListParams {
-  chapter_id?: number;
+  chapter_id?: number | string;
   date_from?: string;
   date_to?: string;
   page: number;
@@ -25,7 +25,7 @@ export const revisionHistoryService = {
     return response.data.data;
   },
 
-  async documentOptions(chapterId: number): Promise<RevisionHistoryOption[]> {
+  async documentOptions(chapterId: number | string): Promise<RevisionHistoryOption[]> {
     const response = await axiosClient.get<ApiResource<RevisionHistoryOption[]>>("/revision-history/document-options", {
       params: { chapter_id: chapterId },
     });
@@ -37,7 +37,7 @@ export const revisionHistoryService = {
     return response.data.data;
   },
 
-  async show(id: number): Promise<RevisionHistoryDetail> {
+  async show(id: number | string): Promise<RevisionHistoryDetail> {
     const response = await axiosClient.get<ApiResource<RevisionHistoryDetail>>(`/revision-history/${id}`);
     return response.data.data;
   },
