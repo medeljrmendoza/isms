@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { pmsConfigurationService } from "./pmsConfigurationService";
-import { CONFIGURATION_VALUES } from "./pmsConfiguration";
 import type { PmsConfigurationOption, PmsConfigurationRow } from "./pmsConfiguration";
 import { Button } from "../../components/ui/Button";
+import { Modal } from "../../components/ui/Modal";
+import { PmsConfigurationForm } from "./PmsConfigurationForm";
 
 const PER_PAGE = 10;
 
@@ -18,8 +19,8 @@ export function PmsConfigurationPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [savingId, setSavingId] = useState<number | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
+
+  const [editing, setEditing] = useState<PmsConfigurationRow | null>(null);
 
   useEffect(() => {
     pmsConfigurationService.options().then((data) => setPrincipals(data.principals)).catch(() => undefined);
@@ -45,19 +46,6 @@ export function PmsConfigurationPage() {
     if (!principalId) return;
     setAppliedPrincipalId(principalId);
     setPage(1);
-  };
-
-  const handleConfigurationChange = async (vesselId: number, configuration: string) => {
-    setActionError(null);
-    setSavingId(vesselId);
-    try {
-      const updated = await pmsConfigurationService.update(vesselId, configuration);
-      setRows((prev) => prev.map((r) => (r.id === vesselId ? updated : r)));
-    } catch {
-      setActionError("Couldn't save the configuration. Please try again.");
-    } finally {
-      setSavingId(null);
-    }
   };
 
   return (
@@ -88,8 +76,6 @@ export function PmsConfigurationPage() {
           </Button>
         </div>
 
-        {actionError && <p className="px-4 pt-2 text-sm text-red-600">{actionError}</p>}
-
         {appliedPrincipalId === null ? (
           <p className="px-4 py-8 text-center text-sm text-slate-400">Select a principal and click Filter to view its vessels.</p>
         ) : (
@@ -100,6 +86,7 @@ export function PmsConfigurationPage() {
                   <th className="whitespace-nowrap px-2 py-1.5 font-semibold text-slate-600">VESSEL</th>
                   <th className="whitespace-nowrap px-2 py-1.5 font-semibold text-slate-600">SHORT NAME</th>
                   <th className="whitespace-nowrap px-2 py-1.5 font-semibold text-slate-600">CONFIGURATION</th>
+                  <th className="whitespace-nowrap px-2 py-1.5 font-semibold text-slate-600">ACTION</th>
                 </tr>
               </thead>
               <tbody>
@@ -107,26 +94,17 @@ export function PmsConfigurationPage() {
                   <tr key={row.id} className="border-b border-slate-100">
                     <td className="px-2 py-1.5 text-slate-700">{row.vessel_name}</td>
                     <td className="px-2 py-1.5 text-slate-700">{row.short_name ?? "—"}</td>
+                    <td className="px-2 py-1.5 text-slate-700">{row.configuration ?? "—"}</td>
                     <td className="px-2 py-1.5">
-                      <select
-                        value={row.configuration ?? ""}
-                        disabled={savingId === row.id}
-                        onChange={(e) => handleConfigurationChange(row.id, e.target.value)}
-                        className="rounded-md border border-slate-300 px-2 py-1 text-sm disabled:bg-slate-50"
-                      >
-                        <option value="">—</option>
-                        {CONFIGURATION_VALUES.map((v) => (
-                          <option key={v} value={v}>
-                            {v}
-                          </option>
-                        ))}
-                      </select>
+                      <Button type="button" variant="secondary" className="!px-1.5 !py-0.5 text-xs" onClick={() => setEditing(row)}>
+                        Edit
+                      </Button>
                     </td>
                   </tr>
                 ))}
                 {rows.length === 0 && !loading && !error && (
                   <tr>
-                    <td colSpan={3} className="px-2 py-6 text-center text-sm text-slate-400">
+                    <td colSpan={4} className="px-2 py-6 text-center text-sm text-slate-400">
                       No vessels for this principal.
                     </td>
                   </tr>
@@ -165,6 +143,19 @@ export function PmsConfigurationPage() {
           </div>
         )}
       </div>
+
+      {editing && (
+        <Modal title={`Edit Configuration — ${editing.vessel_name}`} onClose={() => setEditing(null)}>
+          <PmsConfigurationForm
+            record={editing}
+            onCancel={() => setEditing(null)}
+            onSuccess={(updated) => {
+              setRows((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
+              setEditing(null);
+            }}
+          />
+        </Modal>
+      )}
     </div>
   );
 }

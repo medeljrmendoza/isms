@@ -28,6 +28,7 @@ export function PmsClassificationsPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<PmsClassificationDetail | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [viewList, setViewList] = useState<{ title: string; items: string[] } | null>(null);
 
   useEffect(() => {
     pmsClassificationsService
@@ -88,7 +89,7 @@ export function PmsClassificationsPage() {
         <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
           <h1 className="text-base font-semibold text-slate-800">Classifications</h1>
           <Button type="button" variant="success" className="!px-3 !py-1.5 text-sm" onClick={openAdd}>
-            + Add Classification
+            + Add Item
           </Button>
         </div>
 
@@ -137,11 +138,11 @@ export function PmsClassificationsPage() {
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50">
-                <th className="whitespace-nowrap px-2 py-1.5 font-semibold text-slate-600">CLASSIFICATION</th>
+                <th className="whitespace-nowrap px-2 py-1.5 font-semibold text-slate-600">CLASSIFICATION NAME</th>
                 <th className="whitespace-nowrap px-2 py-1.5 font-semibold text-slate-600">DESCRIPTION</th>
-                <th className="whitespace-nowrap px-2 py-1.5 font-semibold text-slate-600">DEPARTMENT</th>
-                <th className="whitespace-nowrap px-2 py-1.5 font-semibold text-slate-600">VESSEL TYPE</th>
-                <th className="whitespace-nowrap px-2 py-1.5 font-semibold text-slate-600">SUB-CLASS.</th>
+                <th className="whitespace-nowrap px-2 py-1.5 font-semibold text-slate-600">SUB-CLASSIFICATIONS</th>
+                <th className="whitespace-nowrap px-2 py-1.5 font-semibold text-slate-600">DEPARTMENTS</th>
+                <th className="whitespace-nowrap px-2 py-1.5 font-semibold text-slate-600">VESSEL TYPES</th>
                 <th className="whitespace-nowrap px-2 py-1.5 font-semibold text-slate-600">STATUS</th>
                 <th className="px-2 py-1.5 font-semibold text-slate-600">ACTIONS</th>
               </tr>
@@ -151,10 +152,6 @@ export function PmsClassificationsPage() {
                 <tr key={row.id} className="border-b border-slate-100">
                   <td className="px-2 py-1.5 font-medium text-slate-800">{row.name}</td>
                   <td className="max-w-xs px-2 py-1.5 text-slate-700">{row.description ?? "—"}</td>
-                  <td className="px-2 py-1.5 text-slate-700">{row.departments && row.departments.length > 0 ? row.departments.join(", ") : "—"}</td>
-                  <td className="px-2 py-1.5 text-slate-700">
-                    {row.vessel_types && row.vessel_types.length > 0 ? row.vessel_types.join(", ") : "—"}
-                  </td>
                   <td className="px-2 py-1.5 text-center">
                     <Button
                       type="button"
@@ -162,8 +159,36 @@ export function PmsClassificationsPage() {
                       className="!px-2 !py-0.5 text-xs"
                       onClick={() => navigate(`/pms_setup_classification/sub_classification/${row.id}`)}
                     >
-                      {row.sub_classification_count > 0 ? row.sub_classification_count : "+"}
+                      {row.sub_classification_count > 0 ? "Sub-Classifications" : "+ Add"}
                     </Button>
+                  </td>
+                  <td className="px-2 py-1.5 text-center">
+                    {row.department_count > 0 && row.departments ? (
+                      <Button
+                        type="button"
+                        variant="info"
+                        className="!px-2 !py-0.5 text-xs"
+                        onClick={() => setViewList({ title: row.name, items: row.departments ?? [] })}
+                      >
+                        View ({row.department_count})
+                      </Button>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                  <td className="px-2 py-1.5 text-center">
+                    {row.vessel_type_count > 0 && row.vessel_types ? (
+                      <Button
+                        type="button"
+                        variant="info"
+                        className="!px-2 !py-0.5 text-xs"
+                        onClick={() => setViewList({ title: row.name, items: row.vessel_types ?? [] })}
+                      >
+                        View ({row.vessel_type_count})
+                      </Button>
+                    ) : (
+                      "—"
+                    )}
                   </td>
                   <td className="px-2 py-1.5">
                     <span className={row.is_active ? "font-semibold text-emerald-600" : "font-semibold text-red-500"}>
@@ -240,6 +265,20 @@ export function PmsClassificationsPage() {
               reload();
             }}
           />
+        </Modal>
+      )}
+
+      {viewList && (
+        <Modal title={viewList.title} onClose={() => setViewList(null)}>
+          <table className="w-full text-left text-sm">
+            <tbody>
+              {viewList.items.map((item) => (
+                <tr key={item} className="border-b border-slate-100">
+                  <td className="px-2 py-1.5 text-slate-700">{item}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </Modal>
       )}
     </div>

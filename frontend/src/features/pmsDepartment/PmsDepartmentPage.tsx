@@ -70,7 +70,7 @@ export function PmsDepartmentPage() {
               setFormOpen(true);
             }}
           >
-            + Add Department
+            + Add Item
           </Button>
         </div>
 
@@ -100,22 +100,16 @@ export function PmsDepartmentPage() {
                   onClick={handleSort}
                   className="cursor-pointer select-none whitespace-nowrap px-2 py-1.5 font-semibold text-slate-600 hover:text-slate-900"
                 >
-                  DEPARTMENT NAME
+                  DEPARTMENT
                   {sort === "name" && (direction === "asc" ? " ▲" : " ▼")}
                 </th>
-                <th className="whitespace-nowrap px-2 py-1.5 font-semibold text-slate-600">STATUS</th>
-                <th className="px-2 py-1.5 font-semibold text-slate-600">ACTIONS</th>
+                <th className="px-2 py-1.5 font-semibold text-slate-600">ACTION</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((row) => (
                 <tr key={row.id} className="border-b border-slate-100">
                   <td className="px-2 py-1.5 text-slate-700">{row.name}</td>
-                  <td className="px-2 py-1.5">
-                    <span className={row.is_active ? "font-semibold text-emerald-600" : "font-semibold text-red-500"}>
-                      {row.is_active ? "Active" : "Inactive"}
-                    </span>
-                  </td>
                   <td className="px-2 py-1.5">
                     <div className="flex flex-wrap gap-1">
                       <Button
@@ -143,7 +137,7 @@ export function PmsDepartmentPage() {
               ))}
               {rows.length === 0 && !loading && !error && (
                 <tr>
-                  <td colSpan={3} className="px-2 py-6 text-center text-sm text-slate-400">
+                  <td colSpan={2} className="px-2 py-6 text-center text-sm text-slate-400">
                     No departments.
                   </td>
                 </tr>

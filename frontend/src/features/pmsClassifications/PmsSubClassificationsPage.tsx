@@ -75,7 +75,7 @@ export function PmsSubClassificationsPage() {
               setFormOpen(true);
             }}
           >
-            + Add Sub-Classification
+            + Add Item
           </Button>
         </div>
 
