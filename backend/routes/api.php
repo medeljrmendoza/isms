@@ -26,6 +26,9 @@ use App\Http\Controllers\Api\Pms\PmsActivitiesController;
 use App\Http\Controllers\Api\Pms\PmsAdhocController;
 use App\Http\Controllers\Api\Pms\PmsDoneActivitiesController;
 use App\Http\Controllers\Api\Pms\PmsRunningHoursController;
+use App\Http\Controllers\Api\PmsClassification\PmsClassificationController;
+use App\Http\Controllers\Api\PmsConfiguration\PmsConfigurationController;
+use App\Http\Controllers\Api\PmsDepartment\PmsDepartmentController;
 use App\Http\Controllers\Api\PscReports\KpiPscInspectionsController;
 use App\Http\Controllers\Api\PscReports\PscReportController;
 use App\Http\Controllers\Api\RevisionHistory\RevisionHistoryController;
@@ -291,6 +294,27 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/pms-done-activities/options', [PmsDoneActivitiesController::class, 'options']);
     Route::get('/pms-done-activities', [PmsDoneActivitiesController::class, 'index']);
+
+    Route::get('/pms-configuration/options', [PmsConfigurationController::class, 'options']);
+    Route::get('/pms-configuration', [PmsConfigurationController::class, 'index']);
+    Route::put('/pms-configuration/{vessel}', [PmsConfigurationController::class, 'update']);
+
+    Route::get('/pms-departments', [PmsDepartmentController::class, 'index']);
+    Route::post('/pms-departments', [PmsDepartmentController::class, 'store']);
+    Route::put('/pms-departments/{pmsDepartment}', [PmsDepartmentController::class, 'update']);
+    Route::post('/pms-departments/{pmsDepartment}/toggle-status', [PmsDepartmentController::class, 'toggleStatus']);
+
+    Route::get('/pms-classifications/options', [PmsClassificationController::class, 'options']);
+    Route::get('/pms-classifications', [PmsClassificationController::class, 'index']);
+    Route::post('/pms-classifications', [PmsClassificationController::class, 'store']);
+    Route::get('/pms-classifications/{pmsClassification}', [PmsClassificationController::class, 'show']);
+    Route::put('/pms-classifications/{pmsClassification}', [PmsClassificationController::class, 'update']);
+    Route::post('/pms-classifications/{pmsClassification}/toggle-status', [PmsClassificationController::class, 'toggleStatus']);
+    Route::get('/pms-classifications/{pmsClassification}/sub-classifications', [PmsClassificationController::class, 'subIndex']);
+    Route::post('/pms-classifications/{pmsClassification}/sub-classifications', [PmsClassificationController::class, 'subStore']);
+    Route::get('/pms-sub-classifications/{pmsSubClassification}', [PmsClassificationController::class, 'subShow']);
+    Route::put('/pms-sub-classifications/{pmsSubClassification}', [PmsClassificationController::class, 'subUpdate']);
+    Route::post('/pms-sub-classifications/{pmsSubClassification}/toggle-status', [PmsClassificationController::class, 'subToggleStatus']);
 
     Route::get('/manuals/options', [ManualBrowserController::class, 'options']);
     Route::get('/manuals/tree', [ManualBrowserController::class, 'tree']);

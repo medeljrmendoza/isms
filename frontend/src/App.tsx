@@ -38,6 +38,10 @@ import { DefectsPage } from "./features/defects/DefectsPage";
 import { PmsActivitiesPage } from "./features/pmsActivities/PmsActivitiesPage";
 import { PmsDoneActivitiesPage } from "./features/pmsDoneActivities/PmsDoneActivitiesPage";
 import { PmsWorkPlanPage } from "./features/pmsWorkPlan/PmsWorkPlanPage";
+import { PmsConfigurationPage } from "./features/pmsConfiguration/PmsConfigurationPage";
+import { PmsDepartmentPage } from "./features/pmsDepartment/PmsDepartmentPage";
+import { PmsClassificationsPage } from "./features/pmsClassifications/PmsClassificationsPage";
+import { PmsSubClassificationsPage } from "./features/pmsClassifications/PmsSubClassificationsPage";
 import { ComingSoonPage } from "./pages/ComingSoonPage";
 
 // Placeholder — swap in the real page once the change-password module is migrated.
@@ -90,6 +94,10 @@ export default function App() {
               <Route path="/pms_activities" element={<PmsActivitiesPage />} />
               <Route path="/pms_work_plan" element={<PmsWorkPlanPage />} />
               <Route path="/pms_done_activities" element={<PmsDoneActivitiesPage />} />
+              <Route path="/pms_setup_configuration" element={<PmsConfigurationPage />} />
+              <Route path="/pms_setup_department" element={<PmsDepartmentPage />} />
+              <Route path="/pms_setup_classification" element={<PmsClassificationsPage />} />
+              <Route path="/pms_setup_classification/sub_classification/:classificationId" element={<PmsSubClassificationsPage />} />
               <Route path="/change-password" element={<ChangePasswordPage />} />
               {/* Every other nav link points at a real legacy route that
                   isn't migrated yet — see src/data/navigation.ts */}

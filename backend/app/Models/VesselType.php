@@ -1,10 +1,10 @@
 <?php
 
-namespace App\Models\Pms;
+namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class PmsDepartment extends Model
+class VesselType extends Model
 {
     protected $fillable = ['name', 'is_active'];
 
