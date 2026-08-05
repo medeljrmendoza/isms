@@ -29,7 +29,7 @@ function WarningIcon({ status }: { status: 0 | 1 | 2 }) {
 export function CompanyDocumentationPage() {
   const [types, setTypes] = useState<CompanyDocumentationOption[]>([]);
   const [typeId, setTypeId] = useState("");
-  const [appliedTypeId, setAppliedTypeId] = useState<number | null>(null);
+  const [appliedTypeId, setAppliedTypeId] = useState<string | null>(null);
 
   const [rows, setRows] = useState<CompanyDocumentationRow[]>([]);
   const [page, setPage] = useState(1);
@@ -44,9 +44,13 @@ export function CompanyDocumentationPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<CompanyDocumentationDetail | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [canCreateRecord, setCanCreateRecord] = useState(false);
 
   useEffect(() => {
-    companyDocumentationService.typeOptions().then(setTypes).catch(() => undefined);
+    companyDocumentationService.typeOptions().then((data) => {
+      setTypes(data.types);
+      setCanCreateRecord(data.can_create_record);
+    }).catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -80,7 +84,7 @@ export function CompanyDocumentationPage() {
   };
 
   const applyFilter = () => {
-    setAppliedTypeId(typeId ? Number(typeId) : null);
+    setAppliedTypeId(typeId || null);
     setPage(1);
   };
 
@@ -92,7 +96,7 @@ export function CompanyDocumentationPage() {
 
   const reload = () => setReloadKey((k) => k + 1);
 
-  const openEdit = async (id: number) => {
+  const openEdit = async (id: number | string) => {
     setActionError(null);
     const detail = await companyDocumentationService.show(id);
     setEditing(detail);
@@ -114,17 +118,19 @@ export function CompanyDocumentationPage() {
       <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
           <h1 className="text-base font-semibold text-slate-800">Company Documentation</h1>
-          <Button
-            type="button"
-            variant="success"
-            className="!px-3 !py-1.5 text-sm"
-            onClick={() => {
-              setEditing(null);
-              setFormOpen(true);
-            }}
-          >
-            + Add Document
-          </Button>
+          {canCreateRecord && (
+            <Button
+              type="button"
+              variant="success"
+              className="!px-3 !py-1.5 text-sm"
+              onClick={() => {
+                setEditing(null);
+                setFormOpen(true);
+              }}
+            >
+              + Add Document
+            </Button>
+          )}
         </div>
 
         <div className="flex flex-wrap items-end gap-3 border-b border-slate-100 px-4 py-3">
@@ -192,29 +198,35 @@ export function CompanyDocumentationPage() {
                   </td>
                   <td className="px-2 py-1.5">
                     <div className="flex flex-wrap gap-1">
-                      <Button type="button" variant="secondary" className="!px-1.5 !py-0.5 text-xs" onClick={() => openEdit(row.id)}>
-                        Edit
-                      </Button>
-                      <Button
-                        type="button"
-                        variant={row.is_active ? "success" : "secondary"}
-                        className="!px-1.5 !py-0.5 text-xs"
-                        onClick={() => runAction(() => companyDocumentationService.toggleStatus(row.id))}
-                      >
-                        {row.is_active ? "Inactivate" : "Activate"}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        className="!px-1.5 !py-0.5 text-xs text-red-600"
-                        onClick={() => {
-                          if (window.confirm(`Delete this document (${row.document})?`)) {
-                            runAction(() => companyDocumentationService.destroy(row.id));
-                          }
-                        }}
-                      >
-                        Delete
-                      </Button>
+                      {row.can_edit && (
+                        <>
+                          <Button type="button" variant="secondary" className="!px-1.5 !py-0.5 text-xs" onClick={() => openEdit(row.id)}>
+                            Edit
+                          </Button>
+                          <Button
+                            type="button"
+                            variant={row.is_active ? "success" : "secondary"}
+                            className="!px-1.5 !py-0.5 text-xs"
+                            onClick={() => runAction(() => companyDocumentationService.toggleStatus(row.id as number))}
+                          >
+                            {row.is_active ? "Inactivate" : "Activate"}
+                          </Button>
+                        </>
+                      )}
+                      {row.can_delete && (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          className="!px-1.5 !py-0.5 text-xs text-red-600"
+                          onClick={() => {
+                            if (window.confirm(`Delete this document (${row.document})?`)) {
+                              runAction(() => companyDocumentationService.destroy(row.id as number));
+                            }
+                          }}
+                        >
+                          Delete
+                        </Button>
+                      )}
                     </div>
                   </td>
                 </tr>

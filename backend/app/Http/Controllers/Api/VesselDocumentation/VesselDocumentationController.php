@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\VesselDocumentation\VesselDocumentRecordRequest;
 use App\Models\VesselDocumentation\VesselDocumentRecord;
 use App\Repositories\VesselDocumentation\VesselDocumentationRepository;
+use App\Support\LegacyDb;
 use App\Support\TableQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -27,10 +28,15 @@ class VesselDocumentationController extends Controller
     /**
      * GET /api/vessel-documentation/options
      */
-    public function options(): JsonResponse
+    public function options(Request $request): JsonResponse
     {
         return response()->json([
-            'data' => ['vessels' => $this->vesselDocumentation->vesselOptions()],
+            'data' => [
+                'vessels' => LegacyDb::isConfigured()
+                    ? $this->vesselDocumentation->legacyVesselOptions($request->user()?->legacy_user_id)
+                    : $this->vesselDocumentation->vesselOptions(),
+                'can_create_record' => ! LegacyDb::isConfigured(),
+            ],
         ]);
     }
 
@@ -39,6 +45,12 @@ class VesselDocumentationController extends Controller
      */
     public function typeOptions(Request $request): JsonResponse
     {
+        if (LegacyDb::isConfigured()) {
+            return response()->json([
+                'data' => $this->vesselDocumentation->legacyDocumentTypeOptionsForVessel((string) $request->query('vessel_id')),
+            ]);
+        }
+
         return response()->json([
             'data' => $this->vesselDocumentation->documentTypeOptionsForVessel((int) $request->query('vessel_id')),
         ]);
@@ -49,6 +61,12 @@ class VesselDocumentationController extends Controller
      */
     public function documentOptions(Request $request): JsonResponse
     {
+        if (LegacyDb::isConfigured()) {
+            return response()->json([
+                'data' => $this->vesselDocumentation->legacyDocumentOptionsForVessel((string) $request->query('vessel_id')),
+            ]);
+        }
+
         return response()->json([
             'data' => $this->vesselDocumentation->catalogOptionsForVessel((int) $request->query('vessel_id')),
         ]);
@@ -60,10 +78,27 @@ class VesselDocumentationController extends Controller
     public function index(Request $request): JsonResponse
     {
         $typeId = $request->query('type_id');
+        $typeId = $typeId !== null && $typeId !== '' ? $typeId : null;
+
+        if (LegacyDb::isConfigured()) {
+            $result = $this->vesselDocumentation->legacyFullTable(
+                (string) $request->query('vessel_id'),
+                $typeId !== null ? (string) $typeId : null,
+                TableQuery::fromRequest($request),
+            );
+
+            return response()->json([
+                'data' => [
+                    'columns' => VesselDocumentationRepository::moduleColumns(),
+                    'rows' => $result['rows'],
+                    'meta' => $result['meta'],
+                ],
+            ]);
+        }
 
         $paginator = $this->vesselDocumentation->fullTable(
             (int) $request->query('vessel_id'),
-            $typeId !== null && $typeId !== '' ? (int) $typeId : null,
+            $typeId !== null ? (int) $typeId : null,
             TableQuery::fromRequest($request),
         );
 
@@ -79,11 +114,17 @@ class VesselDocumentationController extends Controller
     /**
      * GET /api/vessel-documentation/{vesselDocumentRecord}
      */
-    public function show(VesselDocumentRecord $vesselDocumentRecord): JsonResponse
+    public function show(string $vesselDocumentRecord): JsonResponse
     {
-        $vesselDocumentRecord->load('vesselDocument.vesselDocumentType');
+        if (LegacyDb::isConfigured()) {
+            $detail = $this->vesselDocumentation->legacyDetail($vesselDocumentRecord);
 
-        return response()->json(['data' => $this->mapDetail($vesselDocumentRecord)]);
+            return response()->json(['data' => $detail]);
+        }
+
+        $record = VesselDocumentRecord::query()->with('vesselDocument.vesselDocumentType')->findOrFail((int) $vesselDocumentRecord);
+
+        return response()->json(['data' => $this->mapDetail($record)]);
     }
 
     /**
@@ -142,6 +183,8 @@ class VesselDocumentationController extends Controller
             'is_printer_friendly' => $r->is_printer_friendly,
             'warning_status' => $r->warning_status ?? 0,
             'is_active' => $r->is_active,
+            'can_edit' => true,
+            'can_delete' => true,
         ];
     }
 

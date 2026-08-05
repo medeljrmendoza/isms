@@ -324,4 +324,190 @@ class CompanyDocumentationRepository
 
         return $today->between($record->date_range_from, $record->date_range_to) ? 1 : 0;
     }
+
+    /**
+     * Ported from Controllers/Company_documentation.php's index() (the
+     * TYPE filter dropdown). pl_company_document_type carries a vesID
+     * column but every row uses the same blank value in practice
+     * (confirmed: single distinct vesID = "") — this module is genuinely
+     * company-wide, matching loadData()'s own unscoped query and the
+     * local typeOptions()'s docblock decision, so no vessel filter is
+     * applied here either.
+     */
+    public function legacyTypeOptions(): array
+    {
+        return DB::connection('legacy')->table('pl_company_document_type')
+            ->where('status', '1')
+            ->where('is_deleted', '0')
+            ->orderBy('document_type_name')
+            ->get(['vesDocTypeID', 'document_type_name'])
+            ->map(fn ($t) => ['id' => $t->vesDocTypeID, 'label' => $t->document_type_name])
+            ->all();
+    }
+
+    /**
+     * Active, non-deleted catalog documents — same "no existing-record
+     * exclusion" decision as catalogOptions()'s docblock, applied
+     * against legacy's own pl_company_document.
+     */
+    public function legacyDocumentOptions(): array
+    {
+        return DB::connection('legacy')->table('pl_company_document')
+            ->where('status', '1')
+            ->where('is_deleted', '0')
+            ->orderBy('document_name')
+            ->get(['vesDocID', 'document_name'])
+            ->map(fn ($d) => ['id' => $d->vesDocID, 'label' => $d->document_name])
+            ->all();
+    }
+
+    /**
+     * Ported from loadData(). Legacy's own query has no
+     * tb_company_documentation.status filter (unlike the vessel module's
+     * loadDocumentData()) — both active and inactive records show, with
+     * STATUS rendered as a badge — matching the local fullTable()'s own
+     * `is_deleted`-only filter. Default sort replicates legacy's DataTable
+     * fallback order (status_test DESC, document_type_name ASC, doc_ID
+     * ASC) exactly, same reasoning as VesselDocumentationRepository's
+     * legacyFullTable().
+     */
+    public function legacyFullTable(?string $typeId, TableQuery $query): array
+    {
+        $numMonths = (int) (DB::connection('legacy')->table('tb_company_document_expiring')->where('expID', 1)->value('num_month') ?? 3);
+        $warningCase = self::legacyWarningCaseSql('tb_company_documentation', $numMonths);
+
+        $builder = DB::connection('legacy')->table('tb_company_documentation')
+            ->leftJoin('pl_company_document', 'tb_company_documentation.docID', '=', 'pl_company_document.vesDocID')
+            ->leftJoin('pl_company_document_type', 'tb_company_documentation.vesDocTypeID', '=', 'pl_company_document_type.vesDocTypeID')
+            ->where('pl_company_document_type.status', '1')
+            ->where('pl_company_document_type.is_deleted', '0')
+            ->where('pl_company_document.status', '1')
+            ->where('pl_company_document.is_deleted', '0')
+            ->where('tb_company_documentation.is_deleted', '0')
+            ->select([
+                'tb_company_documentation.company_docID',
+                'pl_company_document_type.document_type_name',
+                'pl_company_document.document_name',
+                'tb_company_documentation.doc_number',
+                'tb_company_documentation.issuing_body',
+                'tb_company_documentation.date_issued',
+                'tb_company_documentation.date_expired',
+                'tb_company_documentation.is_pf',
+                'tb_company_documentation.status',
+                DB::raw("{$warningCase} as warning_status"),
+            ]);
+
+        if ($typeId !== null) {
+            $builder->where('pl_company_document.vesDocTypeID', $typeId);
+        }
+
+        if ($query->search !== null) {
+            $term = "%{$query->search}%";
+            $builder->where(function ($q) use ($term) {
+                $q->where('tb_company_documentation.doc_number', 'like', $term)
+                    ->orWhere('tb_company_documentation.issuing_body', 'like', $term)
+                    ->orWhere('pl_company_document.document_name', 'like', $term);
+            });
+        }
+
+        $sortMap = [
+            'doc_number' => 'tb_company_documentation.doc_number',
+            'issuing_body' => 'tb_company_documentation.issuing_body',
+            'date_issued' => 'tb_company_documentation.date_issued',
+            'date_expired' => 'tb_company_documentation.date_expired',
+            'is_active' => 'tb_company_documentation.status',
+        ];
+
+        if ($query->sort !== null && isset($sortMap[$query->sort])) {
+            $builder->orderBy($sortMap[$query->sort], $query->direction);
+        } else {
+            $builder->orderByDesc(DB::raw('warning_status'))
+                ->orderBy('pl_company_document_type.document_type_name')
+                ->orderBy('pl_company_document.doc_ID');
+        }
+
+        $paginator = $builder->paginate($query->perPage, page: $query->page);
+
+        $rows = collect($paginator->items())->map(fn ($r) => self::mapLegacyRow($r))->all();
+
+        return [
+            'rows' => $rows,
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
+        ];
+    }
+
+    public function legacyDetail(string $companyDocId): ?array
+    {
+        $numMonths = (int) (DB::connection('legacy')->table('tb_company_document_expiring')->where('expID', 1)->value('num_month') ?? 3);
+        $warningCase = self::legacyWarningCaseSql('tb_company_documentation', $numMonths);
+
+        $r = DB::connection('legacy')->table('tb_company_documentation')
+            ->leftJoin('pl_company_document', 'tb_company_documentation.docID', '=', 'pl_company_document.vesDocID')
+            ->leftJoin('pl_company_document_type', 'tb_company_documentation.vesDocTypeID', '=', 'pl_company_document_type.vesDocTypeID')
+            ->where('tb_company_documentation.company_docID', $companyDocId)
+            ->select([
+                'tb_company_documentation.company_docID',
+                'tb_company_documentation.docID',
+                'pl_company_document_type.document_type_name',
+                'pl_company_document.document_name',
+                'tb_company_documentation.doc_number',
+                'tb_company_documentation.issuing_body',
+                'tb_company_documentation.date_issued',
+                'tb_company_documentation.date_expired',
+                'tb_company_documentation.date_range_from',
+                'tb_company_documentation.date_range_to',
+                'tb_company_documentation.is_pf',
+                'tb_company_documentation.status',
+                'tb_company_documentation.remarks',
+                DB::raw("{$warningCase} as warning_status"),
+            ])
+            ->first();
+
+        if ($r === null) {
+            return null;
+        }
+
+        return [
+            ...self::mapLegacyRow($r),
+            'company_document_id' => $r->docID,
+            'date_range_from' => $r->date_range_from === '0000-00-00' ? null : $r->date_range_from,
+            'date_range_to' => $r->date_range_to === '0000-00-00' ? null : $r->date_range_to,
+            'remarks' => $r->remarks,
+        ];
+    }
+
+    private static function mapLegacyRow(object $r): array
+    {
+        return [
+            'id' => $r->company_docID,
+            'document_type' => $r->document_type_name,
+            'document' => $r->document_name,
+            'doc_number' => $r->doc_number,
+            'issuing_body' => $r->issuing_body,
+            'date_issued' => $r->date_issued === '0000-00-00' ? null : $r->date_issued,
+            'date_expired' => $r->date_expired === '0000-00-00' ? null : $r->date_expired,
+            'is_printer_friendly' => $r->is_pf === '1',
+            'warning_status' => (int) $r->warning_status,
+            'is_active' => $r->status === '1',
+            'can_edit' => false,
+            'can_delete' => false,
+        ];
+    }
+
+    /** Shared CASE expression for the expiring/expired warning status, ported from loadDocumentData()/loadData(). */
+    private static function legacyWarningCaseSql(string $table, int $numMonths): string
+    {
+        return "(CASE
+            WHEN {$table}.date_expired = '0000-00-00' THEN 0
+            WHEN {$table}.date_expired <> '0000-00-00' AND {$table}.date_expired <= CURDATE() THEN 2
+            WHEN {$table}.date_expired <> '0000-00-00' AND {$table}.date_expired > CURDATE() AND {$table}.date_range_from = '0000-00-00' AND CURDATE() >= DATE_SUB({$table}.date_expired, INTERVAL {$numMonths} MONTH) THEN 1
+            WHEN {$table}.date_expired <> '0000-00-00' AND {$table}.date_expired > CURDATE() AND {$table}.date_range_from <> '0000-00-00' AND CURDATE() BETWEEN {$table}.date_range_from AND {$table}.date_range_to THEN 1
+            ELSE 0
+        END)";
+    }
 }

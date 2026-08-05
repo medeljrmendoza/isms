@@ -18,7 +18,7 @@ interface VesselDocumentationFormProps {
   onCancel: () => void;
 }
 
-const emptyOptions: VesselDocumentationOptions = { vessels: [] };
+const emptyOptions: VesselDocumentationOptions = { vessels: [], can_create_record: true };
 
 function emptyValues(): VesselDocumentationFormValues {
   return {
@@ -39,8 +39,9 @@ function emptyValues(): VesselDocumentationFormValues {
 function detailToFormValues(r: VesselDocumentationDetail): VesselDocumentationFormValues {
   return {
     ...emptyValues(),
-    vessel_id: r.vessel_id,
-    vessel_document_id: r.vessel_document_id,
+    // vessel_id/vessel_document_id are always numeric here: this form only opens for can_edit records (local-only).
+    vessel_id: r.vessel_id as number,
+    vessel_document_id: r.vessel_document_id as number,
     doc_number: r.doc_number ?? "",
     issuing_body: r.issuing_body ?? "",
     date_issued: r.date_issued ?? "",
@@ -102,7 +103,8 @@ export function VesselDocumentationForm({ record, onSuccess, onCancel }: VesselD
       if (isCreate) {
         await vesselDocumentationService.create(values);
       } else {
-        await vesselDocumentationService.update(record.id, values);
+        // record.id is always numeric here: this form only opens for can_edit records (local-only).
+        await vesselDocumentationService.update(record.id as number, values);
       }
       onSuccess();
     } catch (error) {

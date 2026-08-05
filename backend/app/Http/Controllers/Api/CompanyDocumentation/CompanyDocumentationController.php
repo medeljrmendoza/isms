@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\CompanyDocumentation\CompanyDocumentationRecordRequest;
 use App\Models\CompanyDocumentation\CompanyDocumentationRecord;
 use App\Repositories\CompanyDocumentation\CompanyDocumentationRepository;
+use App\Support\LegacyDb;
 use App\Support\TableQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -28,7 +29,12 @@ class CompanyDocumentationController extends Controller
      */
     public function typeOptions(): JsonResponse
     {
-        return response()->json(['data' => $this->companyDocumentation->typeOptions()]);
+        return response()->json([
+            'data' => [
+                'types' => LegacyDb::isConfigured() ? $this->companyDocumentation->legacyTypeOptions() : $this->companyDocumentation->typeOptions(),
+                'can_create_record' => ! LegacyDb::isConfigured(),
+            ],
+        ]);
     }
 
     /**
@@ -36,7 +42,9 @@ class CompanyDocumentationController extends Controller
      */
     public function documentOptions(): JsonResponse
     {
-        return response()->json(['data' => $this->companyDocumentation->catalogOptions()]);
+        return response()->json([
+            'data' => LegacyDb::isConfigured() ? $this->companyDocumentation->legacyDocumentOptions() : $this->companyDocumentation->catalogOptions(),
+        ]);
     }
 
     /**
@@ -45,9 +53,22 @@ class CompanyDocumentationController extends Controller
     public function index(Request $request): JsonResponse
     {
         $typeId = $request->query('type_id');
+        $typeId = $typeId !== null && $typeId !== '' ? $typeId : null;
+
+        if (LegacyDb::isConfigured()) {
+            $result = $this->companyDocumentation->legacyFullTable($typeId !== null ? (string) $typeId : null, TableQuery::fromRequest($request));
+
+            return response()->json([
+                'data' => [
+                    'columns' => CompanyDocumentationRepository::moduleColumns(),
+                    'rows' => $result['rows'],
+                    'meta' => $result['meta'],
+                ],
+            ]);
+        }
 
         $paginator = $this->companyDocumentation->fullTable(
-            $typeId !== null && $typeId !== '' ? (int) $typeId : null,
+            $typeId !== null ? (int) $typeId : null,
             TableQuery::fromRequest($request),
         );
 
@@ -63,11 +84,15 @@ class CompanyDocumentationController extends Controller
     /**
      * GET /api/company-documentation/{companyDocumentationRecord}
      */
-    public function show(CompanyDocumentationRecord $companyDocumentationRecord): JsonResponse
+    public function show(string $companyDocumentationRecord): JsonResponse
     {
-        $companyDocumentationRecord->load('companyDocument.companyDocumentType');
+        if (LegacyDb::isConfigured()) {
+            return response()->json(['data' => $this->companyDocumentation->legacyDetail($companyDocumentationRecord)]);
+        }
 
-        return response()->json(['data' => $this->mapDetail($companyDocumentationRecord)]);
+        $record = CompanyDocumentationRecord::query()->with('companyDocument.companyDocumentType')->findOrFail((int) $companyDocumentationRecord);
+
+        return response()->json(['data' => $this->mapDetail($record)]);
     }
 
     /**
@@ -126,6 +151,8 @@ class CompanyDocumentationController extends Controller
             'is_printer_friendly' => $r->is_printer_friendly,
             'warning_status' => $r->warning_status ?? 0,
             'is_active' => $r->is_active,
+            'can_edit' => true,
+            'can_delete' => true,
         ];
     }
 

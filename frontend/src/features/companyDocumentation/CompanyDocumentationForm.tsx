@@ -35,7 +35,8 @@ function emptyValues(): CompanyDocumentationFormValues {
 function detailToFormValues(r: CompanyDocumentationDetail): CompanyDocumentationFormValues {
   return {
     ...emptyValues(),
-    company_document_id: r.company_document_id,
+    // company_document_id is always numeric here: this form only opens for can_edit records (local-only).
+    company_document_id: r.company_document_id as number,
     doc_number: r.doc_number ?? "",
     issuing_body: r.issuing_body ?? "",
     date_issued: r.date_issued ?? "",
@@ -83,7 +84,8 @@ export function CompanyDocumentationForm({ record, onSuccess, onCancel }: Compan
       if (isCreate) {
         await companyDocumentationService.create(values);
       } else {
-        await companyDocumentationService.update(record.id, values);
+        // record.id is always numeric here: this form only opens for can_edit records (local-only).
+        await companyDocumentationService.update(record.id as number, values);
       }
       onSuccess();
     } catch (error) {

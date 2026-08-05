@@ -4,11 +4,12 @@ import type {
   CompanyDocumentationDetail,
   CompanyDocumentationListResponse,
   CompanyDocumentationOption,
+  CompanyDocumentationTypeOptions,
 } from "./companyDocumentation";
 import type { CompanyDocumentationFormValues } from "./companyDocumentationSchema";
 
 export interface CompanyDocumentationListParams {
-  type_id?: number;
+  type_id?: number | string;
   page: number;
   per_page: number;
   search?: string;
@@ -17,8 +18,8 @@ export interface CompanyDocumentationListParams {
 }
 
 export const companyDocumentationService = {
-  async typeOptions(): Promise<CompanyDocumentationOption[]> {
-    const response = await axiosClient.get<ApiResource<CompanyDocumentationOption[]>>("/company-documentation/type-options");
+  async typeOptions(): Promise<CompanyDocumentationTypeOptions> {
+    const response = await axiosClient.get<ApiResource<CompanyDocumentationTypeOptions>>("/company-documentation/type-options");
     return response.data.data;
   },
 
@@ -32,7 +33,7 @@ export const companyDocumentationService = {
     return response.data.data;
   },
 
-  async show(id: number): Promise<CompanyDocumentationDetail> {
+  async show(id: number | string): Promise<CompanyDocumentationDetail> {
     const response = await axiosClient.get<ApiResource<CompanyDocumentationDetail>>(`/company-documentation/${id}`);
     return response.data.data;
   },

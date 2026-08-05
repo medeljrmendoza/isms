@@ -9,8 +9,8 @@ import type {
 import type { VesselDocumentationFormValues } from "./vesselDocumentationSchema";
 
 export interface VesselDocumentationListParams {
-  vessel_id: number;
-  type_id?: number;
+  vessel_id: number | string;
+  type_id?: number | string;
   page: number;
   per_page: number;
   search?: string;
@@ -24,14 +24,14 @@ export const vesselDocumentationService = {
     return response.data.data;
   },
 
-  async typeOptions(vesselId: number): Promise<VesselDocumentationOption[]> {
+  async typeOptions(vesselId: number | string): Promise<VesselDocumentationOption[]> {
     const response = await axiosClient.get<ApiResource<VesselDocumentationOption[]>>("/vessel-documentation/type-options", {
       params: { vessel_id: vesselId },
     });
     return response.data.data;
   },
 
-  async documentOptions(vesselId: number): Promise<VesselDocumentationOption[]> {
+  async documentOptions(vesselId: number | string): Promise<VesselDocumentationOption[]> {
     const response = await axiosClient.get<ApiResource<VesselDocumentationOption[]>>("/vessel-documentation/document-options", {
       params: { vessel_id: vesselId },
     });
@@ -43,7 +43,7 @@ export const vesselDocumentationService = {
     return response.data.data;
   },
 
-  async show(id: number): Promise<VesselDocumentationDetail> {
+  async show(id: number | string): Promise<VesselDocumentationDetail> {
     const response = await axiosClient.get<ApiResource<VesselDocumentationDetail>>(`/vessel-documentation/${id}`);
     return response.data.data;
   },

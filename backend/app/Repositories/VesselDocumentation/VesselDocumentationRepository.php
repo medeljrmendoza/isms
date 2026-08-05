@@ -418,4 +418,205 @@ class VesselDocumentationRepository
 
         return $today->between($record->date_range_from, $record->date_range_to) ? 1 : 0;
     }
+
+    /** @return array<int, array{id:string,label:string}> */
+    public function legacyVesselOptions(?string $legacyUserId): array
+    {
+        return LegacyDb::assignedVesselOptions($legacyUserId);
+    }
+
+    /**
+     * Ported from Controllers/Vessel_documentation.php's index() (the
+     * TYPE filter dropdown). Unlike the local VesselDocumentType lookup
+     * (a shared global catalog, per documentTypeOptionsForVessel()'s
+     * docblock), legacy's pl_vessel_document_type is itself vessel-
+     * scoped (has its own vesID column) — so this queries it directly
+     * rather than deriving the list from existing records.
+     */
+    public function legacyDocumentTypeOptionsForVessel(string $vesselId): array
+    {
+        return DB::connection('legacy')->table('pl_vessel_document_type')
+            ->where('vesID', $vesselId)
+            ->where('status', '1')
+            ->where('is_deleted', '0')
+            ->orderBy('document_type_name')
+            ->get(['vesDocTypeID', 'document_type_name'])
+            ->map(fn ($t) => ['id' => $t->vesDocTypeID, 'label' => $t->document_type_name])
+            ->all();
+    }
+
+    /**
+     * Catalog documents this vessel doesn't already have a live record
+     * for — same "get_document()" interpretation as catalogOptionsForVessel()'s
+     * docblock, applied against legacy's own vessel-scoped pl_vessel_document.
+     */
+    public function legacyDocumentOptionsForVessel(string $vesselId): array
+    {
+        return DB::connection('legacy')->table('pl_vessel_document')
+            ->where('vesID', $vesselId)
+            ->where('status', '1')
+            ->where('is_deleted', '0')
+            ->whereNotIn('vesDocID', function ($sub) use ($vesselId) {
+                $sub->select('docID')->from('tb_vessel_documentation')
+                    ->where('vesID', $vesselId)
+                    ->where('is_deleted', '0');
+            })
+            ->orderBy('document_name')
+            ->get(['vesDocID', 'document_name'])
+            ->map(fn ($d) => ['id' => $d->vesDocID, 'label' => $d->document_name])
+            ->all();
+    }
+
+    /**
+     * Ported from loadDocumentData(). The MEMBER-only is_external gate is
+     * dropped per the no-roles-yet precedent used everywhere else in this
+     * migration (same decision as legacyTable()'s docblock). Default sort
+     * replicates legacy's own DataTable fallback order (status_test DESC,
+     * document_type_name ASC, doc_ID ASC) exactly, since real ordering
+     * data is available; an explicit TableQuery sort overrides it.
+     */
+    public function legacyFullTable(string $vesselId, ?string $typeId, TableQuery $query): array
+    {
+        $numMonths = (int) (DB::connection('legacy')->table('tb_document_expiring')->where('expID', 1)->value('num_month') ?? 3);
+        $warningCase = self::legacyWarningCaseSql('tb_vessel_documentation', $numMonths);
+
+        $builder = DB::connection('legacy')->table('tb_vessel_documentation')
+            ->leftJoin('pl_vessel_document', 'tb_vessel_documentation.docID', '=', 'pl_vessel_document.vesDocID')
+            ->leftJoin('pl_vessel_document_type', 'tb_vessel_documentation.vesDocTypeID', '=', 'pl_vessel_document_type.vesDocTypeID')
+            ->where('pl_vessel_document_type.status', '1')
+            ->where('pl_vessel_document.status', '1')
+            ->where('tb_vessel_documentation.vesID', $vesselId)
+            ->where('pl_vessel_document_type.is_deleted', '0')
+            ->where('pl_vessel_document.is_deleted', '0')
+            ->where('tb_vessel_documentation.is_deleted', '0')
+            ->select([
+                'tb_vessel_documentation.vessel_docID',
+                'pl_vessel_document_type.document_type_name',
+                'pl_vessel_document.document_name',
+                'tb_vessel_documentation.doc_number',
+                'tb_vessel_documentation.issuing_body',
+                'tb_vessel_documentation.date_issued',
+                'tb_vessel_documentation.date_expired',
+                'tb_vessel_documentation.is_pf',
+                'tb_vessel_documentation.status',
+                DB::raw("{$warningCase} as warning_status"),
+            ]);
+
+        if ($typeId !== null) {
+            $builder->where('pl_vessel_document.vesDocTypeID', $typeId);
+        }
+
+        if ($query->search !== null) {
+            $term = "%{$query->search}%";
+            $builder->where(function ($q) use ($term) {
+                $q->where('tb_vessel_documentation.doc_number', 'like', $term)
+                    ->orWhere('tb_vessel_documentation.issuing_body', 'like', $term)
+                    ->orWhere('pl_vessel_document.document_name', 'like', $term);
+            });
+        }
+
+        $sortMap = [
+            'doc_number' => 'tb_vessel_documentation.doc_number',
+            'issuing_body' => 'tb_vessel_documentation.issuing_body',
+            'date_issued' => 'tb_vessel_documentation.date_issued',
+            'date_expired' => 'tb_vessel_documentation.date_expired',
+            'is_active' => 'tb_vessel_documentation.status',
+        ];
+
+        if ($query->sort !== null && isset($sortMap[$query->sort])) {
+            $builder->orderBy($sortMap[$query->sort], $query->direction);
+        } else {
+            $builder->orderByDesc(DB::raw('warning_status'))
+                ->orderBy('pl_vessel_document_type.document_type_name')
+                ->orderBy('pl_vessel_document.doc_ID');
+        }
+
+        $paginator = $builder->paginate($query->perPage, page: $query->page);
+
+        $rows = collect($paginator->items())->map(fn ($r) => self::mapLegacyRow($r))->all();
+
+        return [
+            'rows' => $rows,
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
+        ];
+    }
+
+    public function legacyDetail(string $vesselDocId): ?array
+    {
+        $numMonths = (int) (DB::connection('legacy')->table('tb_document_expiring')->where('expID', 1)->value('num_month') ?? 3);
+        $warningCase = self::legacyWarningCaseSql('tb_vessel_documentation', $numMonths);
+
+        $r = DB::connection('legacy')->table('tb_vessel_documentation')
+            ->leftJoin('pl_vessel_document', 'tb_vessel_documentation.docID', '=', 'pl_vessel_document.vesDocID')
+            ->leftJoin('pl_vessel_document_type', 'tb_vessel_documentation.vesDocTypeID', '=', 'pl_vessel_document_type.vesDocTypeID')
+            ->where('tb_vessel_documentation.vessel_docID', $vesselDocId)
+            ->select([
+                'tb_vessel_documentation.vessel_docID',
+                'tb_vessel_documentation.vesID',
+                'tb_vessel_documentation.docID',
+                'pl_vessel_document_type.document_type_name',
+                'pl_vessel_document.document_name',
+                'tb_vessel_documentation.doc_number',
+                'tb_vessel_documentation.issuing_body',
+                'tb_vessel_documentation.date_issued',
+                'tb_vessel_documentation.date_expired',
+                'tb_vessel_documentation.date_range_from',
+                'tb_vessel_documentation.date_range_to',
+                'tb_vessel_documentation.is_pf',
+                'tb_vessel_documentation.status',
+                'tb_vessel_documentation.shore_remarks',
+                'tb_vessel_documentation.vessel_remarks',
+                DB::raw("{$warningCase} as warning_status"),
+            ])
+            ->first();
+
+        if ($r === null) {
+            return null;
+        }
+
+        return [
+            ...self::mapLegacyRow($r),
+            'vessel_id' => $r->vesID,
+            'vessel_document_id' => $r->docID,
+            'date_range_from' => $r->date_range_from === '0000-00-00' ? null : $r->date_range_from,
+            'date_range_to' => $r->date_range_to === '0000-00-00' ? null : $r->date_range_to,
+            'shore_remarks' => $r->shore_remarks,
+            'vessel_remarks' => $r->vessel_remarks,
+        ];
+    }
+
+    private static function mapLegacyRow(object $r): array
+    {
+        return [
+            'id' => $r->vessel_docID,
+            'document_type' => $r->document_type_name,
+            'document' => $r->document_name,
+            'doc_number' => $r->doc_number,
+            'issuing_body' => $r->issuing_body,
+            'date_issued' => $r->date_issued === '0000-00-00' ? null : $r->date_issued,
+            'date_expired' => $r->date_expired === '0000-00-00' ? null : $r->date_expired,
+            'is_printer_friendly' => $r->is_pf === '1',
+            'warning_status' => (int) $r->warning_status,
+            'is_active' => $r->status === '1',
+            'can_edit' => false,
+            'can_delete' => false,
+        ];
+    }
+
+    /** Shared CASE expression for the expiring/expired warning status, ported from loadDocumentData()/loadData(). */
+    private static function legacyWarningCaseSql(string $table, int $numMonths): string
+    {
+        return "(CASE
+            WHEN {$table}.date_expired = '0000-00-00' THEN 0
+            WHEN {$table}.date_expired <> '0000-00-00' AND {$table}.date_expired <= CURDATE() THEN 2
+            WHEN {$table}.date_expired <> '0000-00-00' AND {$table}.date_expired > CURDATE() AND {$table}.date_range_from = '0000-00-00' AND CURDATE() >= DATE_SUB({$table}.date_expired, INTERVAL {$numMonths} MONTH) THEN 1
+            WHEN {$table}.date_expired <> '0000-00-00' AND {$table}.date_expired > CURDATE() AND {$table}.date_range_from <> '0000-00-00' AND CURDATE() BETWEEN {$table}.date_range_from AND {$table}.date_range_to THEN 1
+            ELSE 0
+        END)";
+    }
 }
