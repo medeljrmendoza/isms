@@ -5,14 +5,14 @@ import { Modal } from "../../components/ui/Modal";
 import { Button } from "../../components/ui/Button";
 
 interface DrillCellModalProps {
-  drillListId: number;
+  drillListId: number | string;
   drillName: string;
-  vesselId: number;
+  vesselId: number | string;
   year: number;
   month: number;
   onClose: () => void;
-  onView: (reportId: number) => void;
-  onEdit: (reportId: number) => void;
+  onView: (reportId: number | string) => void;
+  onEdit: (reportId: number | string) => void;
 }
 
 const MONTH_NAMES = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -55,9 +55,11 @@ export function DrillCellModal({ drillListId, drillName, vesselId, year, month, 
                 <td className="px-2 py-1.5 text-slate-700">{item.drill_position ?? "—"}</td>
                 <td className="px-2 py-1.5 text-slate-700">{item.drill_time_from ?? "—"}</td>
                 <td className="px-2 py-1.5">
-                  <Button type="button" variant="secondary" className="!px-1.5 !py-0.5 text-xs" onClick={() => onEdit(item.id)}>
-                    Edit
-                  </Button>
+                  {item.can_edit && (
+                    <Button type="button" variant="secondary" className="!px-1.5 !py-0.5 text-xs" onClick={() => onEdit(item.id)}>
+                      Edit
+                    </Button>
+                  )}
                 </td>
               </tr>
             ))}

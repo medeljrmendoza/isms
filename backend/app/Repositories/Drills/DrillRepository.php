@@ -208,6 +208,12 @@ class DrillRepository
             ->all();
     }
 
+    /** @return array<int, array{id:string,label:string}> */
+    public function legacyVesselOptions(?string $legacyUserId): array
+    {
+        return LegacyDb::assignedVesselOptions($legacyUserId);
+    }
+
     /**
      * Ported from get_drill_report_year(): distinct years with at least
      * one report, plus the current year so a vessel with no history yet
@@ -217,6 +223,19 @@ class DrillRepository
     {
         $years = DrillReport::query()
             ->selectRaw("DISTINCT strftime('%Y', drill_date) as year")
+            ->pluck('year')
+            ->filter()
+            ->map(fn ($y) => (int) $y);
+
+        return $years->push((int) now()->year)->unique()->sortDesc()->values()->all();
+    }
+
+    /** Same as yearOptions(), reading tb_drill_report directly from the legacy connection. MySQL's YEAR() replaces the SQLite strftime() call. */
+    public function legacyYearOptions(): array
+    {
+        $years = DB::connection('legacy')->table('tb_drill_report')
+            ->where('drill_date', '!=', '0000-00-00')
+            ->selectRaw('DISTINCT YEAR(drill_date) as year')
             ->pluck('year')
             ->filter()
             ->map(fn ($y) => (int) $y);
@@ -296,6 +315,152 @@ class DrillRepository
             ->whereMonth('drill_date', $month)
             ->orderBy('drill_date')
             ->get();
+    }
+
+    /**
+     * Same as calendarGrid(), reading tb_drill_list/tb_drill_report
+     * directly from the legacy connection. Keeps the vesID-in-assigned-
+     * vessels scoping the local queries drop project-wide (see other
+     * repositories' same docblock note) in addition to matching the
+     * exact vessel requested.
+     */
+    public function legacyCalendarGrid(string $vesselId, int $year, ?string $legacyUserId): Collection
+    {
+        $assignedVesselIds = LegacyDb::assignedVesselIds($legacyUserId);
+
+        if (! $assignedVesselIds->contains($vesselId)) {
+            return collect();
+        }
+
+        $today = Carbon::today();
+
+        $explicitListIds = DB::connection('legacy')->table('tb_drill_list_vessel')
+            ->where('vesID', $vesselId)
+            ->pluck('drillListID');
+
+        $drillLists = DB::connection('legacy')->table('tb_drill_list')
+            ->leftJoin('tb_drill_type', 'tb_drill_type.drillTypeID', '=', 'tb_drill_list.drillTypeID')
+            ->where('tb_drill_list.status', '1')
+            ->where(function ($q) use ($explicitListIds) {
+                $q->where('tb_drill_list.vessel_access', 'ALL')
+                    ->orWhereIn('tb_drill_list.drillListID', $explicitListIds);
+            })
+            ->orderBy('tb_drill_list.arrangement')
+            ->get(['tb_drill_list.drillListID', 'tb_drill_list.drill_name', 'tb_drill_list.frequency_type', 'tb_drill_list.frequency_count', 'tb_drill_type.drill_type_name']);
+
+        $reports = DB::connection('legacy')->table('tb_drill_report')
+            ->where('vesID', $vesselId)
+            ->whereIn('drillListID', $drillLists->pluck('drillListID'))
+            ->where('is_deleted', '!=', '1')
+            ->orderBy('drill_date')
+            ->get(['drillID', 'drillListID', 'drill_date'])
+            ->groupBy('drillListID');
+
+        return $drillLists->map(function ($list) use ($reports, $year, $today) {
+            $listReports = $reports->get($list->drillListID, collect());
+            $lastDrillDate = $listReports->max('drill_date');
+            $nextDrill = ($lastDrillDate !== null && $lastDrillDate !== '0000-00-00')
+                ? $this->nextDrillDate($lastDrillDate, $list->frequency_type, $list->frequency_count)
+                : null;
+
+            $status = null;
+            if ($nextDrill) {
+                if ($nextDrill->lt($today)) {
+                    $status = 'overdue';
+                } elseif ($nextDrill->copy()->subDays(30)->lte($today)) {
+                    $status = 'upcoming';
+                }
+            }
+
+            $yearReports = $listReports->filter(fn ($r) => $r->drill_date !== '0000-00-00' && Carbon::parse($r->drill_date)->year === $year);
+            $months = [];
+            foreach (self::MONTHS as $month) {
+                $months[$month] = $yearReports->filter(fn ($r) => Carbon::parse($r->drill_date)->month === $month)
+                    ->map(fn ($r) => ['id' => $r->drillID, 'day' => Carbon::parse($r->drill_date)->day])
+                    ->values()->all();
+            }
+
+            return [
+                'id' => $list->drillListID,
+                'drill_type' => $list->drill_type_name,
+                'name' => $list->drill_name,
+                'frequency' => $this->frequencyLabel($list->frequency_type, $list->frequency_count),
+                'last_drill' => ($lastDrillDate === null || $lastDrillDate === '0000-00-00') ? null : $lastDrillDate,
+                'next_drill' => $nextDrill?->toDateString(),
+                'status' => $status,
+                'months' => $months,
+            ];
+        });
+    }
+
+    /**
+     * Same as reportsForCell(), reading tb_drill_report directly from
+     * the legacy connection.
+     */
+    public function legacyReportsForCell(string $drillListId, string $vesselId, int $year, int $month): Collection
+    {
+        return DB::connection('legacy')->table('tb_drill_report')
+            ->where('drillListID', $drillListId)
+            ->where('vesID', $vesselId)
+            ->where('is_deleted', '!=', '1')
+            ->whereRaw('YEAR(drill_date) = ?', [$year])
+            ->whereRaw('MONTH(drill_date) = ?', [$month])
+            ->orderBy('drill_date')
+            ->get(['drillID', 'drill_date', 'drill_position', 'drill_time_from']);
+    }
+
+    /**
+     * Same as show()'s mapDetail(), reading tb_drill_report directly
+     * from the legacy connection. Read-only — no edit action exists for
+     * legacy-sourced reports (see DrillReportController's docblock).
+     */
+    public function legacyDetail(string $drillID): ?array
+    {
+        $r = DB::connection('legacy')->table('tb_drill_report')
+            ->leftJoin('tb_drill_list', 'tb_drill_list.drillListID', '=', 'tb_drill_report.drillListID')
+            ->leftJoin('tb_drill_type', 'tb_drill_type.drillTypeID', '=', 'tb_drill_list.drillTypeID')
+            ->where('tb_drill_report.drillID', $drillID)
+            ->select([
+                'tb_drill_report.*',
+                'tb_drill_list.drill_name', 'tb_drill_type.drill_type_name',
+            ])
+            ->first();
+
+        if ($r === null) {
+            return null;
+        }
+
+        $vessels = LegacyDb::vesselNames();
+        $zeroDateToNull = fn (?string $date) => ($date === null || $date === '0000-00-00') ? null : $date;
+
+        $crew = DB::connection('legacy')->table('tb_drill_report_crew')
+            ->where('drillID', $drillID)
+            ->where('is_inactive', '!=', '1')
+            ->orderBy('arrangement')
+            ->pluck('crew_name')
+            ->map(fn ($name) => ['crew_name' => $name])
+            ->all();
+
+        return [
+            'id' => $r->drillID,
+            'vessel' => $vessels[$r->vesID] ?? '',
+            'drill_list_id' => $r->drillListID,
+            'drill_name' => $r->drill_name ?? '',
+            'drill_type' => $r->drill_type_name,
+            'master_name' => $r->master_name,
+            'drill_date' => $zeroDateToNull($r->drill_date),
+            'drill_time_from' => $r->drill_time_from,
+            'drill_position' => $r->drill_position,
+            'drill_details' => $r->drill_details,
+            'drill_deficiencies' => $r->drill_deficiencies,
+            'drill_corrective_action' => $r->drill_corrective_action,
+            'report_date' => $zeroDateToNull($r->report_date),
+            'vessel_remarks' => $r->vessel_remarks,
+            'receipt_date' => $zeroDateToNull($r->receipt_date),
+            'shore_remarks' => $r->shore_remarks,
+            'can_edit' => false,
+            'crew' => $crew,
+        ];
     }
 
     /**

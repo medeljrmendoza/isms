@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Drills\DrillReportRequest;
 use App\Models\Drills\DrillReport;
 use App\Repositories\Drills\DrillRepository;
+use App\Support\LegacyDb;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -29,12 +30,16 @@ class DrillReportController extends Controller
     /**
      * GET /api/drill-lists/options
      */
-    public function options(): JsonResponse
+    public function options(Request $request): JsonResponse
     {
         return response()->json([
             'data' => [
-                'vessels' => $this->drills->vesselOptions(),
-                'years' => $this->drills->yearOptions(),
+                'vessels' => LegacyDb::isConfigured()
+                    ? $this->drills->legacyVesselOptions($request->user()?->legacy_user_id)
+                    : $this->drills->vesselOptions(),
+                'years' => LegacyDb::isConfigured()
+                    ? $this->drills->legacyYearOptions()
+                    : $this->drills->yearOptions(),
             ],
         ]);
     }
@@ -44,8 +49,24 @@ class DrillReportController extends Controller
      */
     public function calendar(Request $request): JsonResponse
     {
-        $vesselId = (int) $request->query('vessel_id');
         $year = (int) ($request->query('year') ?: now()->year);
+
+        if (LegacyDb::isConfigured()) {
+            $vesselId = $request->query('vessel_id');
+
+            if ($vesselId === null || $vesselId === '') {
+                return response()->json(['data' => ['rows' => [], 'year' => $year]]);
+            }
+
+            return response()->json([
+                'data' => [
+                    'rows' => $this->drills->legacyCalendarGrid($vesselId, $year, $request->user()?->legacy_user_id)->values(),
+                    'year' => $year,
+                ],
+            ]);
+        }
+
+        $vesselId = (int) $request->query('vessel_id');
 
         if ($vesselId === 0) {
             return response()->json(['data' => ['rows' => [], 'year' => $year]]);
@@ -64,10 +85,28 @@ class DrillReportController extends Controller
      */
     public function cell(Request $request): JsonResponse
     {
-        $drillListId = (int) $request->query('drill_list_id');
-        $vesselId = (int) $request->query('vessel_id');
         $year = (int) $request->query('year');
         $month = (int) $request->query('month');
+
+        if (LegacyDb::isConfigured()) {
+            $drillListId = $request->query('drill_list_id');
+            $vesselId = $request->query('vessel_id');
+
+            $reports = $this->drills->legacyReportsForCell($drillListId, $vesselId, $year, $month);
+
+            return response()->json([
+                'data' => $reports->map(fn ($r) => [
+                    'id' => $r->drillID,
+                    'drill_date' => $r->drill_date,
+                    'drill_position' => $r->drill_position,
+                    'drill_time_from' => $r->drill_time_from,
+                    'can_edit' => false,
+                ])->all(),
+            ]);
+        }
+
+        $drillListId = (int) $request->query('drill_list_id');
+        $vesselId = (int) $request->query('vessel_id');
 
         $reports = $this->drills->reportsForCell($drillListId, $vesselId, $year, $month);
 
@@ -77,6 +116,7 @@ class DrillReportController extends Controller
                 'drill_date' => $r->drill_date->format('Y-m-d'),
                 'drill_position' => $r->drill_position,
                 'drill_time_from' => $r->drill_time_from,
+                'can_edit' => true,
             ])->all(),
         ]);
     }
@@ -84,11 +124,18 @@ class DrillReportController extends Controller
     /**
      * GET /api/drill-reports/{drillReport}
      */
-    public function show(DrillReport $drillReport): JsonResponse
+    public function show(string $drillReport): JsonResponse
     {
-        $drillReport->load(['vessel', 'drillList', 'crew']);
+        if (LegacyDb::isConfigured()) {
+            $detail = $this->drills->legacyDetail($drillReport);
+            abort_if($detail === null, 404);
 
-        return response()->json(['data' => $this->mapDetail($drillReport)]);
+            return response()->json(['data' => $detail]);
+        }
+
+        $model = DrillReport::query()->with(['vessel', 'drillList', 'crew'])->findOrFail((int) $drillReport);
+
+        return response()->json(['data' => $this->mapDetail($model)]);
     }
 
     /**
@@ -125,6 +172,7 @@ class DrillReportController extends Controller
             'vessel_remarks' => $r->vessel_remarks,
             'receipt_date' => $r->receipt_date?->format('Y-m-d'),
             'shore_remarks' => $r->shore_remarks,
+            'can_edit' => true,
             'crew' => $r->crew->map(fn ($c) => ['crew_name' => $c->crew_name])->all(),
         ];
     }

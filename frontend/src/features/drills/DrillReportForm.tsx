@@ -20,7 +20,8 @@ interface DrillReportFormProps {
 function detailToFormValues(r: DrillReportDetail): DrillReportFormValues {
   return {
     master_name: r.master_name ?? "",
-    drill_date: r.drill_date,
+    // Never null in practice here: this form only opens for can_edit reports (local-only, always dated).
+    drill_date: r.drill_date ?? "",
     drill_time_from: r.drill_time_from ?? "",
     drill_position: r.drill_position ?? "",
     drill_details: r.drill_details ?? "",
@@ -58,7 +59,8 @@ export function DrillReportForm({ drillReport, onSuccess, onCancel }: DrillRepor
   const onSubmit = async (values: DrillReportFormValues) => {
     setFormError(null);
     try {
-      await drillService.update(drillReport.id, values);
+      // drillReport.id is always numeric here: this form only opens for can_edit reports (local-only).
+      await drillService.update(drillReport.id as number, values);
       onSuccess();
     } catch (error) {
       if (axios.isAxiosError(error) && isApiValidationError(error.response?.data)) {

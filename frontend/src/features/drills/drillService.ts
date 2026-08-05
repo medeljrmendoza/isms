@@ -14,21 +14,21 @@ export const drillService = {
     return response.data.data;
   },
 
-  async calendar(vesselId: number, year: number): Promise<DrillCalendarResponse> {
+  async calendar(vesselId: number | string, year: number): Promise<DrillCalendarResponse> {
     const response = await axiosClient.get<ApiResource<DrillCalendarResponse>>("/drill-lists/calendar", {
       params: { vessel_id: vesselId, year },
     });
     return response.data.data;
   },
 
-  async cell(drillListId: number, vesselId: number, year: number, month: number): Promise<DrillCellItem[]> {
+  async cell(drillListId: number | string, vesselId: number | string, year: number, month: number): Promise<DrillCellItem[]> {
     const response = await axiosClient.get<ApiResource<DrillCellItem[]>>("/drill-reports", {
       params: { drill_list_id: drillListId, vessel_id: vesselId, year, month },
     });
     return response.data.data;
   },
 
-  async show(id: number): Promise<DrillReportDetail> {
+  async show(id: number | string): Promise<DrillReportDetail> {
     const response = await axiosClient.get<ApiResource<DrillReportDetail>>(`/drill-reports/${id}`);
     return response.data.data;
   },

@@ -1,14 +1,15 @@
 export type DrillStatus = "overdue" | "upcoming" | null;
 
 export interface DrillGridRow {
-  id: number;
+  /** A local numeric drill_list id normally, but a legacy drillListID string when reading from the legacy connection. */
+  id: number | string;
   drill_type: string | null;
   name: string;
   frequency: string;
   last_drill: string | null;
   next_drill: string | null;
   status: DrillStatus;
-  months: Record<string, Array<{ id: number; day: number }>>;
+  months: Record<string, Array<{ id: number | string; day: number }>>;
 }
 
 export interface DrillCalendarResponse {
@@ -17,10 +18,12 @@ export interface DrillCalendarResponse {
 }
 
 export interface DrillCellItem {
-  id: number;
+  /** A local numeric id normally, but a legacy drillID string when reading from the legacy connection. */
+  id: number | string;
   drill_date: string;
   drill_position: string | null;
   drill_time_from: string | null;
+  can_edit: boolean;
 }
 
 export interface DrillCrewMember {
@@ -28,13 +31,14 @@ export interface DrillCrewMember {
 }
 
 export interface DrillReportDetail {
-  id: number;
+  /** A local numeric id normally, but a legacy drillID string when reading from the legacy connection. */
+  id: number | string;
   vessel: string;
-  drill_list_id: number;
+  drill_list_id: number | string;
   drill_name: string;
   drill_type: string | null;
   master_name: string | null;
-  drill_date: string;
+  drill_date: string | null;
   drill_time_from: string | null;
   drill_position: string | null;
   drill_details: string | null;
@@ -44,11 +48,12 @@ export interface DrillReportDetail {
   vessel_remarks: string | null;
   receipt_date: string | null;
   shore_remarks: string | null;
+  can_edit: boolean;
   crew: DrillCrewMember[];
 }
 
 export interface DrillOption {
-  id: number;
+  id: number | string;
   label: string;
 }
 

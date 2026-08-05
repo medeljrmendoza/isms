@@ -34,7 +34,7 @@ export function DrillCalendarPage() {
   const [years, setYears] = useState<number[]>([]);
   const [vesselId, setVesselId] = useState<string>("");
   const [year, setYear] = useState<string>("");
-  const [appliedVesselId, setAppliedVesselId] = useState<number | null>(null);
+  const [appliedVesselId, setAppliedVesselId] = useState<number | string | null>(null);
   const [appliedYear, setAppliedYear] = useState<number | null>(null);
 
   const [rows, setRows] = useState<DrillGridRow[]>([]);
@@ -42,7 +42,7 @@ export function DrillCalendarPage() {
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
-  const [cell, setCell] = useState<{ drillListId: number; drillName: string; month: number } | null>(null);
+  const [cell, setCell] = useState<{ drillListId: number | string; drillName: string; month: number } | null>(null);
   const [viewing, setViewing] = useState<DrillReportDetail | null>(null);
   const [editing, setEditing] = useState<DrillReportDetail | null>(null);
 
@@ -71,19 +71,19 @@ export function DrillCalendarPage() {
 
   const applyFilter = () => {
     if (!vesselId || !year) return;
-    setAppliedVesselId(Number(vesselId));
+    setAppliedVesselId(vesselId);
     setAppliedYear(Number(year));
   };
 
   const reload = () => setReloadKey((k) => k + 1);
 
-  const openView = async (reportId: number) => {
+  const openView = async (reportId: number | string) => {
     const detail = await drillService.show(reportId);
     setCell(null);
     setViewing(detail);
   };
 
-  const openEdit = async (reportId: number) => {
+  const openEdit = async (reportId: number | string) => {
     const detail = await drillService.show(reportId);
     setCell(null);
     setEditing(detail);
