@@ -4,7 +4,7 @@ import type { RiskAssessmentShoreDetail, RiskAssessmentShoreOptions, RiskAssessm
 import type { RiskAssessmentShoreFormValues } from "./riskAssessmentShoreSchema";
 
 export interface RiskAssessmentShoreListParams {
-  vessel_id?: number;
+  vessel_id?: number | string;
   year?: number;
   page: number;
   per_page: number;
@@ -30,7 +30,7 @@ export const riskAssessmentShoreService = {
     return response.data.data;
   },
 
-  async show(id: number): Promise<RiskAssessmentShoreDetail> {
+  async show(id: number | string): Promise<RiskAssessmentShoreDetail> {
     const response = await axiosClient.get<ApiResource<RiskAssessmentShoreDetail>>(`/risk-assessments-shore/${id}`);
     return response.data.data;
   },

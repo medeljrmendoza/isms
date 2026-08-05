@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\RiskAssessment\RiskAssessmentShoreRequest;
 use App\Models\RiskAssessment\RiskAssessmentShore;
 use App\Repositories\RiskAssessment\RiskAssessmentShoreRepository;
+use App\Support\LegacyDb;
 use App\Support\TableQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -28,14 +29,18 @@ class RiskAssessmentShoreController extends Controller
     /**
      * GET /api/risk-assessments-shore/options
      */
-    public function options(): JsonResponse
+    public function options(Request $request): JsonResponse
     {
         return response()->json([
             'data' => [
-                'vessels' => $this->riskAssessmentsShore->vesselOptions(),
+                'vessels' => LegacyDb::isConfigured()
+                    ? $this->riskAssessmentsShore->legacyVesselOptions($request->user()?->legacy_user_id)
+                    : $this->riskAssessmentsShore->vesselOptions(),
                 'categories' => $this->riskAssessmentsShore->categoryOptions(),
                 'operations' => $this->riskAssessmentsShore->operationOptions(),
-                'years' => $this->riskAssessmentsShore->years(),
+                'years' => LegacyDb::isConfigured()
+                    ? $this->riskAssessmentsShore->legacyYears()
+                    : $this->riskAssessmentsShore->years(),
             ],
         ]);
     }
@@ -45,10 +50,31 @@ class RiskAssessmentShoreController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $vesselId = $request->query('vessel_id') !== null && $request->query('vessel_id') !== ''
-            ? (int) $request->query('vessel_id') : null;
         $year = $request->query('year') !== null && $request->query('year') !== ''
             ? (int) $request->query('year') : null;
+
+        if (LegacyDb::isConfigured()) {
+            $vesselId = $request->query('vessel_id');
+            $vesselId = $vesselId !== '' ? $vesselId : null;
+
+            $result = $this->riskAssessmentsShore->legacyTable(
+                TableQuery::fromRequest($request),
+                $vesselId,
+                $year,
+                $request->user()?->legacy_user_id,
+            );
+
+            return response()->json([
+                'data' => [
+                    'columns' => RiskAssessmentShoreRepository::columns(),
+                    'rows' => $result['rows'],
+                    'meta' => $result['meta'],
+                ],
+            ]);
+        }
+
+        $vesselId = $request->query('vessel_id') !== null && $request->query('vessel_id') !== ''
+            ? (int) $request->query('vessel_id') : null;
 
         $paginator = $this->riskAssessmentsShore->table(TableQuery::fromRequest($request), $vesselId, $year);
 
@@ -64,11 +90,18 @@ class RiskAssessmentShoreController extends Controller
     /**
      * GET /api/risk-assessments-shore/{riskAssessmentShore}
      */
-    public function show(RiskAssessmentShore $riskAssessmentShore): JsonResponse
+    public function show(string $riskAssessmentShore): JsonResponse
     {
-        $riskAssessmentShore->load(['vessel', 'riskCategoryShore', 'riskOperationShore', 'hazards', 'people']);
+        if (LegacyDb::isConfigured()) {
+            $detail = $this->riskAssessmentsShore->legacyDetail($riskAssessmentShore);
+            abort_if($detail === null, 404);
 
-        return response()->json(['data' => $this->mapDetail($riskAssessmentShore)]);
+            return response()->json(['data' => $detail]);
+        }
+
+        $model = RiskAssessmentShore::query()->with(['vessel', 'riskCategoryShore', 'riskOperationShore', 'hazards', 'people'])->findOrFail((int) $riskAssessmentShore);
+
+        return response()->json(['data' => $this->mapDetail($model)]);
     }
 
     /**
@@ -149,6 +182,7 @@ class RiskAssessmentShoreController extends Controller
             'marine_is_approved' => $r->marine_is_approved,
             'date_closed' => $r->date_closed?->format('Y-m-d'),
             'hazard_count' => $r->hazards_count,
+            'can_edit' => true,
             'can_delete' => $r->date_closed === null,
             'can_reopen' => $r->date_closed !== null,
         ];

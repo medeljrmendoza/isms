@@ -159,7 +159,8 @@ export function RiskAssessmentShoreForm({ report, options, onSuccess, onCancel }
       if (isCreate) {
         await riskAssessmentShoreService.create(payload);
       } else {
-        await riskAssessmentShoreService.update(report.id, payload);
+        // report.id is always numeric here: the edit form only opens for can_edit rows (local-only).
+        await riskAssessmentShoreService.update(report.id as number, payload);
       }
       onSuccess();
     } catch (error) {

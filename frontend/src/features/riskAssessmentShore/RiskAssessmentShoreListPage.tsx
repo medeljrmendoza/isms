@@ -22,7 +22,7 @@ export function RiskAssessmentShoreListPage() {
   const [options, setOptions] = useState<RiskAssessmentShoreOptions>({ vessels: [], categories: [], operations: [], years: [] });
   const [vesselId, setVesselId] = useState<string>("");
   const [year, setYear] = useState<string>("");
-  const [appliedVesselId, setAppliedVesselId] = useState<number | null>(null);
+  const [appliedVesselId, setAppliedVesselId] = useState<number | string | null>(null);
   const [appliedYear, setAppliedYear] = useState<number | null>(null);
 
   const [rows, setRows] = useState<RiskAssessmentShoreRow[]>([]);
@@ -62,7 +62,7 @@ export function RiskAssessmentShoreListPage() {
   }, [appliedVesselId, appliedYear, page, reloadKey]);
 
   const applyFilter = () => {
-    setAppliedVesselId(vesselId ? Number(vesselId) : null);
+    setAppliedVesselId(vesselId || null);
     setAppliedYear(year ? Number(year) : null);
     setPage(1);
   };
@@ -77,8 +77,8 @@ export function RiskAssessmentShoreListPage() {
 
   const reload = () => setReloadKey((k) => k + 1);
 
-  const openView = async (id: number) => setViewing(await riskAssessmentShoreService.show(id));
-  const openEdit = async (id: number) => {
+  const openView = async (id: number | string) => setViewing(await riskAssessmentShoreService.show(id));
+  const openEdit = async (id: number | string) => {
     setEditing(await riskAssessmentShoreService.show(id));
     setFormOpen(true);
   };
@@ -182,9 +182,11 @@ export function RiskAssessmentShoreListPage() {
                   </td>
                   <td className="px-2 py-1.5">
                     <div className="flex flex-wrap gap-1">
-                      <Button type="button" variant="secondary" className="!px-1.5 !py-0.5 text-xs" onClick={() => openEdit(row.id)}>
-                        Edit
-                      </Button>
+                      {row.can_edit && (
+                        <Button type="button" variant="secondary" className="!px-1.5 !py-0.5 text-xs" onClick={() => openEdit(row.id)}>
+                          Edit
+                        </Button>
+                      )}
                       {row.can_delete && (
                         <Button
                           type="button"
@@ -192,7 +194,8 @@ export function RiskAssessmentShoreListPage() {
                           className="!px-1.5 !py-0.5 text-xs text-red-600"
                           onClick={() => {
                             if (window.confirm(`Delete report ${row.report_no}?`)) {
-                              runAction(() => riskAssessmentShoreService.destroy(row.id));
+                              // row.id is always numeric here: can_delete is only true for local rows.
+                              runAction(() => riskAssessmentShoreService.destroy(row.id as number));
                             }
                           }}
                         >
@@ -204,7 +207,8 @@ export function RiskAssessmentShoreListPage() {
                           type="button"
                           variant="secondary"
                           className="!px-1.5 !py-0.5 text-xs text-amber-600"
-                          onClick={() => runAction(() => riskAssessmentShoreService.reopen(row.id))}
+                          // row.id is always numeric here: can_reopen is only true for local rows.
+                          onClick={() => runAction(() => riskAssessmentShoreService.reopen(row.id as number))}
                         >
                           Re-open
                         </Button>

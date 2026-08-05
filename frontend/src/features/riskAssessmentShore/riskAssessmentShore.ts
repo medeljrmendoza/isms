@@ -1,7 +1,8 @@
 export type RiskAssessmentShoreReportType = "SHORE" | "VESSEL";
 
 export interface RiskAssessmentShoreRow {
-  id: number;
+  /** A local numeric id normally, but a legacy riskID string when reading from the legacy connection. */
+  id: number | string;
   report_no: string;
   report_type: RiskAssessmentShoreReportType;
   vessel: string;
@@ -15,6 +16,7 @@ export interface RiskAssessmentShoreRow {
   marine_is_approved: boolean;
   date_closed: string | null;
   hazard_count: number;
+  can_edit: boolean;
   can_delete: boolean;
   can_reopen: boolean;
 }
@@ -60,7 +62,7 @@ export interface RiskAssessmentShoreDetail extends RiskAssessmentShoreRow {
 }
 
 export interface RiskAssessmentShoreOption {
-  id: number;
+  id: number | string;
   label: string;
 }
 
