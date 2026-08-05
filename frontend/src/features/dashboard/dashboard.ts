@@ -39,3 +39,22 @@ export interface TableResponse {
   rows: TableRow[];
   meta: TableMeta;
 }
+
+/** One row of the "Pending Items" dashlet's per-vessel category matrix. */
+export interface PendingItemsRow {
+  vessel_id: string;
+  vessel: string;
+  incident: number;
+  company: number;
+  internal: number;
+  external: number;
+  psc: number;
+  risk_assessment: number;
+  sire: number;
+  non_sire: number;
+  flag_state: number;
+  nc: number;
+  defect: number;
+  master_review: number;
+  isps_review: number;
+}

@@ -32,6 +32,7 @@ import { MasterReviewViewModal } from "../masterReview/MasterReviewViewModal";
 import type { MasterReviewDetail } from "../masterReview/masterReview";
 import { IspsReviewViewModal } from "../ispsReview/IspsReviewViewModal";
 import type { IspsReviewDetail } from "../ispsReview/ispsReview";
+import { PendingItemsGrid } from "./PendingItemsGrid";
 
 function DashletList({ items }: { items: Dashlet["items"] }) {
   if (items.length === 0) {
@@ -86,7 +87,8 @@ export function DashletCard({ dashlet }: { dashlet: Dashlet }) {
   const [riskAssessment, setRiskAssessment] = useState<RiskAssessmentDetail | null>(null);
   const [masterReview, setMasterReview] = useState<MasterReviewDetail | null>(null);
   const [ispsReview, setIspsReview] = useState<IspsReviewDetail | null>(null);
-  const isTable = dashlet.columns !== null && dashlet.endpoint !== null;
+  const isMatrix = dashlet.key === "pending_items";
+  const isTable = !isMatrix && dashlet.columns !== null && dashlet.endpoint !== null;
   const linkColumn = LINK_COLUMNS[dashlet.key];
 
   const handleLoad = () => {
@@ -184,7 +186,9 @@ export function DashletCard({ dashlet }: { dashlet: Dashlet }) {
 
         {loaded &&
           !loading &&
-          (isTable ? (
+          (isMatrix ? (
+            <PendingItemsGrid />
+          ) : isTable ? (
             <DashletTable
               endpoint={dashlet.endpoint!}
               columns={dashlet.columns!}
@@ -199,7 +203,9 @@ export function DashletCard({ dashlet }: { dashlet: Dashlet }) {
 
       {showLarger && (
         <Modal title={dashlet.title} onClose={() => setShowLarger(false)}>
-          {isTable ? (
+          {isMatrix ? (
+            <PendingItemsGrid />
+          ) : isTable ? (
             <DashletTable
               endpoint={dashlet.endpoint!}
               columns={dashlet.columns!}

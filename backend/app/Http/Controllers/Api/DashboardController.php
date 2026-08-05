@@ -39,6 +39,7 @@ use App\Repositories\ManualPublish\SmsVersionMonitoringRepository;
 use App\Repositories\MasterReview\MasterReviewRepository;
 use App\Repositories\Nonconformities\NonconformityRepository;
 use App\Repositories\NonSire\NonSireReportRepository;
+use App\Repositories\PendingItems\PendingItemsRepository;
 use App\Repositories\Pms\PmsRepository;
 use App\Repositories\PscReports\PscReportRepository;
 use App\Repositories\RiskAssessment\RiskAssessmentRepository;
@@ -79,6 +80,7 @@ class DashboardController extends Controller
         private readonly PmsRepository $pms,
         private readonly SmsVersionMonitoringRepository $smsVersionMonitoring,
         private readonly VesselDocumentationRepository $vesselDocumentation,
+        private readonly PendingItemsRepository $pendingItems,
     ) {}
 
     /**
@@ -91,6 +93,18 @@ class DashboardController extends Controller
                 'dashlets' => $this->dashboardService->getDashletData(),
             ],
         ]);
+    }
+
+    /**
+     * GET /api/dashboard/pending-items
+     */
+    public function pendingItemsTable(Request $request): JsonResponse
+    {
+        $rows = LegacyDb::isConfigured()
+            ? $this->pendingItems->legacyTable($request->user()?->legacy_user_id)
+            : $this->pendingItems->table();
+
+        return response()->json(['data' => ['rows' => $rows]]);
     }
 
     /**

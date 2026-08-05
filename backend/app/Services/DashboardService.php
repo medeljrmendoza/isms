@@ -59,11 +59,7 @@ class DashboardService
     public function getDashletData(): array
     {
         return [
-            $this->dashlet('pending_items', 'Pending Items', span: 'full', manualLoad: true, items: [
-                $this->item('Non-conformity NC-2031 requires shore approval', 'MV Pacific Star'),
-                $this->item('Internal audit report pending submission', 'MV Northern Light'),
-                $this->item('Risk assessment RA-118 awaiting sign-off', 'MV Coral Voyager'),
-            ]),
+            $this->matrix('pending_items', 'Pending Items', '/dashboard/pending-items'),
             $this->dashlet('notifications', 'Notifications', items: [
                 $this->item('Drill schedule updated for Q3', 'Fleet-wide'),
                 $this->item('New SMS manual revision published', 'Rev. 14'),
@@ -135,5 +131,25 @@ class DashboardService
     private function item(string $label, string $meta): array
     {
         return ['label' => $label, 'meta' => $meta];
+    }
+
+    /**
+     * The "Pending Items" dashlet: a per-vessel matrix of pending counts
+     * across every other module, not a row-per-record table — same
+     * `endpoint` mechanism as table(), but the frontend renders it with
+     * a dedicated grid component instead of DashletTable.
+     */
+    private function matrix(string $key, string $title, string $endpoint): array
+    {
+        return [
+            'key' => $key,
+            'title' => $title,
+            'span' => 'full',
+            'manual_load' => true,
+            'extra_action' => null,
+            'items' => [],
+            'columns' => null,
+            'endpoint' => $endpoint,
+        ];
     }
 }

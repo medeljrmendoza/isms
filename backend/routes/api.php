@@ -42,6 +42,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', [AuthController::class, 'me']);
     Route::get('/dashboard', [DashboardController::class, 'index']);
+    Route::get('/dashboard/pending-items', [DashboardController::class, 'pendingItemsTable']);
     Route::get('/dashboard/nonconformities', [DashboardController::class, 'nonconformitiesTable']);
     Route::get('/dashboard/nonconformities/{id}', [DashboardController::class, 'nonconformityDetail']);
     Route::get('/dashboard/claims', [DashboardController::class, 'claimsTable']);

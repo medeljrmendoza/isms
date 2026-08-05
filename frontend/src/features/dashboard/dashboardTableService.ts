@@ -15,7 +15,7 @@ import type { RiskAssessmentDetail } from "../riskAssessment/riskAssessment";
 import type { MasterReviewDetail } from "../masterReview/masterReview";
 import type { IspsReviewDetail } from "../ispsReview/ispsReview";
 import type { ClaimDetail } from "../claims/claim";
-import type { TableResponse } from "./dashboard";
+import type { PendingItemsRow, TableResponse } from "./dashboard";
 
 export interface TableParams {
   page: number;
@@ -104,5 +104,10 @@ export const dashboardTableService = {
   async fetchClaimDetail(recordId: string): Promise<ClaimDetail> {
     const response = await axiosClient.get<ApiResource<ClaimDetail>>(`/dashboard/claims/${recordId}`);
     return response.data.data;
+  },
+
+  async fetchPendingItems(): Promise<PendingItemsRow[]> {
+    const response = await axiosClient.get<ApiResource<{ rows: PendingItemsRow[] }>>("/dashboard/pending-items");
+    return response.data.data.rows;
   },
 };
