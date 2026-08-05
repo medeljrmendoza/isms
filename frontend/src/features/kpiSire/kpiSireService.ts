@@ -14,7 +14,7 @@ export const kpiSireService = {
     return response.data.data;
   },
 
-  async reportsByVessel(vesselId: number, params: DrillDownParams): Promise<KpiListResponse> {
+  async reportsByVessel(vesselId: number | string, params: DrillDownParams): Promise<KpiListResponse> {
     const response = await axiosClient.get<ApiResource<KpiListResponse>>("/kpi/sire/reports-by-vessel", {
       params: { vessel_id: vesselId, ...params },
     });

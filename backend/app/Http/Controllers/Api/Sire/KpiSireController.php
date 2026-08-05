@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Sire;
 use App\Http\Controllers\Controller;
 use App\Models\Sire\SireReport;
 use App\Repositories\Sire\KpiSireRepository;
+use App\Support\LegacyDb;
 use App\Support\TableQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -24,10 +25,14 @@ class KpiSireController extends Controller
     /**
      * GET /api/kpi/sire/options
      */
-    public function options(): JsonResponse
+    public function options(Request $request): JsonResponse
     {
         return response()->json([
-            'data' => ['vessels' => $this->kpi->vesselOptions()],
+            'data' => [
+                'vessels' => LegacyDb::isConfigured()
+                    ? $this->kpi->legacyVesselOptions($request->user()?->legacy_user_id)
+                    : $this->kpi->vesselOptions(),
+            ],
         ]);
     }
 
@@ -36,7 +41,12 @@ class KpiSireController extends Controller
      */
     public function summary(Request $request): JsonResponse
     {
-        $rows = $this->kpi->reportsPerVessel($request->query('from') ?: null, $request->query('to') ?: null);
+        $from = $request->query('from') ?: null;
+        $to = $request->query('to') ?: null;
+
+        $rows = LegacyDb::isConfigured()
+            ? $this->kpi->legacyReportsPerVessel($from, $to, $request->user()?->legacy_user_id)
+            : $this->kpi->reportsPerVessel($from, $to);
 
         return response()->json(['data' => $rows]);
     }
@@ -46,10 +56,19 @@ class KpiSireController extends Controller
      */
     public function reportsByVessel(Request $request): JsonResponse
     {
+        $from = $request->query('from') ?: null;
+        $to = $request->query('to') ?: null;
+
+        if (LegacyDb::isConfigured()) {
+            $result = $this->kpi->legacyReportsByVessel((string) $request->query('vessel_id'), $from, $to, TableQuery::fromRequest($request));
+
+            return response()->json(['data' => ['columns' => KpiSireRepository::reportColumns(), 'rows' => $result['rows'], 'meta' => $result['meta']]]);
+        }
+
         $paginator = $this->kpi->reportsByVessel(
             (int) $request->query('vessel_id'),
-            $request->query('from') ?: null,
-            $request->query('to') ?: null,
+            $from,
+            $to,
             TableQuery::fromRequest($request),
         );
 

@@ -16,7 +16,7 @@ export const kpiClaimsService = {
     return response.data.data;
   },
 
-  async byVessel(vesselId: number, params: DrillDownParams): Promise<KpiListResponse> {
+  async byVessel(vesselId: number | string, params: DrillDownParams): Promise<KpiListResponse> {
     const response = await axiosClient.get<ApiResource<KpiListResponse>>("/kpi/claims/by-vessel", {
       params: { vessel_id: vesselId, ...params },
     });

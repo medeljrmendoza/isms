@@ -4,7 +4,8 @@ export interface KpiSummaryRow {
 }
 
 export interface KpiOption {
-  id: number;
+  /** A local numeric id normally, but a legacy string id when reading from the legacy connection. */
+  id: number | string;
   label: string;
 }
 

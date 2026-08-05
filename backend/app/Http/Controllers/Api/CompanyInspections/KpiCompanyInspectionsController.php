@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\CompanyInspections\AuditReport;
 use App\Models\Nonconformities\Nonconformity;
 use App\Repositories\CompanyInspections\KpiCompanyInspectionsRepository;
+use App\Support\LegacyDb;
 use App\Support\TableQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -25,10 +26,14 @@ class KpiCompanyInspectionsController extends Controller
     /**
      * GET /api/kpi/company-inspections/options
      */
-    public function options(): JsonResponse
+    public function options(Request $request): JsonResponse
     {
         return response()->json([
-            'data' => ['vessels' => $this->kpi->vesselOptions()],
+            'data' => [
+                'vessels' => LegacyDb::isConfigured()
+                    ? $this->kpi->legacyVesselOptions($request->user()?->legacy_user_id)
+                    : $this->kpi->vesselOptions(),
+            ],
         ]);
     }
 
@@ -39,8 +44,21 @@ class KpiCompanyInspectionsController extends Controller
     {
         $from = $request->query('from') ?: null;
         $to = $request->query('to') ?: null;
+        $filter = $request->query('filter');
 
-        $rows = match ($request->query('filter')) {
+        if (LegacyDb::isConfigured()) {
+            $legacyUserId = $request->user()?->legacy_user_id;
+            $rows = match ($filter) {
+                'company' => $this->kpi->legacyReportsPerCompany($from, $to),
+                'nc_vessel' => $this->kpi->legacyNonConformitiesPerVessel($from, $to, $legacyUserId),
+                'nc_company' => $this->kpi->legacyNonConformitiesPerCompany($from, $to),
+                default => $this->kpi->legacyReportsPerVessel($from, $to, $legacyUserId),
+            };
+
+            return response()->json(['data' => $rows]);
+        }
+
+        $rows = match ($filter) {
             'company' => $this->kpi->reportsPerCompany($from, $to),
             'nc_vessel' => $this->kpi->nonConformitiesPerVessel($from, $to),
             'nc_company' => $this->kpi->nonConformitiesPerCompany($from, $to),
@@ -55,10 +73,19 @@ class KpiCompanyInspectionsController extends Controller
      */
     public function reportsByVessel(Request $request): JsonResponse
     {
+        $from = $request->query('from') ?: null;
+        $to = $request->query('to') ?: null;
+
+        if (LegacyDb::isConfigured()) {
+            $result = $this->kpi->legacyReportsByVessel((string) $request->query('vessel_id'), $from, $to, TableQuery::fromRequest($request));
+
+            return response()->json(['data' => ['columns' => KpiCompanyInspectionsRepository::reportColumns(), 'rows' => $result['rows'], 'meta' => $result['meta']]]);
+        }
+
         $paginator = $this->kpi->reportsByVessel(
             (int) $request->query('vessel_id'),
-            $request->query('from') ?: null,
-            $request->query('to') ?: null,
+            $from,
+            $to,
             TableQuery::fromRequest($request),
         );
 
@@ -76,10 +103,19 @@ class KpiCompanyInspectionsController extends Controller
      */
     public function reportsByCompany(Request $request): JsonResponse
     {
+        $from = $request->query('from') ?: null;
+        $to = $request->query('to') ?: null;
+
+        if (LegacyDb::isConfigured()) {
+            $result = $this->kpi->legacyReportsByCompany((string) $request->query('company'), $from, $to, TableQuery::fromRequest($request));
+
+            return response()->json(['data' => ['columns' => KpiCompanyInspectionsRepository::reportColumns(), 'rows' => $result['rows'], 'meta' => $result['meta']]]);
+        }
+
         $paginator = $this->kpi->reportsByCompany(
             (string) $request->query('company'),
-            $request->query('from') ?: null,
-            $request->query('to') ?: null,
+            $from,
+            $to,
             TableQuery::fromRequest($request),
         );
 
@@ -97,10 +133,19 @@ class KpiCompanyInspectionsController extends Controller
      */
     public function nonConformitiesByVessel(Request $request): JsonResponse
     {
+        $from = $request->query('from') ?: null;
+        $to = $request->query('to') ?: null;
+
+        if (LegacyDb::isConfigured()) {
+            $result = $this->kpi->legacyNonConformitiesByVessel((string) $request->query('vessel_id'), $from, $to, TableQuery::fromRequest($request));
+
+            return response()->json(['data' => ['columns' => KpiCompanyInspectionsRepository::nonconformityColumns(), 'rows' => $result['rows'], 'meta' => $result['meta']]]);
+        }
+
         $paginator = $this->kpi->nonConformitiesByVessel(
             (int) $request->query('vessel_id'),
-            $request->query('from') ?: null,
-            $request->query('to') ?: null,
+            $from,
+            $to,
             TableQuery::fromRequest($request),
         );
 
@@ -118,10 +163,19 @@ class KpiCompanyInspectionsController extends Controller
      */
     public function nonConformitiesByCompany(Request $request): JsonResponse
     {
+        $from = $request->query('from') ?: null;
+        $to = $request->query('to') ?: null;
+
+        if (LegacyDb::isConfigured()) {
+            $result = $this->kpi->legacyNonConformitiesByCompany((string) $request->query('company'), $from, $to, TableQuery::fromRequest($request));
+
+            return response()->json(['data' => ['columns' => KpiCompanyInspectionsRepository::nonconformityColumns(), 'rows' => $result['rows'], 'meta' => $result['meta']]]);
+        }
+
         $paginator = $this->kpi->nonConformitiesByCompany(
             (string) $request->query('company'),
-            $request->query('from') ?: null,
-            $request->query('to') ?: null,
+            $from,
+            $to,
             TableQuery::fromRequest($request),
         );
 

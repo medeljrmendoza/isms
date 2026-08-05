@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Nonconformities\Nonconformity;
 use App\Models\PscReports\PscReport;
 use App\Repositories\PscReports\KpiPscInspectionsRepository;
+use App\Support\LegacyDb;
 use App\Support\TableQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -25,10 +26,13 @@ class KpiPscInspectionsController extends Controller
     /**
      * GET /api/kpi/psc-inspections/options
      */
-    public function options(): JsonResponse
+    public function options(Request $request): JsonResponse
     {
         return response()->json([
-            'data' => [
+            'data' => LegacyDb::isConfigured() ? [
+                'vessels' => $this->kpi->legacyVesselOptions($request->user()?->legacy_user_id),
+                'mous' => $this->kpi->legacyMouOptions(),
+            ] : [
                 'vessels' => $this->kpi->vesselOptions(),
                 'mous' => $this->kpi->mouOptions(),
             ],
@@ -42,8 +46,20 @@ class KpiPscInspectionsController extends Controller
     {
         $from = $request->query('from') ?: null;
         $to = $request->query('to') ?: null;
+        $filter = $request->query('filter');
 
-        $rows = match ($request->query('filter')) {
+        if (LegacyDb::isConfigured()) {
+            $legacyUserId = $request->user()?->legacy_user_id;
+            $rows = match ($filter) {
+                'mou' => $this->kpi->legacyReportsPerMou($from, $to, $legacyUserId),
+                'nonconformities' => $this->kpi->legacyNonConformitiesPerVessel($from, $to, $legacyUserId),
+                default => $this->kpi->legacyReportsPerVessel($from, $to, $legacyUserId),
+            };
+
+            return response()->json(['data' => $rows]);
+        }
+
+        $rows = match ($filter) {
             'mou' => $this->kpi->reportsPerMou($from, $to),
             'nonconformities' => $this->kpi->nonConformitiesPerVessel($from, $to),
             default => $this->kpi->reportsPerVessel($from, $to),
@@ -57,10 +73,19 @@ class KpiPscInspectionsController extends Controller
      */
     public function reportsByVessel(Request $request): JsonResponse
     {
+        $from = $request->query('from') ?: null;
+        $to = $request->query('to') ?: null;
+
+        if (LegacyDb::isConfigured()) {
+            $result = $this->kpi->legacyReportsByVessel((string) $request->query('vessel_id'), $from, $to, TableQuery::fromRequest($request));
+
+            return response()->json(['data' => ['columns' => KpiPscInspectionsRepository::reportColumns(), 'rows' => $result['rows'], 'meta' => $result['meta']]]);
+        }
+
         $paginator = $this->kpi->reportsByVessel(
             (int) $request->query('vessel_id'),
-            $request->query('from') ?: null,
-            $request->query('to') ?: null,
+            $from,
+            $to,
             TableQuery::fromRequest($request),
         );
 
@@ -85,10 +110,19 @@ class KpiPscInspectionsController extends Controller
      */
     public function reportsByMou(Request $request): JsonResponse
     {
+        $from = $request->query('from') ?: null;
+        $to = $request->query('to') ?: null;
+
+        if (LegacyDb::isConfigured()) {
+            $result = $this->kpi->legacyReportsByMou((string) $request->query('mou_id'), $from, $to, TableQuery::fromRequest($request), $request->user()?->legacy_user_id);
+
+            return response()->json(['data' => ['columns' => KpiPscInspectionsRepository::mouReportColumns(), 'rows' => $result['rows'], 'meta' => $result['meta']]]);
+        }
+
         $paginator = $this->kpi->reportsByMou(
             (int) $request->query('mou_id'),
-            $request->query('from') ?: null,
-            $request->query('to') ?: null,
+            $from,
+            $to,
             TableQuery::fromRequest($request),
         );
 
@@ -113,10 +147,19 @@ class KpiPscInspectionsController extends Controller
      */
     public function nonConformitiesByVessel(Request $request): JsonResponse
     {
+        $from = $request->query('from') ?: null;
+        $to = $request->query('to') ?: null;
+
+        if (LegacyDb::isConfigured()) {
+            $result = $this->kpi->legacyNonConformitiesByVessel((string) $request->query('vessel_id'), $from, $to, TableQuery::fromRequest($request));
+
+            return response()->json(['data' => ['columns' => KpiPscInspectionsRepository::nonconformityColumns(), 'rows' => $result['rows'], 'meta' => $result['meta']]]);
+        }
+
         $paginator = $this->kpi->nonConformitiesByVessel(
             (int) $request->query('vessel_id'),
-            $request->query('from') ?: null,
-            $request->query('to') ?: null,
+            $from,
+            $to,
             TableQuery::fromRequest($request),
         );
 

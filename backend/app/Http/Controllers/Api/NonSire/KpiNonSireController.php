@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\NonSire;
 use App\Http\Controllers\Controller;
 use App\Models\NonSire\NonSireReport;
 use App\Repositories\NonSire\KpiNonSireRepository;
+use App\Support\LegacyDb;
 use App\Support\TableQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -24,10 +25,14 @@ class KpiNonSireController extends Controller
     /**
      * GET /api/kpi/non-sire/options
      */
-    public function options(): JsonResponse
+    public function options(Request $request): JsonResponse
     {
         return response()->json([
-            'data' => ['vessels' => $this->kpi->vesselOptions()],
+            'data' => [
+                'vessels' => LegacyDb::isConfigured()
+                    ? $this->kpi->legacyVesselOptions($request->user()?->legacy_user_id)
+                    : $this->kpi->vesselOptions(),
+            ],
         ]);
     }
 
@@ -38,8 +43,18 @@ class KpiNonSireController extends Controller
     {
         $from = $request->query('from') ?: null;
         $to = $request->query('to') ?: null;
+        $isType = $request->query('filter') === 'inspection_type';
 
-        $rows = $request->query('filter') === 'inspection_type'
+        if (LegacyDb::isConfigured()) {
+            $legacyUserId = $request->user()?->legacy_user_id;
+            $rows = $isType
+                ? $this->kpi->legacyReportsPerInspectionType($from, $to, $legacyUserId)
+                : $this->kpi->legacyReportsPerVessel($from, $to, $legacyUserId);
+
+            return response()->json(['data' => $rows]);
+        }
+
+        $rows = $isType
             ? $this->kpi->reportsPerInspectionType($from, $to)
             : $this->kpi->reportsPerVessel($from, $to);
 
@@ -51,10 +66,19 @@ class KpiNonSireController extends Controller
      */
     public function reportsByVessel(Request $request): JsonResponse
     {
+        $from = $request->query('from') ?: null;
+        $to = $request->query('to') ?: null;
+
+        if (LegacyDb::isConfigured()) {
+            $result = $this->kpi->legacyReportsByVessel((string) $request->query('vessel_id'), $from, $to, TableQuery::fromRequest($request));
+
+            return response()->json(['data' => ['columns' => KpiNonSireRepository::reportColumns(), 'rows' => $result['rows'], 'meta' => $result['meta']]]);
+        }
+
         $paginator = $this->kpi->reportsByVessel(
             (int) $request->query('vessel_id'),
-            $request->query('from') ?: null,
-            $request->query('to') ?: null,
+            $from,
+            $to,
             TableQuery::fromRequest($request),
         );
 
@@ -79,10 +103,19 @@ class KpiNonSireController extends Controller
      */
     public function reportsByInspectionType(Request $request): JsonResponse
     {
+        $from = $request->query('from') ?: null;
+        $to = $request->query('to') ?: null;
+
+        if (LegacyDb::isConfigured()) {
+            $result = $this->kpi->legacyReportsByInspectionType((string) $request->query('inspection_type'), $from, $to, TableQuery::fromRequest($request), $request->user()?->legacy_user_id);
+
+            return response()->json(['data' => ['columns' => KpiNonSireRepository::inspectionTypeReportColumns(), 'rows' => $result['rows'], 'meta' => $result['meta']]]);
+        }
+
         $paginator = $this->kpi->reportsByInspectionType(
             (string) $request->query('inspection_type'),
-            $request->query('from') ?: null,
-            $request->query('to') ?: null,
+            $from,
+            $to,
             TableQuery::fromRequest($request),
         );
 

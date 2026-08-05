@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Claims;
 use App\Http\Controllers\Controller;
 use App\Models\Claims\Claim;
 use App\Repositories\Claims\KpiClaimsRepository;
+use App\Support\LegacyDb;
 use App\Support\TableQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -22,10 +23,14 @@ class KpiClaimsController extends Controller
     /**
      * GET /api/kpi/claims/options
      */
-    public function options(): JsonResponse
+    public function options(Request $request): JsonResponse
     {
         return response()->json([
-            'data' => ['vessels' => $this->kpi->vesselOptions()],
+            'data' => [
+                'vessels' => LegacyDb::isConfigured()
+                    ? $this->kpi->legacyVesselOptions($request->user()?->legacy_user_id)
+                    : $this->kpi->vesselOptions(),
+            ],
         ]);
     }
 
@@ -36,8 +41,18 @@ class KpiClaimsController extends Controller
     {
         $from = $request->query('from') ?: null;
         $to = $request->query('to') ?: null;
+        $isCategory = $request->query('filter') === 'category';
 
-        $rows = $request->query('filter') === 'category'
+        if (LegacyDb::isConfigured()) {
+            $legacyUserId = $request->user()?->legacy_user_id;
+            $rows = $isCategory
+                ? $this->kpi->legacyClaimsPerCategory($from, $to, $legacyUserId)
+                : $this->kpi->legacyClaimsPerVessel($from, $to, $legacyUserId);
+
+            return response()->json(['data' => $rows]);
+        }
+
+        $rows = $isCategory
             ? $this->kpi->claimsPerCategory($from, $to)
             : $this->kpi->claimsPerVessel($from, $to);
 
@@ -49,10 +64,19 @@ class KpiClaimsController extends Controller
      */
     public function byVessel(Request $request): JsonResponse
     {
+        $from = $request->query('from') ?: null;
+        $to = $request->query('to') ?: null;
+
+        if (LegacyDb::isConfigured()) {
+            $result = $this->kpi->legacyClaimsByVessel((string) $request->query('vessel_id'), $from, $to, TableQuery::fromRequest($request));
+
+            return response()->json(['data' => ['columns' => KpiClaimsRepository::reportColumns(), 'rows' => $result['rows'], 'meta' => $result['meta']]]);
+        }
+
         $paginator = $this->kpi->claimsByVessel(
             (int) $request->query('vessel_id'),
-            $request->query('from') ?: null,
-            $request->query('to') ?: null,
+            $from,
+            $to,
             TableQuery::fromRequest($request),
         );
 
@@ -78,10 +102,19 @@ class KpiClaimsController extends Controller
      */
     public function byCategory(Request $request): JsonResponse
     {
+        $from = $request->query('from') ?: null;
+        $to = $request->query('to') ?: null;
+
+        if (LegacyDb::isConfigured()) {
+            $result = $this->kpi->legacyClaimsByCategory((string) $request->query('category'), $from, $to, TableQuery::fromRequest($request));
+
+            return response()->json(['data' => ['columns' => KpiClaimsRepository::categoryColumns(), 'rows' => $result['rows'], 'meta' => $result['meta']]]);
+        }
+
         $paginator = $this->kpi->claimsByCategory(
             (string) $request->query('category'),
-            $request->query('from') ?: null,
-            $request->query('to') ?: null,
+            $from,
+            $to,
             TableQuery::fromRequest($request),
         );
 

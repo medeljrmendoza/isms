@@ -16,21 +16,21 @@ export const kpiPscInspectionsService = {
     return response.data.data;
   },
 
-  async reportsByVessel(vesselId: number, params: DrillDownParams): Promise<KpiListResponse> {
+  async reportsByVessel(vesselId: number | string, params: DrillDownParams): Promise<KpiListResponse> {
     const response = await axiosClient.get<ApiResource<KpiListResponse>>("/kpi/psc-inspections/reports-by-vessel", {
       params: { vessel_id: vesselId, ...params },
     });
     return response.data.data;
   },
 
-  async reportsByMou(mouId: number, params: DrillDownParams): Promise<KpiListResponse> {
+  async reportsByMou(mouId: number | string, params: DrillDownParams): Promise<KpiListResponse> {
     const response = await axiosClient.get<ApiResource<KpiListResponse>>("/kpi/psc-inspections/reports-by-mou", {
       params: { mou_id: mouId, ...params },
     });
     return response.data.data;
   },
 
-  async nonConformitiesByVessel(vesselId: number, params: DrillDownParams): Promise<KpiListResponse> {
+  async nonConformitiesByVessel(vesselId: number | string, params: DrillDownParams): Promise<KpiListResponse> {
     const response = await axiosClient.get<ApiResource<KpiListResponse>>("/kpi/psc-inspections/nonconformities-by-vessel", {
       params: { vessel_id: vesselId, ...params },
     });
