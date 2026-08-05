@@ -26,10 +26,10 @@ export function DashboardPage() {
   }, []);
 
   return (
-    // Pinned to the app's original content width — the dashlet cards'
-    // sizing/proportions are unaffected by AppLayout's wider max-width,
-    // which other (non-dashboard) pages use for their full-page tables.
-    <div className="mx-auto max-w-6xl">
+    // Matches every other page's width — inherits AppLayout's
+    // max-w-screen-2xl directly instead of the narrower cap this used to
+    // apply, so dashlet cards size like the rest of the app.
+    <div>
       {error && (
         <div className="mb-4">
           <Alert variant="error">{error}</Alert>
