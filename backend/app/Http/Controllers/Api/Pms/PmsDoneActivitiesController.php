@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Pms;
 
 use App\Http\Controllers\Controller;
 use App\Repositories\Pms\PmsDoneActivitiesRepository;
+use App\Support\LegacyDb;
 use App\Support\TableQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -20,11 +21,9 @@ class PmsDoneActivitiesController extends Controller
      */
     public function options(): JsonResponse
     {
-        return response()->json([
-            'data' => [
-                'vessels' => $this->doneActivities->vesselOptions(),
-            ],
-        ]);
+        $vessels = LegacyDb::isConfigured() ? $this->doneActivities->legacyVesselOptions() : $this->doneActivities->vesselOptions();
+
+        return response()->json(['data' => ['vessels' => $vessels]]);
     }
 
     /**
@@ -32,17 +31,22 @@ class PmsDoneActivitiesController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $vesselId = (int) $request->query('vessel_id');
         $dateFrom = $request->query('date_from') ?: null;
         $dateTo = $request->query('date_to') ?: null;
 
-        if (! $vesselId || ! $dateFrom || ! $dateTo) {
+        if (! $request->query('vessel_id') || ! $dateFrom || ! $dateTo) {
             throw ValidationException::withMessages([
                 'vessel_id' => ['Vessel, Date From, and Date To are all required.'],
             ]);
         }
 
-        $paginator = $this->doneActivities->table($vesselId, $dateFrom, $dateTo, TableQuery::fromRequest($request));
+        if (LegacyDb::isConfigured()) {
+            $result = $this->doneActivities->legacyTable((string) $request->query('vessel_id'), $dateFrom, $dateTo, TableQuery::fromRequest($request));
+
+            return response()->json(['data' => $result]);
+        }
+
+        $paginator = $this->doneActivities->table((int) $request->query('vessel_id'), $dateFrom, $dateTo, TableQuery::fromRequest($request));
 
         return response()->json([
             'data' => [

@@ -3,7 +3,7 @@ import type { ApiResource } from "../auth/auth";
 import type { PmsDoneActivitiesListResponse, PmsDoneActivityOptions } from "./pmsDoneActivities";
 
 export interface PmsDoneActivitiesListParams {
-  vessel_id: number;
+  vessel_id: number | string;
   date_from: string;
   date_to: string;
   page: number;

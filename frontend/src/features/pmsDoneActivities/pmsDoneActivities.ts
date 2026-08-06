@@ -1,5 +1,5 @@
 export interface PmsDoneActivityOption {
-  id: number;
+  id: number | string;
   label: string;
 }
 
@@ -14,7 +14,7 @@ export interface PmsDoneActivityColumn {
 }
 
 export interface PmsDoneActivityRow {
-  id: number;
+  id: number | string;
   ticket_no: string;
   date_of_activity: string;
   previous_due_date: string | null;

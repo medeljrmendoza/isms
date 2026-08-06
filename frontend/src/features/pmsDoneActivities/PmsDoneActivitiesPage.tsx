@@ -48,7 +48,7 @@ export function PmsDoneActivitiesPage() {
     setLoading(true);
     pmsDoneActivitiesService
       .list({
-        vessel_id: Number(applied.vesselId),
+        vessel_id: applied.vesselId,
         date_from: applied.dateFrom,
         date_to: applied.dateTo,
         page,
