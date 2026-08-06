@@ -51,13 +51,21 @@ class PmsConfigurationController extends Controller
 
     /**
      * PUT /api/pms-configuration/{vessel}
+     *
+     * String param (not an Eloquent-bound model) so a legacy vesID — a
+     * string with no matching local row — can reach legacyUpdateConfiguration().
      */
-    public function update(Request $request, Vessel $vessel): JsonResponse
+    public function update(Request $request, string $vessel): JsonResponse
     {
         $data = $request->validate(['configuration' => 'required|in:SHORE,VESSEL']);
-        $vessel = $this->configuration->updateConfiguration($vessel, $data['configuration']);
 
-        return response()->json(['data' => $this->mapRow($vessel)]);
+        if (LegacyDb::isConfigured()) {
+            return response()->json(['data' => $this->configuration->legacyUpdateConfiguration($vessel, $data['configuration'])]);
+        }
+
+        $updated = $this->configuration->updateConfiguration(Vessel::query()->findOrFail((int) $vessel), $data['configuration']);
+
+        return response()->json(['data' => $this->mapRow($updated)]);
     }
 
     private function mapRow(Vessel $v): array
