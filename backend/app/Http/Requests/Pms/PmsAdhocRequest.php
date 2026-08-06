@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests\Pms;
 
-use App\Support\LegacyDb;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
@@ -17,18 +16,16 @@ class PmsAdhocRequest extends FormRequest
 
     public function rules(): array
     {
-        $legacy = LegacyDb::isConfigured();
-
         $rules = [
             'type' => ['required', Rule::in(['EQUIPMENT', 'LOCATION'])],
-            'pms_equipment_id' => ['required_if:type,EQUIPMENT', 'nullable', $legacy ? 'string' : 'exists:pms_equipment,id'],
-            'pms_part_id' => ['nullable', $legacy ? 'string' : 'exists:pms_parts,id'],
-            'pms_department_id' => ['required_if:type,LOCATION', 'nullable', $legacy ? 'string' : 'exists:pms_departments,id'],
+            'pms_equipment_id' => ['required_if:type,EQUIPMENT', 'nullable', 'string'],
+            'pms_part_id' => ['nullable', 'string'],
+            'pms_department_id' => ['required_if:type,LOCATION', 'nullable', 'string'],
             'location' => ['required_if:type,LOCATION', 'nullable', 'string', 'max:255'],
             'sub_location' => ['nullable', 'string', 'max:255'],
             'activity_name' => ['required', 'string', 'max:255'],
-            'pms_job_class_id' => ['nullable', $legacy ? 'string' : 'exists:pms_job_classes,id'],
-            'pms_job_type_id' => ['nullable', $legacy ? 'string' : 'exists:pms_job_types,id'],
+            'pms_job_class_id' => ['nullable', 'string'],
+            'pms_job_type_id' => ['nullable', 'string'],
             'incharge' => ['required', 'string', 'max:255'],
             'assignee' => ['nullable', 'string', 'max:255'],
             'work_procedure' => ['nullable', 'string'],
@@ -36,13 +33,13 @@ class PmsAdhocRequest extends FormRequest
             'description' => ['required', 'string'],
             'remarks' => ['nullable', 'string'],
             'inventory' => ['nullable', 'array'],
-            'inventory.*.pms_part_id' => ['required', $legacy ? 'string' : 'exists:pms_parts,id'],
+            'inventory.*.pms_part_id' => ['required', 'string'],
             'inventory.*.new_qty' => ['nullable', 'integer', 'min:0'],
             'inventory.*.reconditioned_qty' => ['nullable', 'integer', 'min:0'],
         ];
 
         if ($this->isMethod('post')) {
-            $rules['vessel_id'] = ['required', $legacy ? 'string' : 'exists:vessels,id'];
+            $rules['vessel_id'] = ['required', 'string'];
         }
 
         return $rules;

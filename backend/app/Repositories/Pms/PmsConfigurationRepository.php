@@ -2,10 +2,7 @@
 
 namespace App\Repositories\Pms;
 
-use App\Models\Principal;
-use App\Models\Vessel;
 use App\Support\TableQuery;
-use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -17,14 +14,6 @@ use Illuminate\Support\Facades\DB;
  */
 class PmsConfigurationRepository
 {
-    /** @return array<int, array{id:int,label:string}> */
-    public function principalOptions(): array
-    {
-        return Principal::query()->where('is_active', true)->orderBy('name')->get()
-            ->map(fn (Principal $p) => ['id' => $p->id, 'label' => $p->name])
-            ->all();
-    }
-
     /** @return array<int, array{id:string,label:string}> */
     public function legacyPrincipalOptions(): array
     {
@@ -34,23 +23,6 @@ class PmsConfigurationRepository
             ->get()
             ->map(fn ($p) => ['id' => $p->principalID, 'label' => $p->principal_name])
             ->all();
-    }
-
-    public function table(int $principalId, TableQuery $query): LengthAwarePaginator
-    {
-        $builder = Vessel::query()->where('principal_id', $principalId);
-
-        if ($query->search !== null) {
-            $term = "%{$query->search}%";
-            $builder->where(function ($q) use ($term) {
-                $q->where('name', 'like', $term)->orWhere('short_name', 'like', $term);
-            });
-        }
-
-        $sortable = ['vessel' => 'name', 'short_name' => 'short_name', 'configuration' => 'configuration'];
-        $sort = $sortable[$query->sort ?? 'vessel'] ?? 'name';
-
-        return $builder->orderBy($sort, $query->direction)->paginate($query->perPage, page: $query->page);
     }
 
     /**
@@ -111,13 +83,5 @@ class PmsConfigurationRepository
             'configuration' => $v->configuration,
             'can_edit' => true,
         ];
-    }
-
-    /** Ported from add_item(). */
-    public function updateConfiguration(Vessel $vessel, string $configuration): Vessel
-    {
-        $vessel->update(['configuration' => $configuration]);
-
-        return $vessel;
     }
 }

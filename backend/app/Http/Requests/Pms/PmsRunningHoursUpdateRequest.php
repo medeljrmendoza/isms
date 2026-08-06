@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests\Pms;
 
-use App\Support\LegacyDb;
 use Illuminate\Foundation\Http\FormRequest;
 
 /** Ported from update_running_hours()'s posted fields (rh_equipmentID, rh_date, rh_no_hours, rh_remarks). */
@@ -16,7 +15,7 @@ class PmsRunningHoursUpdateRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'equipment_id' => ['required', LegacyDb::isConfigured() ? 'string' : 'integer|exists:pms_equipment,id'],
+            'equipment_id' => ['required', 'string'],
             'date' => ['required', 'date'],
             'hours' => ['required', 'numeric', 'min:0.01'],
             'remarks' => ['nullable', 'string'],
