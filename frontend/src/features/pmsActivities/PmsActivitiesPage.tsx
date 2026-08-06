@@ -82,10 +82,10 @@ export function PmsActivitiesPage() {
     setLoading(true);
     pmsActivitiesService
       .list({
-        vessel_id: Number(appliedVesselId),
+        vessel_id: appliedVesselId,
         year: year ? Number(year) : undefined,
-        main_group_id: mainGroupId ? Number(mainGroupId) : undefined,
-        criticality_id: criticalityId ? Number(criticalityId) : undefined,
+        main_group_id: mainGroupId || undefined,
+        criticality_id: criticalityId || undefined,
         search: search || undefined,
       })
       .then((data) => {
@@ -110,7 +110,7 @@ export function PmsActivitiesPage() {
 
   const reload = () => setReloadKey((k) => k + 1);
 
-  const openView = async (id: number) => {
+  const openView = async (id: number | string) => {
     setActionError(null);
     try {
       setViewingActivity(await pmsActivitiesService.show(id));

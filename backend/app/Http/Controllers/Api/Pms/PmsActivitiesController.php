@@ -7,6 +7,7 @@ use App\Http\Requests\Pms\PmsActivityMarkDoneRequest;
 use App\Http\Requests\Pms\PmsActivityPostponeRequest;
 use App\Models\Pms\PmsActivity;
 use App\Repositories\Pms\PmsActivitiesRepository;
+use App\Support\LegacyDb;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -24,12 +25,14 @@ class PmsActivitiesController extends Controller
      */
     public function options(): JsonResponse
     {
+        $legacy = LegacyDb::isConfigured();
+
         return response()->json([
             'data' => [
-                'vessels' => $this->activities->vesselOptions(),
-                'departments' => $this->activities->departmentOptions(),
-                'criticalities' => $this->activities->criticalityOptions(),
-                'main_groups' => $this->activities->mainGroupOptions(),
+                'vessels' => $legacy ? $this->activities->legacyVesselOptions() : $this->activities->vesselOptions(),
+                'departments' => $legacy ? $this->activities->legacyDepartmentOptions() : $this->activities->departmentOptions(),
+                'criticalities' => $legacy ? $this->activities->legacyCriticalityOptions() : $this->activities->criticalityOptions(),
+                'main_groups' => $legacy ? $this->activities->legacyMainGroupOptions() : $this->activities->mainGroupOptions(),
             ],
         ]);
     }
@@ -39,8 +42,30 @@ class PmsActivitiesController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $vesselId = (int) $request->query('vessel_id');
         $year = $this->intOrNull($request->query('year'));
+
+        if (LegacyDb::isConfigured()) {
+            $vesselId = (string) $request->query('vessel_id');
+
+            return response()->json([
+                'data' => [
+                    'current_period' => $this->activities->legacyCurrentPeriod($vesselId),
+                    'year_options' => array_values(array_unique(array_filter([
+                        $this->activities->legacyCurrentYear($vesselId),
+                        ...$this->activities->legacyHistoricalYears($vesselId),
+                    ]))),
+                    'rows' => $this->activities->legacyTable(
+                        $vesselId,
+                        $year,
+                        $this->stringOrNull($request->query('main_group_id')),
+                        $this->stringOrNull($request->query('criticality_id')),
+                        $request->query('search') ?: null,
+                    ),
+                ],
+            ]);
+        }
+
+        $vesselId = (int) $request->query('vessel_id');
 
         return response()->json([
             'data' => [
@@ -62,21 +87,44 @@ class PmsActivitiesController extends Controller
 
     /**
      * GET /api/pms-activities/{activity}
+     *
+     * String param (not an Eloquent-bound model) so a legacy activityID —
+     * a string with no matching local row — can reach legacyActivityDetail().
      */
-    public function show(PmsActivity $activity): JsonResponse
+    public function show(string $activity): JsonResponse
     {
-        return response()->json(['data' => $this->activities->activityDetail($activity)]);
+        if (LegacyDb::isConfigured()) {
+            return response()->json(['data' => $this->activities->legacyActivityDetail($activity)]);
+        }
+
+        $model = PmsActivity::query()->findOrFail((int) $activity);
+
+        return response()->json(['data' => $this->activities->activityDetail($model)]);
     }
 
     /**
      * POST /api/pms-activities/{activity}/mark-done
      */
-    public function markDone(PmsActivityMarkDoneRequest $request, PmsActivity $activity): JsonResponse
+    public function markDone(PmsActivityMarkDoneRequest $request, string $activity): JsonResponse
     {
         $data = $request->validated();
 
-        $activity = $this->activities->markDone(
-            $activity,
+        if (LegacyDb::isConfigured()) {
+            $detail = $this->activities->legacyMarkDone(
+                $activity,
+                $data['last_done'],
+                (bool) $data['unplanned'],
+                $data['unplanned_description'] ?? null,
+                $data['unplanned_cause'] ?? null,
+                $data['remarks'] ?? null,
+                $request->user()->name,
+            );
+
+            return response()->json(['data' => $detail]);
+        }
+
+        $model = $this->activities->markDone(
+            PmsActivity::query()->findOrFail((int) $activity),
             $data['last_done'],
             (bool) $data['unplanned'],
             $data['unplanned_description'] ?? null,
@@ -85,25 +133,37 @@ class PmsActivitiesController extends Controller
             $request->user()->name,
         );
 
-        return response()->json(['data' => $this->activities->activityDetail($activity)]);
+        return response()->json(['data' => $this->activities->activityDetail($model)]);
     }
 
     /**
      * POST /api/pms-activities/{activity}/postpone
      */
-    public function postpone(PmsActivityPostponeRequest $request, PmsActivity $activity): JsonResponse
+    public function postpone(PmsActivityPostponeRequest $request, string $activity): JsonResponse
     {
         $data = $request->validated();
 
-        $activity = $this->activities->postpone(
-            $activity,
+        if (LegacyDb::isConfigured()) {
+            $detail = $this->activities->legacyPostpone(
+                $activity,
+                $data['postpone_date'],
+                $data['description'],
+                $data['possible_cause'],
+                $data['remarks'] ?? null,
+            );
+
+            return response()->json(['data' => $detail]);
+        }
+
+        $model = $this->activities->postpone(
+            PmsActivity::query()->findOrFail((int) $activity),
             $data['postpone_date'],
             $data['description'],
             $data['possible_cause'],
             $data['remarks'] ?? null,
         );
 
-        return response()->json(['data' => $this->activities->activityDetail($activity)]);
+        return response()->json(['data' => $this->activities->activityDetail($model)]);
     }
 
     /**
@@ -111,6 +171,10 @@ class PmsActivitiesController extends Controller
      */
     public function ticket(string $ticketNo): JsonResponse
     {
+        if (LegacyDb::isConfigured()) {
+            return response()->json(['data' => $this->activities->legacyTicket($ticketNo)]);
+        }
+
         $ticket = $this->activities->ticket($ticketNo);
 
         return response()->json([
@@ -143,5 +207,10 @@ class PmsActivitiesController extends Controller
     private function intOrNull(mixed $value): ?int
     {
         return $value === null || $value === '' ? null : (int) $value;
+    }
+
+    private function stringOrNull(mixed $value): ?string
+    {
+        return $value === null || $value === '' ? null : (string) $value;
     }
 }

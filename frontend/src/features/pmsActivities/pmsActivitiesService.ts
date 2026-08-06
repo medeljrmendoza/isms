@@ -24,28 +24,28 @@ export const pmsActivitiesService = {
   },
 
   async list(params: {
-    vessel_id: number;
+    vessel_id: number | string;
     year?: number;
-    department_id?: number;
-    criticality_id?: number;
-    main_group_id?: number;
+    department_id?: number | string;
+    criticality_id?: number | string;
+    main_group_id?: number | string;
     search?: string;
   }): Promise<PmsActivitiesResponse> {
     const response = await axiosClient.get<ApiResource<PmsActivitiesResponse>>("/pms-activities", { params });
     return response.data.data;
   },
 
-  async show(id: number): Promise<PmsActivityDetail> {
+  async show(id: number | string): Promise<PmsActivityDetail> {
     const response = await axiosClient.get<ApiResource<PmsActivityDetail>>(`/pms-activities/${id}`);
     return response.data.data;
   },
 
-  async markDone(id: number, values: MarkDoneValues): Promise<PmsActivityDetail> {
+  async markDone(id: number | string, values: MarkDoneValues): Promise<PmsActivityDetail> {
     const response = await axiosClient.post<ApiResource<PmsActivityDetail>>(`/pms-activities/${id}/mark-done`, values);
     return response.data.data;
   },
 
-  async postpone(id: number, values: PostponeValues): Promise<PmsActivityDetail> {
+  async postpone(id: number | string, values: PostponeValues): Promise<PmsActivityDetail> {
     const response = await axiosClient.post<ApiResource<PmsActivityDetail>>(`/pms-activities/${id}/postpone`, values);
     return response.data.data;
   },

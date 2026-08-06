@@ -1,5 +1,5 @@
 export interface PmsActivityOption {
-  id: number;
+  id: number | string;
   label: string;
 }
 
@@ -24,7 +24,7 @@ export interface PmsActivityMonth {
 export type PmsActivityStatus = "overdue" | "upcoming" | "postponed" | null;
 
 export interface PmsActivityRow {
-  id: number;
+  id: number | string;
   is_snapshot: boolean;
   main_group: string | null;
   department: string | null;
@@ -43,7 +43,7 @@ export interface PmsActivityRow {
 }
 
 export interface PmsActivityDetail {
-  id: number;
+  id: number | string;
   vessel: string;
   activity_code: string | null;
   activity_name: string;
