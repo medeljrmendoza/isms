@@ -6,7 +6,7 @@ import { isApiValidationError } from "../auth/auth";
 import { Button } from "../../components/ui/Button";
 
 interface PmsSubClassificationFormProps {
-  classificationId: number;
+  classificationId: number | string;
   classificationName: string;
   record?: PmsSubClassificationRow;
   onCancel: () => void;

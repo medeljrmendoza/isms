@@ -12,7 +12,7 @@ const PER_PAGE = 10;
 export function PmsSubClassificationsPage() {
   const { classificationId } = useParams<{ classificationId: string }>();
   const navigate = useNavigate();
-  const classId = Number(classificationId);
+  const classId = classificationId ?? "";
 
   const [classificationName, setClassificationName] = useState("");
   const [rows, setRows] = useState<PmsSubClassificationRow[]>([]);
@@ -26,6 +26,7 @@ export function PmsSubClassificationsPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<PmsSubClassificationRow | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [canCreateRecord, setCanCreateRecord] = useState(true);
 
   useEffect(() => {
     if (!classId) return;
@@ -38,6 +39,7 @@ export function PmsSubClassificationsPage() {
         setRows(data.rows);
         setLastPage(data.meta.last_page);
         setTotal(data.meta.total);
+        setCanCreateRecord(data.can_create_record);
         setError(null);
       })
       .catch(() => setError("Couldn't load sub-classifications. Please try again."))
@@ -66,17 +68,19 @@ export function PmsSubClassificationsPage() {
             </button>
             <h1 className="text-base font-semibold text-slate-800">Sub-Classifications — {classificationName}</h1>
           </div>
-          <Button
-            type="button"
-            variant="success"
-            className="!px-3 !py-1.5 text-sm"
-            onClick={() => {
-              setEditing(null);
-              setFormOpen(true);
-            }}
-          >
-            + Add Item
-          </Button>
+          {canCreateRecord && (
+            <Button
+              type="button"
+              variant="success"
+              className="!px-3 !py-1.5 text-sm"
+              onClick={() => {
+                setEditing(null);
+                setFormOpen(true);
+              }}
+            >
+              + Add Item
+            </Button>
+          )}
         </div>
 
         {actionError && <p className="px-4 pt-2 text-sm text-red-600">{actionError}</p>}
@@ -104,27 +108,29 @@ export function PmsSubClassificationsPage() {
                     </span>
                   </td>
                   <td className="px-2 py-1.5">
-                    <div className="flex flex-wrap gap-1">
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        className="!px-1.5 !py-0.5 text-xs"
-                        onClick={() => {
-                          setEditing(row);
-                          setFormOpen(true);
-                        }}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        type="button"
-                        variant={row.is_active ? "success" : "secondary"}
-                        className="!px-1.5 !py-0.5 text-xs"
-                        onClick={() => runAction(() => pmsClassificationsService.subToggleStatus(row.id))}
-                      >
-                        {row.is_active ? "Inactivate" : "Activate"}
-                      </Button>
-                    </div>
+                    {row.can_edit && (
+                      <div className="flex flex-wrap gap-1">
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          className="!px-1.5 !py-0.5 text-xs"
+                          onClick={() => {
+                            setEditing(row);
+                            setFormOpen(true);
+                          }}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={row.is_active ? "success" : "secondary"}
+                          className="!px-1.5 !py-0.5 text-xs"
+                          onClick={() => runAction(() => pmsClassificationsService.subToggleStatus(row.id))}
+                        >
+                          {row.is_active ? "Inactivate" : "Activate"}
+                        </Button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}

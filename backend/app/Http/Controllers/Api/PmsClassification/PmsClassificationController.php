@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Pms\PmsClassification;
 use App\Models\Pms\PmsSubClassification;
 use App\Repositories\Pms\PmsClassificationRepository;
+use App\Support\LegacyDb;
 use App\Support\TableQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,14 +19,27 @@ class PmsClassificationController extends Controller
 
     public function options(): JsonResponse
     {
+        $legacy = LegacyDb::isConfigured();
+
         return response()->json(['data' => [
-            'departments' => $this->classifications->departmentOptions(),
-            'vessel_types' => $this->classifications->vesselTypeOptions(),
+            'departments' => $legacy ? $this->classifications->legacyDepartmentOptions() : $this->classifications->departmentOptions(),
+            'vessel_types' => $legacy ? $this->classifications->legacyVesselTypeOptions() : $this->classifications->vesselTypeOptions(),
+            'can_create_record' => ! $legacy,
         ]]);
     }
 
     public function index(Request $request): JsonResponse
     {
+        if (LegacyDb::isConfigured()) {
+            $result = $this->classifications->legacyTable(
+                $this->stringOrNull($request->query('department_id')),
+                $this->stringOrNull($request->query('vessel_type_id')),
+                TableQuery::fromRequest($request),
+            );
+
+            return response()->json(['data' => ['rows' => $result['rows'], 'meta' => $result['meta']]]);
+        }
+
         $departmentId = $request->query('department_id') !== null ? (int) $request->query('department_id') : null;
         $vesselTypeId = $request->query('vessel_type_id') !== null ? (int) $request->query('vessel_type_id') : null;
 
@@ -67,15 +81,29 @@ class PmsClassificationController extends Controller
         return response()->json(['data' => $this->mapRow($classification->loadCount(['departments', 'vesselTypes', 'subClassifications']))]);
     }
 
-    public function subIndex(Request $request, PmsClassification $pmsClassification): JsonResponse
+    /**
+     * GET /api/pms-classifications/{pmsClassification}/sub-classifications
+     *
+     * String param (not an Eloquent-bound model) so a legacy classID —
+     * a string with no matching local row — can reach legacySubTable().
+     */
+    public function subIndex(Request $request, string $pmsClassification): JsonResponse
     {
-        $paginator = $this->classifications->subTable($pmsClassification, TableQuery::fromRequest($request));
+        if (LegacyDb::isConfigured()) {
+            $result = $this->classifications->legacySubTable($pmsClassification, TableQuery::fromRequest($request));
+
+            return response()->json(['data' => [...$result, 'can_create_record' => false]]);
+        }
+
+        $classification = PmsClassification::query()->findOrFail((int) $pmsClassification);
+        $paginator = $this->classifications->subTable($classification, TableQuery::fromRequest($request));
 
         return response()->json([
             'data' => [
-                'classification' => ['id' => $pmsClassification->id, 'name' => $pmsClassification->name],
+                'classification' => ['id' => $classification->id, 'name' => $classification->name],
                 'rows' => collect($paginator->items())->map(fn (PmsSubClassification $s) => $this->mapSubRow($s))->all(),
                 'meta' => $this->meta($paginator),
+                'can_create_record' => true,
             ],
         ]);
     }
@@ -106,6 +134,11 @@ class PmsClassificationController extends Controller
         $sub = $this->classifications->toggleSubStatus($pmsSubClassification);
 
         return response()->json(['data' => $this->mapSubRow($sub)]);
+    }
+
+    private function stringOrNull(mixed $value): ?string
+    {
+        return $value === null || $value === '' ? null : (string) $value;
     }
 
     private function validateData(Request $request): array
@@ -150,6 +183,7 @@ class PmsClassificationController extends Controller
             'department_count' => $c->departments_count,
             'vessel_type_count' => $c->vessel_types_count,
             'sub_classification_count' => $c->sub_classifications_count,
+            'can_edit' => true,
         ];
     }
 
@@ -174,6 +208,7 @@ class PmsClassificationController extends Controller
             'name' => $s->name,
             'description' => $s->description,
             'is_active' => $s->is_active,
+            'can_edit' => true,
         ];
     }
 

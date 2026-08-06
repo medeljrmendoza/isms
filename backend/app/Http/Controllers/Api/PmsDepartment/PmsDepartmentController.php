@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\PmsDepartment;
 use App\Http\Controllers\Controller;
 use App\Models\Pms\PmsDepartment;
 use App\Repositories\Pms\PmsDepartmentRepository;
+use App\Support\LegacyDb;
 use App\Support\TableQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -20,12 +21,21 @@ class PmsDepartmentController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        if (LegacyDb::isConfigured()) {
+            $result = $this->departments->legacyTable(TableQuery::fromRequest($request));
+
+            return response()->json([
+                'data' => ['rows' => $result['rows'], 'meta' => $result['meta'], 'can_create_record' => false],
+            ]);
+        }
+
         $paginator = $this->departments->table(TableQuery::fromRequest($request));
 
         return response()->json([
             'data' => [
                 'rows' => collect($paginator->items())->map(fn (PmsDepartment $d) => $this->mapRow($d))->all(),
                 'meta' => $this->meta($paginator),
+                'can_create_record' => true,
             ],
         ]);
     }
@@ -72,6 +82,7 @@ class PmsDepartmentController extends Controller
             'id' => $d->id,
             'name' => $d->name,
             'is_active' => $d->is_active,
+            'can_edit' => true,
         ];
     }
 

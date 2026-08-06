@@ -22,8 +22,8 @@ export interface PmsClassificationListParams {
 export interface PmsClassificationFormValues {
   name: string;
   description?: string;
-  department_ids: number[];
-  vessel_type_ids: number[];
+  department_ids: (number | string)[];
+  vessel_type_ids: (number | string)[];
 }
 
 export interface PmsSubClassificationFormValues {
@@ -43,7 +43,7 @@ export const pmsClassificationsService = {
     return response.data.data;
   },
 
-  async show(id: number): Promise<PmsClassificationDetail> {
+  async show(id: number | string): Promise<PmsClassificationDetail> {
     const response = await axiosClient.get<ApiResource<PmsClassificationDetail>>(`/pms-classifications/${id}`);
     return response.data.data;
   },
@@ -53,18 +53,18 @@ export const pmsClassificationsService = {
     return response.data.data;
   },
 
-  async update(id: number, values: PmsClassificationFormValues): Promise<PmsClassificationDetail> {
+  async update(id: number | string, values: PmsClassificationFormValues): Promise<PmsClassificationDetail> {
     const response = await axiosClient.put<ApiResource<PmsClassificationDetail>>(`/pms-classifications/${id}`, values);
     return response.data.data;
   },
 
-  async toggleStatus(id: number): Promise<PmsClassificationRow> {
+  async toggleStatus(id: number | string): Promise<PmsClassificationRow> {
     const response = await axiosClient.post<ApiResource<PmsClassificationRow>>(`/pms-classifications/${id}/toggle-status`);
     return response.data.data;
   },
 
   async subList(
-    classificationId: number,
+    classificationId: number | string,
     params: { page: number; per_page: number; search?: string; sort?: string; direction?: "asc" | "desc" },
   ): Promise<PmsSubClassificationListResponse> {
     const response = await axiosClient.get<ApiResource<PmsSubClassificationListResponse>>(
@@ -74,7 +74,7 @@ export const pmsClassificationsService = {
     return response.data.data;
   },
 
-  async subCreate(classificationId: number, values: PmsSubClassificationFormValues): Promise<PmsSubClassificationRow> {
+  async subCreate(classificationId: number | string, values: PmsSubClassificationFormValues): Promise<PmsSubClassificationRow> {
     const response = await axiosClient.post<ApiResource<PmsSubClassificationRow>>(
       `/pms-classifications/${classificationId}/sub-classifications`,
       values,
@@ -82,12 +82,12 @@ export const pmsClassificationsService = {
     return response.data.data;
   },
 
-  async subUpdate(id: number, values: PmsSubClassificationFormValues): Promise<PmsSubClassificationRow> {
+  async subUpdate(id: number | string, values: PmsSubClassificationFormValues): Promise<PmsSubClassificationRow> {
     const response = await axiosClient.put<ApiResource<PmsSubClassificationRow>>(`/pms-sub-classifications/${id}`, values);
     return response.data.data;
   },
 
-  async subToggleStatus(id: number): Promise<PmsSubClassificationRow> {
+  async subToggleStatus(id: number | string): Promise<PmsSubClassificationRow> {
     const response = await axiosClient.post<ApiResource<PmsSubClassificationRow>>(`/pms-sub-classifications/${id}/toggle-status`);
     return response.data.data;
   },

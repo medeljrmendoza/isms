@@ -96,9 +96,11 @@ export function PmsConfigurationPage() {
                     <td className="px-2 py-1.5 text-slate-700">{row.short_name ?? "—"}</td>
                     <td className="px-2 py-1.5 text-slate-700">{row.configuration ?? "—"}</td>
                     <td className="px-2 py-1.5">
-                      <Button type="button" variant="secondary" className="!px-1.5 !py-0.5 text-xs" onClick={() => setEditing(row)}>
-                        Edit
-                      </Button>
+                      {row.can_edit && (
+                        <Button type="button" variant="secondary" className="!px-1.5 !py-0.5 text-xs" onClick={() => setEditing(row)}>
+                          Edit
+                        </Button>
+                      )}
                     </td>
                   </tr>
                 ))}

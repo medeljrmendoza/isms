@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\PmsConfiguration;
 use App\Http\Controllers\Controller;
 use App\Models\Vessel;
 use App\Repositories\Pms\PmsConfigurationRepository;
+use App\Support\LegacyDb;
 use App\Support\TableQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -20,7 +21,11 @@ class PmsConfigurationController extends Controller
      */
     public function options(): JsonResponse
     {
-        return response()->json(['data' => ['principals' => $this->configuration->principalOptions()]]);
+        $principals = LegacyDb::isConfigured()
+            ? $this->configuration->legacyPrincipalOptions()
+            : $this->configuration->principalOptions();
+
+        return response()->json(['data' => ['principals' => $principals]]);
     }
 
     /**
@@ -28,6 +33,12 @@ class PmsConfigurationController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        if (LegacyDb::isConfigured()) {
+            $result = $this->configuration->legacyTable((string) $request->query('principal_id'), TableQuery::fromRequest($request));
+
+            return response()->json(['data' => ['rows' => $result['rows'], 'meta' => $result['meta']]]);
+        }
+
         $paginator = $this->configuration->table((int) $request->query('principal_id'), TableQuery::fromRequest($request));
 
         return response()->json([
@@ -56,6 +67,7 @@ class PmsConfigurationController extends Controller
             'vessel_name' => $v->display_name,
             'short_name' => $v->short_name,
             'configuration' => $v->configuration,
+            'can_edit' => true,
         ];
     }
 

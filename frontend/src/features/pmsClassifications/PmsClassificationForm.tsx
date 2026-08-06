@@ -17,8 +17,8 @@ interface PmsClassificationFormProps {
 export function PmsClassificationForm({ record, departments, vesselTypes, onCancel, onSuccess }: PmsClassificationFormProps) {
   const [name, setName] = useState(record?.name ?? "");
   const [description, setDescription] = useState(record?.description ?? "");
-  const [departmentIds, setDepartmentIds] = useState<number[]>(record?.departments.map((d) => d.id) ?? []);
-  const [vesselTypeIds, setVesselTypeIds] = useState<number[]>(record?.vessel_types.map((v) => v.id) ?? []);
+  const [departmentIds, setDepartmentIds] = useState<(number | string)[]>(record?.departments.map((d) => d.id) ?? []);
+  const [vesselTypeIds, setVesselTypeIds] = useState<(number | string)[]>(record?.vessel_types.map((v) => v.id) ?? []);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -27,11 +27,11 @@ export function PmsClassificationForm({ record, departments, vesselTypes, onCanc
     setVesselTypeIds(record?.vessel_types.map((v) => v.id) ?? []);
   }, [record]);
 
-  const toggleDepartment = (id: number) => {
+  const toggleDepartment = (id: number | string) => {
     setDepartmentIds((prev) => (prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id]));
   };
 
-  const toggleVesselType = (id: number) => {
+  const toggleVesselType = (id: number | string) => {
     setVesselTypeIds((prev) => (prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id]));
   };
 

@@ -21,12 +21,12 @@ export const pmsDepartmentService = {
     return response.data.data;
   },
 
-  async update(id: number, name: string): Promise<PmsDepartmentRow> {
+  async update(id: number | string, name: string): Promise<PmsDepartmentRow> {
     const response = await axiosClient.put<ApiResource<PmsDepartmentRow>>(`/pms-departments/${id}`, { name });
     return response.data.data;
   },
 
-  async toggleStatus(id: number): Promise<PmsDepartmentRow> {
+  async toggleStatus(id: number | string): Promise<PmsDepartmentRow> {
     const response = await axiosClient.post<ApiResource<PmsDepartmentRow>>(`/pms-departments/${id}/toggle-status`);
     return response.data.data;
   },

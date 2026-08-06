@@ -23,6 +23,7 @@ export function PmsDepartmentPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<PmsDepartmentRow | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [canCreateRecord, setCanCreateRecord] = useState(true);
 
   useEffect(() => {
     setLoading(true);
@@ -32,6 +33,7 @@ export function PmsDepartmentPage() {
         setRows(data.rows);
         setLastPage(data.meta.last_page);
         setTotal(data.meta.total);
+        setCanCreateRecord(data.can_create_record);
         setError(null);
       })
       .catch(() => setError("Couldn't load departments. Please try again."))
@@ -61,17 +63,19 @@ export function PmsDepartmentPage() {
       <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
           <h1 className="text-base font-semibold text-slate-800">PMS Department</h1>
-          <Button
-            type="button"
-            variant="success"
-            className="!px-3 !py-1.5 text-sm"
-            onClick={() => {
-              setEditing(null);
-              setFormOpen(true);
-            }}
-          >
-            + Add Item
-          </Button>
+          {canCreateRecord && (
+            <Button
+              type="button"
+              variant="success"
+              className="!px-3 !py-1.5 text-sm"
+              onClick={() => {
+                setEditing(null);
+                setFormOpen(true);
+              }}
+            >
+              + Add Item
+            </Button>
+          )}
         </div>
 
         <div className="flex flex-wrap items-end gap-3 border-b border-slate-100 px-4 py-3">
@@ -111,27 +115,29 @@ export function PmsDepartmentPage() {
                 <tr key={row.id} className="border-b border-slate-100">
                   <td className="px-2 py-1.5 text-slate-700">{row.name}</td>
                   <td className="px-2 py-1.5">
-                    <div className="flex flex-wrap gap-1">
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        className="!px-1.5 !py-0.5 text-xs"
-                        onClick={() => {
-                          setEditing(row);
-                          setFormOpen(true);
-                        }}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        type="button"
-                        variant={row.is_active ? "success" : "secondary"}
-                        className="!px-1.5 !py-0.5 text-xs"
-                        onClick={() => runAction(() => pmsDepartmentService.toggleStatus(row.id))}
-                      >
-                        {row.is_active ? "Inactivate" : "Activate"}
-                      </Button>
-                    </div>
+                    {row.can_edit && (
+                      <div className="flex flex-wrap gap-1">
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          className="!px-1.5 !py-0.5 text-xs"
+                          onClick={() => {
+                            setEditing(row);
+                            setFormOpen(true);
+                          }}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={row.is_active ? "success" : "secondary"}
+                          className="!px-1.5 !py-0.5 text-xs"
+                          onClick={() => runAction(() => pmsDepartmentService.toggleStatus(row.id))}
+                        >
+                          {row.is_active ? "Inactivate" : "Activate"}
+                        </Button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}

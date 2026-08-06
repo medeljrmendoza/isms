@@ -1,5 +1,5 @@
 export interface PmsConfigurationOption {
-  id: number;
+  id: number | string;
   label: string;
 }
 
@@ -8,10 +8,11 @@ export interface PmsConfigurationOptions {
 }
 
 export interface PmsConfigurationRow {
-  id: number;
+  id: number | string;
   vessel_name: string;
   short_name: string | null;
   configuration: string | null;
+  can_edit: boolean;
 }
 
 export interface PmsConfigurationListResponse {

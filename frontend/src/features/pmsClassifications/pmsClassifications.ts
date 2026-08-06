@@ -1,15 +1,16 @@
 export interface PmsClassificationOption {
-  id: number;
+  id: number | string;
   label: string;
 }
 
 export interface PmsClassificationOptions {
   departments: PmsClassificationOption[];
   vessel_types: PmsClassificationOption[];
+  can_create_record: boolean;
 }
 
 export interface PmsClassificationRow {
-  id: number;
+  id: number | string;
   name: string;
   description: string | null;
   is_active: boolean;
@@ -18,15 +19,16 @@ export interface PmsClassificationRow {
   department_count: number;
   vessel_type_count: number;
   sub_classification_count: number;
+  can_edit: boolean;
 }
 
 export interface PmsClassificationDetail {
-  id: number;
+  id: number | string;
   name: string;
   description: string | null;
   is_active: boolean;
-  departments: { id: number; name: string }[];
-  vessel_types: { id: number; name: string }[];
+  departments: { id: number | string; name: string }[];
+  vessel_types: { id: number | string; name: string }[];
 }
 
 export interface PmsClassificationListResponse {
@@ -40,16 +42,17 @@ export interface PmsClassificationListResponse {
 }
 
 export interface PmsSubClassificationRow {
-  id: number;
-  pms_classification_id: number;
+  id: number | string;
+  pms_classification_id: number | string;
   chart_code: string;
   name: string;
   description: string | null;
   is_active: boolean;
+  can_edit: boolean;
 }
 
 export interface PmsSubClassificationListResponse {
-  classification: { id: number; name: string };
+  classification: { id: number | string; name: string };
   rows: PmsSubClassificationRow[];
   meta: {
     current_page: number;
@@ -57,4 +60,5 @@ export interface PmsSubClassificationListResponse {
     per_page: number;
     total: number;
   };
+  can_create_record: boolean;
 }

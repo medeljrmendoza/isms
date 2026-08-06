@@ -29,6 +29,7 @@ export function PmsClassificationsPage() {
   const [editing, setEditing] = useState<PmsClassificationDetail | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [viewList, setViewList] = useState<{ title: string; items: string[] } | null>(null);
+  const [canCreateRecord, setCanCreateRecord] = useState(true);
 
   useEffect(() => {
     pmsClassificationsService
@@ -36,6 +37,7 @@ export function PmsClassificationsPage() {
       .then((data) => {
         setDepartments(data.departments);
         setVesselTypes(data.vessel_types);
+        setCanCreateRecord(data.can_create_record);
       })
       .catch(() => undefined);
   }, []);
@@ -66,7 +68,7 @@ export function PmsClassificationsPage() {
     setFormOpen(true);
   };
 
-  const openEdit = async (id: number) => {
+  const openEdit = async (id: number | string) => {
     setActionError(null);
     const detail = await pmsClassificationsService.show(id);
     setEditing(detail);
@@ -88,9 +90,11 @@ export function PmsClassificationsPage() {
       <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
           <h1 className="text-base font-semibold text-slate-800">Classifications</h1>
-          <Button type="button" variant="success" className="!px-3 !py-1.5 text-sm" onClick={openAdd}>
-            + Add Item
-          </Button>
+          {canCreateRecord && (
+            <Button type="button" variant="success" className="!px-3 !py-1.5 text-sm" onClick={openAdd}>
+              + Add Item
+            </Button>
+          )}
         </div>
 
         <div className="flex flex-wrap items-end gap-3 border-b border-slate-100 px-4 py-3">
@@ -196,19 +200,21 @@ export function PmsClassificationsPage() {
                     </span>
                   </td>
                   <td className="px-2 py-1.5">
-                    <div className="flex flex-wrap gap-1">
-                      <Button type="button" variant="secondary" className="!px-1.5 !py-0.5 text-xs" onClick={() => openEdit(row.id)}>
-                        Edit
-                      </Button>
-                      <Button
-                        type="button"
-                        variant={row.is_active ? "success" : "secondary"}
-                        className="!px-1.5 !py-0.5 text-xs"
-                        onClick={() => runAction(() => pmsClassificationsService.toggleStatus(row.id))}
-                      >
-                        {row.is_active ? "Inactivate" : "Activate"}
-                      </Button>
-                    </div>
+                    {row.can_edit && (
+                      <div className="flex flex-wrap gap-1">
+                        <Button type="button" variant="secondary" className="!px-1.5 !py-0.5 text-xs" onClick={() => openEdit(row.id)}>
+                          Edit
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={row.is_active ? "success" : "secondary"}
+                          className="!px-1.5 !py-0.5 text-xs"
+                          onClick={() => runAction(() => pmsClassificationsService.toggleStatus(row.id))}
+                        >
+                          {row.is_active ? "Inactivate" : "Activate"}
+                        </Button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}

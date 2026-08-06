@@ -1,7 +1,8 @@
 export interface PmsDepartmentRow {
-  id: number;
+  id: number | string;
   name: string;
   is_active: boolean;
+  can_edit: boolean;
 }
 
 export interface PmsDepartmentListResponse {
@@ -12,4 +13,5 @@ export interface PmsDepartmentListResponse {
     per_page: number;
     total: number;
   };
+  can_create_record: boolean;
 }

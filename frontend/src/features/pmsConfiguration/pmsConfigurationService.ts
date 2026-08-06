@@ -22,7 +22,7 @@ export const pmsConfigurationService = {
     return response.data.data;
   },
 
-  async update(vesselId: number, configuration: string): Promise<PmsConfigurationRow> {
+  async update(vesselId: number | string, configuration: string): Promise<PmsConfigurationRow> {
     const response = await axiosClient.put<ApiResource<PmsConfigurationRow>>(`/pms-configuration/${vesselId}`, { configuration });
     return response.data.data;
   },
