@@ -113,30 +113,15 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/sire-reports/options', [SireReportController::class, 'options']);
     Route::get('/sire-reports', [SireReportController::class, 'index']);
-    Route::post('/sire-reports', [SireReportController::class, 'store']);
     Route::get('/sire-reports/{sireReport}', [SireReportController::class, 'show']);
-    Route::put('/sire-reports/{sireReport}', [SireReportController::class, 'update']);
-    Route::delete('/sire-reports/{sireReport}', [SireReportController::class, 'destroy']);
-    Route::post('/sire-reports/{sireReport}/publish', [SireReportController::class, 'publish']);
-    Route::post('/sire-reports/{sireReport}/approve', [SireReportController::class, 'approve']);
 
     Route::get('/non-sire-reports/options', [NonSireReportController::class, 'options']);
     Route::get('/non-sire-reports', [NonSireReportController::class, 'index']);
-    Route::post('/non-sire-reports', [NonSireReportController::class, 'store']);
     Route::get('/non-sire-reports/{nonSireReport}', [NonSireReportController::class, 'show']);
-    Route::put('/non-sire-reports/{nonSireReport}', [NonSireReportController::class, 'update']);
-    Route::delete('/non-sire-reports/{nonSireReport}', [NonSireReportController::class, 'destroy']);
-    Route::post('/non-sire-reports/{nonSireReport}/publish', [NonSireReportController::class, 'publish']);
-    Route::post('/non-sire-reports/{nonSireReport}/approve', [NonSireReportController::class, 'approve']);
 
     Route::get('/flag-state-reports/options', [FlagStateReportController::class, 'options']);
     Route::get('/flag-state-reports', [FlagStateReportController::class, 'index']);
-    Route::post('/flag-state-reports', [FlagStateReportController::class, 'store']);
     Route::get('/flag-state-reports/{flagStateReport}', [FlagStateReportController::class, 'show']);
-    Route::put('/flag-state-reports/{flagStateReport}', [FlagStateReportController::class, 'update']);
-    Route::delete('/flag-state-reports/{flagStateReport}', [FlagStateReportController::class, 'destroy']);
-    Route::post('/flag-state-reports/{flagStateReport}/publish', [FlagStateReportController::class, 'publish']);
-    Route::post('/flag-state-reports/{flagStateReport}/approve', [FlagStateReportController::class, 'approve']);
 
     Route::get('/committee-meetings/options', [CommitteeMeetingController::class, 'options']);
     Route::get('/committee-meetings', [CommitteeMeetingController::class, 'index']);
@@ -164,16 +149,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/risk-assessments/options', [RiskAssessmentController::class, 'options']);
     Route::get('/risk-assessments', [RiskAssessmentController::class, 'index']);
     Route::get('/risk-assessments/{riskAssessment}', [RiskAssessmentController::class, 'show']);
-    Route::post('/risk-assessments/{riskAssessment}/approve-shore', [RiskAssessmentController::class, 'approveShore']);
-    Route::post('/risk-assessments/{riskAssessment}/approve-marine', [RiskAssessmentController::class, 'approveMarine']);
 
     Route::get('/risk-assessments-shore/options', [RiskAssessmentShoreController::class, 'options']);
     Route::get('/risk-assessments-shore', [RiskAssessmentShoreController::class, 'index']);
-    Route::post('/risk-assessments-shore', [RiskAssessmentShoreController::class, 'store']);
     Route::get('/risk-assessments-shore/{riskAssessmentShore}', [RiskAssessmentShoreController::class, 'show']);
-    Route::put('/risk-assessments-shore/{riskAssessmentShore}', [RiskAssessmentShoreController::class, 'update']);
-    Route::delete('/risk-assessments-shore/{riskAssessmentShore}', [RiskAssessmentShoreController::class, 'destroy']);
-    Route::post('/risk-assessments-shore/{riskAssessmentShore}/reopen', [RiskAssessmentShoreController::class, 'reopen']);
 
     Route::get('/kpi/psc-inspections/options', [KpiPscInspectionsController::class, 'options']);
     Route::get('/kpi/psc-inspections/summary', [KpiPscInspectionsController::class, 'summary']);

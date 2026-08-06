@@ -68,7 +68,5 @@ export interface RiskAssessmentShoreOption {
 
 export interface RiskAssessmentShoreOptions {
   vessels: RiskAssessmentShoreOption[];
-  categories: RiskAssessmentShoreOption[];
-  operations: RiskAssessmentShoreOption[];
   years: number[];
 }

@@ -1,10 +1,8 @@
 import { useEffect, useState } from "react";
 import { riskAssessmentService } from "./riskAssessmentService";
 import type { RiskAssessmentDetail, RiskAssessmentOption, RiskAssessmentRow } from "./riskAssessment";
-import { Modal } from "../../components/ui/Modal";
 import { Button } from "../../components/ui/Button";
 import { RiskAssessmentViewModal } from "./RiskAssessmentViewModal";
-import { RiskAssessmentApprovalForm } from "./RiskAssessmentApprovalForm";
 
 const PER_PAGE = 10;
 
@@ -17,7 +15,11 @@ function ApprovalBadge({ required, approved }: { required: boolean; approved: bo
   );
 }
 
-/** Ported from admin/riskassessmentvessel/risk_assessment_v.php. */
+/**
+ * Ported from admin/riskassessmentvessel/risk_assessment_v.php.
+ * Read-only: approveShore/approveMarine have no legacy write-back
+ * path — see RiskAssessmentRepository.
+ */
 export function RiskAssessmentListPage() {
   const [vessels, setVessels] = useState<RiskAssessmentOption[]>([]);
   const [years, setYears] = useState<number[]>([]);
@@ -32,10 +34,8 @@ export function RiskAssessmentListPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [reloadKey, setReloadKey] = useState(0);
 
   const [viewing, setViewing] = useState<RiskAssessmentDetail | null>(null);
-  const [editing, setEditing] = useState<RiskAssessmentDetail | null>(null);
 
   useEffect(() => {
     riskAssessmentService.options().then((data) => {
@@ -58,7 +58,7 @@ export function RiskAssessmentListPage() {
       })
       .catch(() => setError("Couldn't load Risk Assessment reports. Please try again."))
       .finally(() => setLoading(false));
-  }, [appliedVesselId, appliedYear, page, reloadKey]);
+  }, [appliedVesselId, appliedYear, page]);
 
   const applyFilter = () => {
     if (!vesselId || !year) return;
@@ -67,10 +67,7 @@ export function RiskAssessmentListPage() {
     setPage(1);
   };
 
-  const reload = () => setReloadKey((k) => k + 1);
-
   const openView = async (id: number | string) => setViewing(await riskAssessmentService.show(id));
-  const openEdit = async (id: number | string) => setEditing(await riskAssessmentService.show(id));
 
   return (
     <div className="p-6">
@@ -122,7 +119,6 @@ export function RiskAssessmentListPage() {
                   <th className="whitespace-nowrap px-2 py-1.5 font-semibold text-slate-600">TASK</th>
                   <th className="whitespace-nowrap px-2 py-1.5 font-semibold text-slate-600">APPROVED BY TECHNICAL?</th>
                   <th className="whitespace-nowrap px-2 py-1.5 font-semibold text-slate-600">APPROVED BY MARINE?</th>
-                  <th className="px-2 py-1.5 font-semibold text-slate-600">ACTIONS</th>
                 </tr>
               </thead>
               <tbody>
@@ -144,18 +140,11 @@ export function RiskAssessmentListPage() {
                     <td className="px-2 py-1.5">
                       <ApprovalBadge required={row.approval_from_marine} approved={row.marine_is_approved} />
                     </td>
-                    <td className="px-2 py-1.5">
-                      {row.can_edit && (
-                        <Button type="button" variant="secondary" className="!px-1.5 !py-0.5 text-xs" onClick={() => openEdit(row.id)}>
-                          Edit
-                        </Button>
-                      )}
-                    </td>
                   </tr>
                 ))}
                 {rows.length === 0 && !loading && !error && (
                   <tr>
-                    <td colSpan={9} className="px-2 py-6 text-center text-sm text-slate-400">
+                    <td colSpan={8} className="px-2 py-6 text-center text-sm text-slate-400">
                       No items.
                     </td>
                   </tr>
@@ -198,19 +187,6 @@ export function RiskAssessmentListPage() {
       </div>
 
       {viewing && <RiskAssessmentViewModal report={viewing} onClose={() => setViewing(null)} />}
-
-      {editing && (
-        <Modal title={`Process Approval — ${editing.report_no}`} onClose={() => setEditing(null)}>
-          <RiskAssessmentApprovalForm
-            report={editing}
-            onCancel={() => setEditing(null)}
-            onSuccess={() => {
-              setEditing(null);
-              reload();
-            }}
-          />
-        </Modal>
-      )}
     </div>
   );
 }

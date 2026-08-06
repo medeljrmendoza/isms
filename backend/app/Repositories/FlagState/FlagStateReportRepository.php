@@ -2,13 +2,8 @@
 
 namespace App\Repositories\FlagState;
 
-use App\Models\FlagState\FlagStateReport;
-use App\Models\Nonconformities\Nonconformity;
-use App\Models\Vessel;
 use App\Support\LegacyDb;
 use App\Support\TableQuery;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 
 class FlagStateReportRepository
@@ -49,65 +44,11 @@ class FlagStateReportRepository
     }
 
     /**
-     * Ported from Controllers/Dashboard_flag_state.php's loadData() —
-     * same missing-parens issue in the legacy WHERE clause as
-     * ExternalAuditReportRepository (identical structure: an OBS branch
-     * that would otherwise ignore vessel scoping and is_deleted), fixed
-     * the same way with one properly grouped OR. See that repository's
-     * docblock for the full explanation.
-     */
-    public function pendingQuery(): Builder
-    {
-        return FlagStateReport::query()
-            ->with('vessel')
-            ->where('is_deleted', false)
-            ->where(function (Builder $query) {
-                $query->where(function (Builder $shore) {
-                    $shore->where('added_by', 'SHORE')
-                        ->where('is_published', true)
-                        ->where('is_approved', false);
-                })->orWhere(function (Builder $vessel) {
-                    $vessel->where('added_by', 'VESSEL')
-                        ->where('is_approved', false);
-                })->orWhereHas('nonconformities', function (Builder $nc) {
-                    $nc->where('is_inactive', false)->whereNull('close_out_date');
-                });
-            })
-            ->withCount([
-                'nonconformities as pending_nc_count' => fn (Builder $q) => $q->where('is_inactive', false)->whereNull('close_out_date'),
-                'nonconformities as total_nc_count' => fn (Builder $q) => $q->where('is_inactive', false),
-            ]);
-    }
-
-    public function table(TableQuery $query): LengthAwarePaginator
-    {
-        $builder = $this->pendingQuery();
-
-        if ($query->search !== null) {
-            $term = "%{$query->search}%";
-            $builder->where(function (Builder $q) use ($term) {
-                $q->where('ref_no', 'like', $term)
-                    ->orWhere('dateof_inspection', 'like', $term)
-                    ->orWhereHas('vessel', fn (Builder $v) => $v->where('name', 'like', $term));
-            });
-        }
-
-        $sortable = array_column(array_filter(self::COLUMNS, fn ($c) => $c['sortable']), 'key');
-        $sortMap = ['date' => 'dateof_inspection'];
-        $sort = in_array($query->sort, $sortable, true) ? ($sortMap[$query->sort] ?? $query->sort) : 'dateof_inspection';
-
-        return $builder->orderBy($sort, $query->direction)
-            ->paginate($query->perPage, page: $query->page);
-    }
-
-    /**
      * Ported from Controllers/Dashboard_flag_state.php's loadData():
      * visible when (still needs approval) OR (has a pending NC) OR (has
      * a pending observation), scoped to the logged-in user's assigned
-     * vessels. Unlike the local `pendingQuery()`, the real legacy DB has
-     * real tb_nonconformities/tb_observations tables, so all three
-     * branches (and the real "pending/total" counts for both NC and
-     * OBS) are implemented here, not just the approval-pending branch.
+     * vessels. Same missing-parens fix as ExternalAuditReportRepository
+     * — see its docblock for the full explanation.
      */
     public function legacyTable(TableQuery $query, ?string $legacyUserId): array
     {
@@ -193,46 +134,9 @@ class FlagStateReportRepository
     }
 
     /**
-     * Ported from Controllers/Flag_state.php's loadData(). The
-     * `WHERE vesID IN (SELECT ... tb_user_vessel)` scoping is dropped
-     * like everywhere else; the vessel filter is kept since it's a
-     * genuine user-facing filter.
-     */
-    public function fullTable(TableQuery $query, ?string $vesselId): LengthAwarePaginator
-    {
-        $builder = FlagStateReport::query()->with('vessel')
-            ->where('is_deleted', false)
-            ->withCount([
-                'nonconformities as pending_nc_count' => fn (Builder $q) => $q->where('is_inactive', false)->whereNull('close_out_date'),
-                'nonconformities as total_nc_count' => fn (Builder $q) => $q->where('is_inactive', false),
-            ]);
-
-        if ($vesselId !== null && $vesselId !== '' && $vesselId !== 'ALL') {
-            $builder->where('vessel_id', $vesselId);
-        }
-
-        if ($query->search !== null) {
-            $term = "%{$query->search}%";
-            $builder->where(function (Builder $q) use ($term) {
-                $q->where('ref_no', 'like', $term)
-                    ->orWhere('dateof_inspection', 'like', $term)
-                    ->orWhere('inspector', 'like', $term)
-                    ->orWhere('placeof_inspection', 'like', $term)
-                    ->orWhereHas('vessel', fn (Builder $v) => $v->where('name', 'like', $term));
-            });
-        }
-
-        $sortable = array_column(array_filter(self::MODULE_COLUMNS, fn ($c) => $c['sortable']), 'key');
-        $sort = in_array($query->sort, $sortable, true) ? $query->sort : 'dateof_inspection';
-
-        return $builder->orderBy($sort, $query->direction)
-            ->paginate($query->perPage, page: $query->page);
-    }
-
-    /**
-     * Same as fullTable(), reading tb_flag_state directly from the
-     * legacy connection. Keeps the vesID-in-assigned-vessels scoping
-     * fullTable() drops (see its docblock). Read-only: can_edit/
+     * Ported from Controllers/Flag_state.php's loadData(), reading
+     * tb_flag_state directly from the legacy connection, scoped to the
+     * logged-in user's assigned vessels. Read-only: can_edit/
      * can_publish/can_approve/can_delete are always false.
      */
     public function legacyFullTable(TableQuery $query, ?string $vesselId, ?string $legacyUserId): array
@@ -309,132 +213,7 @@ class FlagStateReportRepository
         ];
     }
 
-    /**
-     * Ported from add_flag_state_report()'s insert branch: new records
-     * are always SHORE-added (there's no VESSEL-origin path reachable
-     * from this admin) and start unpublished/unapproved.
-     */
-    public function create(array $data): FlagStateReport
-    {
-        return FlagStateReport::create([
-            ...$data,
-            'added_by' => 'SHORE',
-            'is_published' => false,
-            'is_approved' => false,
-            'is_deleted' => false,
-        ]);
-    }
-
-    /**
-     * Ported from add_flag_state_report()'s edit branch. Vessel and
-     * added_by are frozen at creation time (legacy always re-reads them
-     * from the existing row). is_published is left untouched — only the
-     * separate publish toggle changes it — but is_approved
-     * unconditionally resets to false on every save, published or not
-     * (legacy hardcodes `"is_approved" => "0"` regardless of branch,
-     * same as External Audits/SIRE/Non-SIRE). Legacy also has no ref_no
-     * rename cascade into Nonconformities here — add_flag_state_report()
-     * has no such UPDATE statement, matching External Audits.
-     */
-    public function update(FlagStateReport $report, array $data): FlagStateReport
-    {
-        unset($data['vessel_id']);
-
-        $report->update([...$data, 'is_approved' => false]);
-
-        return $report;
-    }
-
-    /**
-     * Ported from publish_flag_state_report(): toggles is_published,
-     * always sets is_approved true. Unlike External Audits' migrated
-     * equivalent, this also cascades onto every currently-linked
-     * Nonconformity row (matched by source_of_nc_ref_no, no is_inactive
-     * filter — legacy's own SELECT has none): publishing/unpublishing
-     * the parent report force-syncs each NC's is_published to match and
-     * force-approves it. This is a real legacy behavior (nc_data resave
-     * inside publish_flag_state_report()), not just the S3-file-sync
-     * side effect it's bundled with — confirmed identical in
-     * Controllers/External.php, where the migrated repository is
-     * missing it (flagged separately for a follow-up fix).
-     */
-    public function publish(FlagStateReport $report): FlagStateReport
-    {
-        $report->update([
-            'is_published' => ! $report->is_published,
-            'is_approved' => true,
-        ]);
-
-        Nonconformity::where('source_of_nc_ref_no', $report->ref_no)
-            ->update(['is_published' => $report->is_published, 'is_approved' => true]);
-
-        return $report;
-    }
-
-    /**
-     * Ported from approve_flag_state_report(): sets is_approved true,
-     * and — same as publish() above — force-approves every currently
-     * linked Nonconformity row (is_published on those rows is left
-     * untouched, matching legacy's `"is_published" => $key->is_published`).
-     */
-    public function approve(FlagStateReport $report): FlagStateReport
-    {
-        $report->update(['is_approved' => true]);
-
-        Nonconformity::where('source_of_nc_ref_no', $report->ref_no)
-            ->update(['is_approved' => true]);
-
-        return $report;
-    }
-
-    /**
-     * Ported from delete_flag_state_report(): soft delete, plus cascades
-     * deactivating any Nonconformity rows linked by this report's ref.
-     */
-    public function delete(FlagStateReport $report): void
-    {
-        $report->update(['is_deleted' => true]);
-
-        Nonconformity::where('source_of_nc_ref_no', $report->ref_no)->update(['is_inactive' => true]);
-    }
-
-    /**
-     * Ported from admin/flag_state/view_flag_state.php, surfaced via
-     * the dashboard's clickable ref_no column. Read-only — see
-     * SireReportRepository::detail()'s docblock for the convention.
-     */
-    public function detail(int $id): ?array
-    {
-        $r = FlagStateReport::query()->with('vessel')
-            ->withCount([
-                'nonconformities as pending_nc_count' => fn (Builder $q) => $q->where('is_inactive', false)->whereNull('close_out_date'),
-                'nonconformities as total_nc_count' => fn (Builder $q) => $q->where('is_inactive', false),
-            ])
-            ->find($id);
-
-        if ($r === null) {
-            return null;
-        }
-
-        return $this->toDetailArray([
-            'id' => $r->id,
-            'ref_no' => $r->ref_no,
-            'vessel' => $r->vessel?->display_name ?? '',
-            'added_by' => $r->added_by,
-            'dateof_inspection' => $r->dateof_inspection->format('Y-m-d'),
-            'placeof_inspection' => $r->placeof_inspection,
-            'inspector' => $r->inspector,
-            'published' => $r->added_by === 'SHORE' ? $r->is_published : null,
-            'is_approved' => $r->is_published ? $r->is_approved : null,
-            'pending_nc_count' => $r->pending_nc_count ?? 0,
-            'total_nc_count' => $r->total_nc_count ?? 0,
-            'flag_cost' => $r->flag_cost,
-            'shore_remarks' => $r->shore_remarks,
-            'vessel_remarks' => $r->vessel_remarks,
-        ]);
-    }
-
-    /** Same as detail(), reading tb_flag_state directly from the legacy connection. */
+    /** Ported from admin/flag_state/view_flag_state.php, reading tb_flag_state directly from the legacy connection. */
     public function legacyDetail(string $flagID): ?array
     {
         $r = DB::connection('legacy')->table('tb_flag_state')->where('flagID', $flagID)->first();
@@ -498,14 +277,6 @@ class FlagStateReportRepository
             'shore_remarks' => $r['shore_remarks'],
             'vessel_remarks' => $r['vessel_remarks'],
         ];
-    }
-
-    /** @return array<int, array{id:int,label:string}> */
-    public function vesselOptions(): array
-    {
-        return Vessel::query()->orderBy('name')->get()
-            ->map(fn (Vessel $v) => ['id' => $v->id, 'label' => $v->display_name])
-            ->all();
     }
 
     /** @return array<int, array{id:string,label:string}> */

@@ -1,7 +1,6 @@
 import { axiosClient } from "../../api/axiosClient";
 import type { ApiResource } from "../auth/auth";
 import type {
-  RiskAssessmentApprovalPayload,
   RiskAssessmentDetail,
   RiskAssessmentOptions,
   RiskAssessmentRow,
@@ -23,6 +22,7 @@ export interface RiskAssessmentListResponse {
   meta: { current_page: number; last_page: number; per_page: number; total: number } | null;
 }
 
+/** Read-only: approveShore/approveMarine have no legacy write-back path — see RiskAssessmentListPage. */
 export const riskAssessmentService = {
   async options(): Promise<RiskAssessmentOptions> {
     const response = await axiosClient.get<ApiResource<RiskAssessmentOptions>>("/risk-assessments/options");
@@ -36,16 +36,6 @@ export const riskAssessmentService = {
 
   async show(id: number | string): Promise<RiskAssessmentDetail> {
     const response = await axiosClient.get<ApiResource<RiskAssessmentDetail>>(`/risk-assessments/${id}`);
-    return response.data.data;
-  },
-
-  async approveShore(id: number, payload: RiskAssessmentApprovalPayload): Promise<RiskAssessmentDetail> {
-    const response = await axiosClient.post<ApiResource<RiskAssessmentDetail>>(`/risk-assessments/${id}/approve-shore`, payload);
-    return response.data.data;
-  },
-
-  async approveMarine(id: number, payload: RiskAssessmentApprovalPayload): Promise<RiskAssessmentDetail> {
-    const response = await axiosClient.post<ApiResource<RiskAssessmentDetail>>(`/risk-assessments/${id}/approve-marine`, payload);
     return response.data.data;
   },
 };

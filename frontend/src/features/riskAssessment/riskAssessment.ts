@@ -67,9 +67,3 @@ export interface RiskAssessmentOptions {
   vessels: RiskAssessmentOption[];
   years: number[];
 }
-
-export interface RiskAssessmentApprovalPayload {
-  approved: boolean;
-  date_approved?: string | null;
-  remarks?: string | null;
-}

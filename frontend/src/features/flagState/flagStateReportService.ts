@@ -5,7 +5,6 @@ import type {
   FlagStateReportListResponse,
   FlagStateReportOptions,
 } from "./flagState";
-import type { FlagStateReportFormValues } from "./flagStateReportSchema";
 
 export interface FlagStateReportListParams {
   page: number;
@@ -16,6 +15,7 @@ export interface FlagStateReportListParams {
   vessel_id?: string;
 }
 
+/** Read-only: Add/Edit/Publish/Approve/Delete have no legacy write-back path — see FlagStateReportsPage. */
 export const flagStateReportService = {
   async list(params: FlagStateReportListParams): Promise<FlagStateReportListResponse> {
     const response = await axiosClient.get<ApiResource<FlagStateReportListResponse>>("/flag-state-reports", { params });
@@ -29,30 +29,6 @@ export const flagStateReportService = {
 
   async show(id: number | string): Promise<FlagStateReportDetail> {
     const response = await axiosClient.get<ApiResource<FlagStateReportDetail>>(`/flag-state-reports/${id}`);
-    return response.data.data;
-  },
-
-  async create(values: FlagStateReportFormValues): Promise<FlagStateReportDetail> {
-    const response = await axiosClient.post<ApiResource<FlagStateReportDetail>>("/flag-state-reports", values);
-    return response.data.data;
-  },
-
-  async update(id: number, values: FlagStateReportFormValues): Promise<FlagStateReportDetail> {
-    const response = await axiosClient.put<ApiResource<FlagStateReportDetail>>(`/flag-state-reports/${id}`, values);
-    return response.data.data;
-  },
-
-  async destroy(id: number): Promise<void> {
-    await axiosClient.delete(`/flag-state-reports/${id}`);
-  },
-
-  async publish(id: number): Promise<FlagStateReportDetail> {
-    const response = await axiosClient.post<ApiResource<FlagStateReportDetail>>(`/flag-state-reports/${id}/publish`);
-    return response.data.data;
-  },
-
-  async approve(id: number): Promise<FlagStateReportDetail> {
-    const response = await axiosClient.post<ApiResource<FlagStateReportDetail>>(`/flag-state-reports/${id}/approve`);
     return response.data.data;
   },
 };

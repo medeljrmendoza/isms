@@ -2,8 +2,6 @@ import { useEffect, useState } from "react";
 import { sireReportService } from "./sireReportService";
 import type { SireReportDetail, SireReportOption, SireReportRow } from "./sire";
 import { Button } from "../../components/ui/Button";
-import { Modal } from "../../components/ui/Modal";
-import { SireReportForm } from "./SireReportForm";
 import { SireReportViewModal } from "./SireReportViewModal";
 
 const PER_PAGE = 10;
@@ -25,6 +23,7 @@ function FlagIcon({ value }: { value: boolean | null }) {
   return value ? <span className="text-green-600">✓</span> : <span className="text-red-500">✕</span>;
 }
 
+/** Read-only: Add/Edit/Publish/Approve/Delete have no legacy write-back path — see SireReportRepository. */
 export function SireReportsPage() {
   const [vessels, setVessels] = useState<SireReportOption[]>([]);
   const [vesselId, setVesselId] = useState("ALL");
@@ -40,12 +39,8 @@ export function SireReportsPage() {
   const [direction, setDirection] = useState<"asc" | "desc">("desc");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [reloadKey, setReloadKey] = useState(0);
 
-  const [formOpen, setFormOpen] = useState(false);
-  const [editing, setEditing] = useState<SireReportDetail | null>(null);
   const [viewing, setViewing] = useState<SireReportDetail | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
     sireReportService.options().then((data) => {
@@ -91,7 +86,7 @@ export function SireReportsPage() {
     return () => {
       isMounted = false;
     };
-  }, [page, search, sort, direction, appliedVesselId, reloadKey]);
+  }, [page, search, sort, direction, appliedVesselId]);
 
   const handleSort = (columnKey: string) => {
     if (sort === columnKey) {
@@ -114,29 +109,9 @@ export function SireReportsPage() {
     setPage(1);
   };
 
-  const reload = () => setReloadKey((k) => k + 1);
-
   const openView = async (id: number | string) => {
-    setActionError(null);
     const detail = await sireReportService.show(id);
     setViewing(detail);
-  };
-
-  const openEdit = async (id: number | string) => {
-    setActionError(null);
-    const detail = await sireReportService.show(id);
-    setEditing(detail);
-    setFormOpen(true);
-  };
-
-  const runAction = async (action: () => Promise<unknown>) => {
-    setActionError(null);
-    try {
-      await action();
-      reload();
-    } catch {
-      setActionError("Action failed. Please try again.");
-    }
   };
 
   return (
@@ -144,17 +119,6 @@ export function SireReportsPage() {
       <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
           <h1 className="text-base font-semibold text-slate-800">SIRE</h1>
-          <Button
-            type="button"
-            variant="success"
-            className="!px-3 !py-1.5 text-sm"
-            onClick={() => {
-              setEditing(null);
-              setFormOpen(true);
-            }}
-          >
-            + Add Report
-          </Button>
         </div>
 
         <div className="flex flex-wrap items-end gap-3 border-b border-slate-100 px-4 py-3">
@@ -192,8 +156,6 @@ export function SireReportsPage() {
           </div>
         </div>
 
-        {actionError && <p className="px-4 pt-2 text-sm text-red-600">{actionError}</p>}
-
         <div className="overflow-x-auto px-4 py-3">
           <table className="w-full text-left text-sm">
             <thead>
@@ -210,7 +172,6 @@ export function SireReportsPage() {
                     {sort === column.key && (direction === "asc" ? " ▲" : " ▼")}
                   </th>
                 ))}
-                <th className="px-2 py-1.5 font-semibold text-slate-600">ACTIONS</th>
               </tr>
             </thead>
             <tbody>
@@ -233,57 +194,11 @@ export function SireReportsPage() {
                   <td className="px-2 py-1.5 text-center">
                     <FlagIcon value={row.is_approved} />
                   </td>
-                  <td className="px-2 py-1.5">
-                    <div className="flex flex-wrap gap-1">
-                      {row.can_edit && (
-                        <Button type="button" variant="secondary" className="!px-1.5 !py-0.5 text-xs" onClick={() => openEdit(row.id)}>
-                          Edit
-                        </Button>
-                      )}
-                      {row.can_publish && (
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          className="!px-1.5 !py-0.5 text-xs"
-                          // row.id is always numeric here: can_publish is only true for local rows.
-                          onClick={() => runAction(() => sireReportService.publish(row.id as number))}
-                        >
-                          {row.published ? "Unpublish" : "Publish"}
-                        </Button>
-                      )}
-                      {row.can_approve && (
-                        <Button
-                          type="button"
-                          variant="success"
-                          className="!px-1.5 !py-0.5 text-xs"
-                          // row.id is always numeric here: can_approve is only true for local rows.
-                          onClick={() => runAction(() => sireReportService.approve(row.id as number))}
-                        >
-                          Approve
-                        </Button>
-                      )}
-                      {row.can_delete && (
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          className="!px-1.5 !py-0.5 text-xs text-red-600"
-                          onClick={() => {
-                            if (window.confirm(`Delete this report for ${row.vessel}?`)) {
-                              // row.id is always numeric here: can_delete is only true for local rows.
-                              runAction(() => sireReportService.destroy(row.id as number));
-                            }
-                          }}
-                        >
-                          Delete
-                        </Button>
-                      )}
-                    </div>
-                  </td>
                 </tr>
               ))}
               {rows.length === 0 && !loading && !error && (
                 <tr>
-                  <td colSpan={MODULE_COLUMNS.length + 1} className="px-2 py-6 text-center text-sm text-slate-400">
+                  <td colSpan={MODULE_COLUMNS.length} className="px-2 py-6 text-center text-sm text-slate-400">
                     No items.
                   </td>
                 </tr>
@@ -327,19 +242,6 @@ export function SireReportsPage() {
           </div>
         </div>
       </div>
-
-      {formOpen && (
-        <Modal title={editing ? `Edit Report — ${editing.vessel}` : "Add SIRE Report"} onClose={() => setFormOpen(false)}>
-          <SireReportForm
-            sireReport={editing ?? undefined}
-            onCancel={() => setFormOpen(false)}
-            onSuccess={() => {
-              setFormOpen(false);
-              reload();
-            }}
-          />
-        </Modal>
-      )}
 
       {viewing && <SireReportViewModal sireReport={viewing} onClose={() => setViewing(null)} />}
     </div>
