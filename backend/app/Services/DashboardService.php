@@ -25,6 +25,7 @@ use App\Repositories\RiskAssessment\RiskAssessmentRepository;
 use App\Repositories\Sire\SireReportRepository;
 use App\Repositories\Tasks\TaskRepository;
 use App\Repositories\VesselDocumentation\VesselDocumentationRepository;
+use App\Repositories\VesselExports\VesselExportRepository;
 
 /**
  * TEMPORARY: most dashlets below still return hand-written placeholder
@@ -65,6 +66,7 @@ class DashboardService
                 $this->item('New SMS manual revision published', 'Rev. 14'),
             ]),
             $this->table('assigned_task', 'Assigned Task', '/dashboard/assigned-tasks', TaskRepository::columns(), extraAction: 'add_task'),
+            $this->table('export_import', 'Export / Import', '/dashboard/vessel-exports', VesselExportRepository::columns(), extraAction: 'export_import'),
             $this->table('nonconformities', 'Non Conformities - In Progress / For Approval', '/dashboard/nonconformities', NonconformityRepository::columns()),
             $this->table('incident', 'Incident Report / HOR - In Progress', '/dashboard/incident-reports', IncidentReportRepository::columns()),
             $this->table('company_inspections', 'Company Inspections - Pending', '/dashboard/company-inspections', AuditReportRepository::columns()),

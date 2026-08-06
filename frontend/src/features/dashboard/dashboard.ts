@@ -14,7 +14,7 @@ export interface Dashlet {
   title: string;
   span: "full" | "half";
   manual_load: boolean;
-  extra_action: "add_task" | null;
+  extra_action: "add_task" | "export_import" | null;
   items: DashletItem[];
   /** Present only for dashlets backed by a real, paginated table endpoint. */
   columns: DashletColumn[] | null;

@@ -154,6 +154,28 @@ export function DashletCard({ dashlet }: { dashlet: Dashlet }) {
               + Add Task
             </Button>
           )}
+          {dashlet.extra_action === "export_import" && (
+            <>
+              <Button
+                type="button"
+                variant="success"
+                className="!px-2 !py-1 text-xs"
+                disabled
+                title="Not available in this migration — depends on the vessel-side sync application, which has no counterpart here"
+              >
+                Export
+              </Button>
+              <Button
+                type="button"
+                variant="success"
+                className="!px-2 !py-1 text-xs"
+                disabled
+                title="Not available in this migration — depends on the vessel-side sync application, which has no counterpart here"
+              >
+                Import
+              </Button>
+            </>
+          )}
           {loaded && (
             <Button
               type="button"

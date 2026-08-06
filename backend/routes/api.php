@@ -52,6 +52,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/dashboard/claims/{id}', [DashboardController::class, 'claimDetail']);
     Route::get('/dashboard/exposure-hours', [DashboardController::class, 'exposureHoursTable']);
     Route::get('/dashboard/assigned-tasks', [DashboardController::class, 'assignedTasksTable']);
+    Route::get('/dashboard/vessel-exports', [DashboardController::class, 'vesselExportsTable']);
     Route::get('/dashboard/incident-reports', [DashboardController::class, 'incidentReportsTable']);
     Route::get('/dashboard/incident-reports/{id}', [DashboardController::class, 'incidentReportDetail']);
     Route::get('/dashboard/company-inspections', [DashboardController::class, 'companyInspectionsTable']);

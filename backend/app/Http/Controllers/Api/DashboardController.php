@@ -22,6 +22,7 @@ use App\Models\RiskAssessment\RiskAssessment;
 use App\Models\Sire\SireReport;
 use App\Models\Tasks\Task;
 use App\Models\Vessel;
+use App\Models\VesselExports\VesselExport;
 use App\Repositories\Claims\ClaimRepository;
 use App\Repositories\CommitteeMeetings\CommitteeMeetingRepository;
 use App\Repositories\CompanyDocumentation\CompanyDocumentationRepository;
@@ -46,6 +47,7 @@ use App\Repositories\RiskAssessment\RiskAssessmentRepository;
 use App\Repositories\Sire\SireReportRepository;
 use App\Repositories\Tasks\TaskRepository;
 use App\Repositories\VesselDocumentation\VesselDocumentationRepository;
+use App\Repositories\VesselExports\VesselExportRepository;
 use App\Services\DashboardService;
 use App\Support\LegacyDb;
 use App\Support\TableQuery;
@@ -81,6 +83,7 @@ class DashboardController extends Controller
         private readonly SmsVersionMonitoringRepository $smsVersionMonitoring,
         private readonly VesselDocumentationRepository $vesselDocumentation,
         private readonly PendingItemsRepository $pendingItems,
+        private readonly VesselExportRepository $vesselExports,
     ) {}
 
     /**
@@ -237,6 +240,28 @@ class DashboardController extends Controller
                 'due_date' => $task->due_date->format('Y-m-d'),
                 'priority' => $task->priority,
                 'task_status' => $task->task_status,
+            ];
+        });
+    }
+
+    /**
+     * GET /api/dashboard/vessel-exports
+     */
+    public function vesselExportsTable(Request $request): JsonResponse
+    {
+        if (LegacyDb::isConfigured()) {
+            $result = $this->vesselExports->legacyTable(TableQuery::fromRequest($request));
+
+            return response()->json(['data' => ['columns' => VesselExportRepository::columns(), ...$result]]);
+        }
+
+        $paginator = $this->vesselExports->table(TableQuery::fromRequest($request));
+
+        return $this->tableResponse($paginator, VesselExportRepository::columns(), function (VesselExport $export) {
+            return [
+                'vessel_file' => substr($export->vessel_file, 0, 19),
+                'date_of_export' => $export->date_of_export->format('Y-m-d'),
+                'status' => $export->status ? 'Synced' : 'Pending',
             ];
         });
     }
