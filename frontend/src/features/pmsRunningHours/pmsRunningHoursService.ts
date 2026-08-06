@@ -1,6 +1,6 @@
 import { axiosClient } from "../../api/axiosClient";
 import type { ApiResource } from "../auth/auth";
-import type { PmsRunningHoursOptions, PmsRunningHoursResponse } from "./pmsRunningHours";
+import type { PmsRunningHoursOptions, PmsRunningHoursPartsResponse, PmsRunningHoursResponse } from "./pmsRunningHours";
 
 export const pmsRunningHoursService = {
   async options(): Promise<PmsRunningHoursOptions> {
@@ -15,11 +15,15 @@ export const pmsRunningHoursService = {
     return response.data.data;
   },
 
-  async update(values: { equipment_id: number | string; date: string; hours: number; remarks?: string }): Promise<void> {
-    await axiosClient.post("/pms-running-hours/update", values);
-  },
-
-  async proceedNextMonth(vesselId: number | string): Promise<void> {
-    await axiosClient.post("/pms-running-hours/proceed-next-month", { vessel_id: vesselId });
+  async parts(
+    vesselId: number | string,
+    equipmentId: number | string,
+    month?: number,
+    year?: number,
+  ): Promise<PmsRunningHoursPartsResponse> {
+    const response = await axiosClient.get<ApiResource<PmsRunningHoursPartsResponse>>("/pms-running-hours/parts", {
+      params: { vessel_id: vesselId, equipment_id: equipmentId, month, year },
+    });
+    return response.data.data;
   },
 };

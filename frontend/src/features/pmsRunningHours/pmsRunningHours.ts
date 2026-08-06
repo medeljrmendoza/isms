@@ -28,3 +28,21 @@ export interface PmsRunningHoursResponse {
   period_options: PmsRunningHoursPeriod[];
   rows: PmsRunningHoursRow[];
 }
+
+export interface PmsRunningHoursPartRow {
+  part_id: string;
+  part_code: string;
+  part_name: string;
+  since_delivery: number;
+  since_last_activity: number;
+  date_last_activity: string | null;
+  date_last_reset: string | null;
+  daily_hours: Record<string, number>;
+}
+
+export interface PmsRunningHoursPartsResponse {
+  current_period: PmsRunningHoursPeriod | null;
+  equipment_code: string | null;
+  equipment_name: string | null;
+  rows: PmsRunningHoursPartRow[];
+}

@@ -56,6 +56,36 @@ class PmsRunningHoursController extends Controller
     }
 
     /**
+     * GET /api/pms-running-hours/parts?vessel_id=&equipment_id=&month=&year=
+     *
+     * Legacy-only, matching the local Eloquent port's documented scope
+     * (parts are never given their own drill-down page there).
+     */
+    public function parts(Request $request): JsonResponse
+    {
+        abort_unless(LegacyDb::isConfigured(), 404);
+
+        $month = $this->intOrNull($request->query('month'));
+        $year = $this->intOrNull($request->query('year'));
+
+        $result = $this->runningHours->legacyPartsTable(
+            (string) $request->query('vessel_id'),
+            (string) $request->query('equipment_id'),
+            $month,
+            $year,
+        );
+
+        return response()->json([
+            'data' => [
+                'current_period' => $this->runningHours->legacyCurrentPeriod((string) $request->query('vessel_id')),
+                'equipment_code' => $result['equipment_code'],
+                'equipment_name' => $result['equipment_name'],
+                'rows' => $result['rows'],
+            ],
+        ]);
+    }
+
+    /**
      * POST /api/pms-running-hours/update
      */
     public function update(PmsRunningHoursUpdateRequest $request): JsonResponse

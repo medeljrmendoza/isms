@@ -393,7 +393,17 @@ class PmsRunningHoursRepository
             ->values()->all();
     }
 
-    /** Ported from loadData(), reading tb_pms_running_hours_equipment(_details[_history]) directly from the legacy connection. */
+    /**
+     * Ported from loadData(), reading tb_pms_running_hours_equipment(_details[_history])
+     * directly from the legacy connection. The current-period branch joins
+     * the detail row on rhequipID exactly like legacy's own query does —
+     * not equipmentID, which would be the more "correct" key. A handful of
+     * detail rows have a blank rhequipID (dirty data), and legacy's real
+     * loadData() renders those components entirely blank (no totals, no
+     * Update button) despite real accumulated hours sitting in the row.
+     * Matching that exactly, rather than equipmentID-joining around it,
+     * keeps this port's numbers identical to what legacy actually shows.
+     */
     public function legacyTable(string $vesselId, ?int $month, ?int $year): array
     {
         $legacy = DB::connection('legacy');
@@ -405,7 +415,7 @@ class PmsRunningHoursRepository
         $tracked = $legacy->table('tb_pms_running_hours_equipment as rhe')
             ->leftJoin('tb_pms_equipment as e', 'e.equipmentID', '=', 'rhe.equipmentID')
             ->where('rhe.vesID', $vesselId)->where('rhe.status', 1)
-            ->select(['rhe.equipmentID', 'rhe.update_by_component', 'e.equipment_code', 'e.equipment_name'])
+            ->select(['rhe.rhequipID', 'rhe.equipmentID', 'rhe.update_by_component', 'e.equipment_code', 'e.equipment_name'])
             ->get()
             ->sortBy('equipment_code');
 
@@ -415,7 +425,7 @@ class PmsRunningHoursRepository
             $detail = null;
             if ($tracksAtComponentLevel) {
                 $detail = $isCurrent
-                    ? $legacy->table('tb_pms_running_hours_equipment_details')->where('equipmentID', $rhe->equipmentID)->first()
+                    ? $legacy->table('tb_pms_running_hours_equipment_details')->where('rhequipID', $rhe->rhequipID)->first()
                     : $legacy->table('tb_pms_running_hours_equipment_details_history')
                         ->where('equipmentID', $rhe->equipmentID)->where('month', $targetMonth)->where('year', $targetYear)->where('is_reset', 0)
                         ->first();
@@ -436,11 +446,73 @@ class PmsRunningHoursRepository
                 'equipment_code' => $rhe->equipment_code,
                 'equipment_name' => $rhe->equipment_name,
                 'update_by_component' => $tracksAtComponentLevel,
-                'since_delivery' => $tracksAtComponentLevel ? (float) ($detail->trh_since_delivery ?? 0) : null,
-                'monthly_rh' => $tracksAtComponentLevel ? (float) ($detail->monthly_rh ?? 0) : null,
+                'since_delivery' => $detail !== null ? (float) $detail->trh_since_delivery : null,
+                'monthly_rh' => $detail !== null ? (float) $detail->monthly_rh : null,
                 'daily_hours' => $dailyHours,
             ];
         })->values()->all();
+    }
+
+    /**
+     * Ported from the "View Parts" drill-down (pms_running_hours_parts).
+     * Unlike the equipment-level table, the parts link (tb_pms_running_hours)
+     * and its detail rows share a reliable eID FK, so there's no join-miss
+     * quirk to replicate here — parts render correctly even for equipment
+     * whose own row is blanked out by the rhequipID bug above.
+     */
+    public function legacyPartsTable(string $vesselId, string $equipmentId, ?int $month, ?int $year): array
+    {
+        $legacy = DB::connection('legacy');
+        $current = $this->legacyCurrentPeriod($vesselId);
+        $targetMonth = $month ?? $current['month'] ?? null;
+        $targetYear = $year ?? $current['year'] ?? null;
+        $isCurrent = $current && $targetMonth === $current['month'] && $targetYear === $current['year'];
+
+        $zeroDateToNull = fn (?string $date) => ($date === null || $date === '0000-00-00') ? null : $date;
+
+        $equipment = $legacy->table('tb_pms_equipment')->where('equipmentID', $equipmentId)->first(['equipment_code', 'equipment_name']);
+
+        $links = $legacy->table('tb_pms_running_hours as rh')
+            ->leftJoin('tb_pms_parts as p', 'p.partsID', '=', 'rh.partsID')
+            ->where('rh.vesID', $vesselId)->where('rh.equipmentID', $equipmentId)->where('rh.status', 1)
+            ->select(['rh.eID', 'rh.partsID', 'p.part_code', 'p.part_name'])
+            ->get()
+            ->sortBy('part_code');
+
+        $rows = $links->map(function ($link) use ($legacy, $isCurrent, $targetMonth, $targetYear, $zeroDateToNull) {
+            $detail = $isCurrent
+                ? $legacy->table('tb_pms_running_hours_details')->where('eID', $link->eID)->first()
+                : $legacy->table('tb_pms_running_hours_details_history')
+                    ->where('eID', $link->eID)->where('month', $targetMonth)->where('year', $targetYear)->where('is_reset', 0)
+                    ->first();
+
+            $dailyHours = [];
+            if ($detail !== null) {
+                foreach (self::DAY_COLUMNS as $i => $col) {
+                    $value = (float) $detail->{$col};
+                    if ($value !== 0.0) {
+                        $dailyHours[(string) ($i + 1)] = $value;
+                    }
+                }
+            }
+
+            return [
+                'part_id' => $link->partsID,
+                'part_code' => $link->part_code,
+                'part_name' => $link->part_name,
+                'since_delivery' => (float) ($detail->trh_since_delivery ?? 0),
+                'since_last_activity' => (float) ($detail->trh_since_last_overhaul ?? 0),
+                'date_last_activity' => $zeroDateToNull($detail->date_last_overhauled ?? null),
+                'date_last_reset' => $zeroDateToNull($detail->date_last_reset ?? null),
+                'daily_hours' => $dailyHours,
+            ];
+        })->values()->all();
+
+        return [
+            'equipment_code' => $equipment->equipment_code ?? null,
+            'equipment_name' => $equipment->equipment_name ?? null,
+            'rows' => $rows,
+        ];
     }
 
     /** Ported from update_running_hours(). */

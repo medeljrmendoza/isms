@@ -272,6 +272,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/master-review/{masterReview}', [MasterReviewController::class, 'destroy']);
 
     Route::get('/pms-running-hours/options', [PmsRunningHoursController::class, 'options']);
+    Route::get('/pms-running-hours/parts', [PmsRunningHoursController::class, 'parts']);
     Route::get('/pms-running-hours', [PmsRunningHoursController::class, 'index']);
     Route::post('/pms-running-hours/update', [PmsRunningHoursController::class, 'update']);
     Route::post('/pms-running-hours/proceed-next-month', [PmsRunningHoursController::class, 'proceedNextMonth']);

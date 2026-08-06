@@ -34,6 +34,7 @@ import { RevisionHistoryPage } from "./features/revisionHistory/RevisionHistoryP
 import { IspsReviewPage } from "./features/ispsReview/IspsReviewPage";
 import { ManualsPage } from "./features/manuals/ManualsPage";
 import { PmsRunningHoursPage } from "./features/pmsRunningHours/PmsRunningHoursPage";
+import { PmsRunningHoursPartsPage } from "./features/pmsRunningHours/PmsRunningHoursPartsPage";
 import { DefectsPage } from "./features/defects/DefectsPage";
 import { PmsActivitiesPage } from "./features/pmsActivities/PmsActivitiesPage";
 import { PmsDoneActivitiesPage } from "./features/pmsDoneActivities/PmsDoneActivitiesPage";
@@ -90,6 +91,7 @@ export default function App() {
               <Route path="/isps_review" element={<IspsReviewPage />} />
               <Route path="/sms" element={<ManualsPage />} />
               <Route path="/pms_running_hours_equipments" element={<PmsRunningHoursPage />} />
+              <Route path="/pms_running_hours_equipments/:vesselId/parts/:equipmentId" element={<PmsRunningHoursPartsPage />} />
               <Route path="/defect_list" element={<DefectsPage />} />
               <Route path="/pms_activities" element={<PmsActivitiesPage />} />
               <Route path="/pms_work_plan" element={<PmsWorkPlanPage />} />
