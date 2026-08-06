@@ -74,5 +74,4 @@ export interface ExposureHoursOption {
 
 export interface ExposureHoursOptions {
   vessels: ExposureHoursOption[];
-  can_create_record: boolean;
 }

@@ -131,15 +131,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/drill-lists/calendar', [DrillReportController::class, 'calendar']);
     Route::get('/drill-reports', [DrillReportController::class, 'cell']);
     Route::get('/drill-reports/{drillReport}', [DrillReportController::class, 'show']);
-    Route::put('/drill-reports/{drillReport}', [DrillReportController::class, 'update']);
 
     Route::get('/exposure-hours/options', [ExposureHoursController::class, 'options']);
     Route::get('/exposure-hours/summary', [ExposureHoursController::class, 'summary']);
     Route::get('/exposure-hours-records', [ExposureHoursController::class, 'index']);
-    Route::post('/exposure-hours-records', [ExposureHoursController::class, 'store']);
     Route::get('/exposure-hours-records/{exposureHoursRecord}', [ExposureHoursController::class, 'show']);
-    Route::put('/exposure-hours-records/{exposureHoursRecord}', [ExposureHoursController::class, 'update']);
-    Route::delete('/exposure-hours-records/{exposureHoursRecord}', [ExposureHoursController::class, 'destroy']);
 
     Route::get('/risk-assessments/options', [RiskAssessmentController::class, 'options']);
     Route::get('/risk-assessments', [RiskAssessmentController::class, 'index']);

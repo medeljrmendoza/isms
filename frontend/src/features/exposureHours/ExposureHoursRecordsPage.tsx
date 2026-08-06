@@ -3,8 +3,6 @@ import { useNavigate, useParams } from "react-router-dom";
 import { exposureHoursService } from "./exposureHoursService";
 import type { ExposureHoursRecordDetail, ExposureHoursRecordRow } from "./exposureHours";
 import { Button } from "../../components/ui/Button";
-import { Modal } from "../../components/ui/Modal";
-import { ExposureHoursRecordForm } from "./ExposureHoursRecordForm";
 import { ExposureHoursRecordViewModal } from "./ExposureHoursRecordViewModal";
 
 const PER_PAGE = 10;
@@ -23,7 +21,7 @@ const COLUMNS = [
   { key: "total_hours", label: "TOTAL HOURS", sortable: true },
 ];
 
-/** Ported from admin/exposurehours/records_v.php. */
+/** Ported from admin/exposurehours/records_v.php. Read-only: Add/Edit/Delete have no legacy write-back path — see ExposureHoursRepository. */
 export function ExposureHoursRecordsPage() {
   const { vesselId: vesselIdParam } = useParams<{ vesselId: string }>();
   const navigate = useNavigate();
@@ -42,20 +40,14 @@ export function ExposureHoursRecordsPage() {
   const [direction, setDirection] = useState<"asc" | "desc">("desc");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [reloadKey, setReloadKey] = useState(0);
 
-  const [formOpen, setFormOpen] = useState(false);
-  const [editing, setEditing] = useState<ExposureHoursRecordDetail | null>(null);
   const [viewing, setViewing] = useState<ExposureHoursRecordDetail | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
   const [vesselName, setVesselName] = useState<string | null>(null);
-  const [canCreateRecord, setCanCreateRecord] = useState(false);
 
   useEffect(() => {
     exposureHoursService.options().then((opts) => {
       const match = opts.vessels.find((v) => String(v.id) === vesselId);
       setVesselName(match?.label ?? null);
-      setCanCreateRecord(opts.can_create_record);
     });
   }, [vesselId]);
 
@@ -90,7 +82,7 @@ export function ExposureHoursRecordsPage() {
     return () => {
       isMounted = false;
     };
-  }, [vesselId, page, sort, direction, appliedDateFrom, appliedDateTo, reloadKey]);
+  }, [vesselId, page, sort, direction, appliedDateFrom, appliedDateTo]);
 
   const handleSort = (columnKey: string) => {
     if (sort === columnKey) {
@@ -116,28 +108,8 @@ export function ExposureHoursRecordsPage() {
     setPage(1);
   };
 
-  const reload = () => setReloadKey((k) => k + 1);
-
   const openView = async (id: number | string) => {
-    setActionError(null);
     setViewing(await exposureHoursService.show(id));
-  };
-
-  const openEdit = async (id: number | string) => {
-    setActionError(null);
-    const detail = await exposureHoursService.show(id);
-    setEditing(detail);
-    setFormOpen(true);
-  };
-
-  const runAction = async (action: () => Promise<unknown>) => {
-    setActionError(null);
-    try {
-      await action();
-      reload();
-    } catch {
-      setActionError("Action failed. Please try again.");
-    }
   };
 
   return (
@@ -150,19 +122,6 @@ export function ExposureHoursRecordsPage() {
             </Button>
             <h1 className="text-base font-semibold text-slate-800">Exposure Hours — Records{vesselName ? ` — ${vesselName}` : ""}</h1>
           </div>
-          {canCreateRecord && (
-            <Button
-              type="button"
-              variant="success"
-              className="!px-3 !py-1.5 text-sm"
-              onClick={() => {
-                setEditing(null);
-                setFormOpen(true);
-              }}
-            >
-              + Add Record
-            </Button>
-          )}
         </div>
 
         <div className="flex flex-wrap items-end gap-3 border-b border-slate-100 px-4 py-3">
@@ -192,8 +151,6 @@ export function ExposureHoursRecordsPage() {
           </Button>
         </div>
 
-        {actionError && <p className="px-4 pt-2 text-sm text-red-600">{actionError}</p>}
-
         <div className="overflow-x-auto px-4 py-3">
           <table className="w-full text-left text-sm">
             <thead>
@@ -210,7 +167,6 @@ export function ExposureHoursRecordsPage() {
                     {sort === column.key && (direction === "asc" ? " ▲" : " ▼")}
                   </th>
                 ))}
-                <th className="px-2 py-1.5 font-semibold text-slate-600">ACTIONS</th>
               </tr>
             </thead>
             <tbody>
@@ -231,35 +187,11 @@ export function ExposureHoursRecordsPage() {
                   <td className="px-2 py-1.5 text-slate-700">{row.no_of_rwc}</td>
                   <td className="px-2 py-1.5 text-slate-700">{row.no_of_mtc}</td>
                   <td className="px-2 py-1.5 text-slate-700">{row.total_hours}</td>
-                  <td className="px-2 py-1.5">
-                    <div className="flex flex-wrap gap-1">
-                      {row.can_edit && (
-                        <Button type="button" variant="secondary" className="!px-1.5 !py-0.5 text-xs" onClick={() => openEdit(row.id)}>
-                          Edit
-                        </Button>
-                      )}
-                      {row.can_delete && (
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          className="!px-1.5 !py-0.5 text-xs text-red-600"
-                          onClick={() => {
-                            if (window.confirm(`Delete this record (${row.date_from} – ${row.date_to})?`)) {
-                              // row.id is always numeric here: can_delete is only true for local rows.
-                              runAction(() => exposureHoursService.destroy(row.id as number));
-                            }
-                          }}
-                        >
-                          Delete
-                        </Button>
-                      )}
-                    </div>
-                  </td>
                 </tr>
               ))}
               {rows.length === 0 && !loading && !error && (
                 <tr>
-                  <td colSpan={COLUMNS.length + 1} className="px-2 py-6 text-center text-sm text-slate-400">
+                  <td colSpan={COLUMNS.length} className="px-2 py-6 text-center text-sm text-slate-400">
                     No items.
                   </td>
                 </tr>
@@ -303,22 +235,6 @@ export function ExposureHoursRecordsPage() {
           </div>
         </div>
       </div>
-
-      {formOpen && (
-        <Modal title={editing ? "Edit Exposure Hours Record" : "Add Exposure Hours Record"} onClose={() => setFormOpen(false)}>
-          <ExposureHoursRecordForm
-            // vesselId is always numeric here: the "+ Add Record" button that opens this form for
-            // create is only rendered when canCreateRecord is true (local mode).
-            vesselId={Number(vesselId)}
-            record={editing ?? undefined}
-            onCancel={() => setFormOpen(false)}
-            onSuccess={() => {
-              setFormOpen(false);
-              reload();
-            }}
-          />
-        </Modal>
-      )}
 
       {viewing && <ExposureHoursRecordViewModal record={viewing} onClose={() => setViewing(null)} />}
     </div>

@@ -6,7 +6,6 @@ import type {
   ExposureHoursRecordListResponse,
   ExposureHoursSummaryResponse,
 } from "./exposureHours";
-import type { ExposureHoursRecordFormValues } from "./exposureHoursRecordSchema";
 
 export interface DateRangeParams {
   date_from?: string;
@@ -22,6 +21,7 @@ export interface ExposureHoursRecordListParams extends DateRangeParams {
   direction?: "asc" | "desc";
 }
 
+/** Read-only: Add/Edit/Delete have no legacy write-back path — see ExposureHoursRecordsPage. */
 export const exposureHoursService = {
   async options(): Promise<ExposureHoursOptions> {
     const response = await axiosClient.get<ApiResource<ExposureHoursOptions>>("/exposure-hours/options");
@@ -43,19 +43,5 @@ export const exposureHoursService = {
   async show(id: number | string): Promise<ExposureHoursRecordDetail> {
     const response = await axiosClient.get<ApiResource<ExposureHoursRecordDetail>>(`/exposure-hours-records/${id}`);
     return response.data.data;
-  },
-
-  async create(values: ExposureHoursRecordFormValues): Promise<ExposureHoursRecordDetail> {
-    const response = await axiosClient.post<ApiResource<ExposureHoursRecordDetail>>("/exposure-hours-records", values);
-    return response.data.data;
-  },
-
-  async update(id: number, values: ExposureHoursRecordFormValues): Promise<ExposureHoursRecordDetail> {
-    const response = await axiosClient.put<ApiResource<ExposureHoursRecordDetail>>(`/exposure-hours-records/${id}`, values);
-    return response.data.data;
-  },
-
-  async destroy(id: number): Promise<void> {
-    await axiosClient.delete(`/exposure-hours-records/${id}`);
   },
 };

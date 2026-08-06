@@ -6,8 +6,8 @@ import type {
   DrillOptions,
   DrillReportDetail,
 } from "./drill";
-import type { DrillReportFormValues } from "./drillReportSchema";
 
+/** Read-only: legacy never lets shore create/edit/delete a drill report — see DrillCalendarPage. */
 export const drillService = {
   async options(): Promise<DrillOptions> {
     const response = await axiosClient.get<ApiResource<DrillOptions>>("/drill-lists/options");
@@ -30,11 +30,6 @@ export const drillService = {
 
   async show(id: number | string): Promise<DrillReportDetail> {
     const response = await axiosClient.get<ApiResource<DrillReportDetail>>(`/drill-reports/${id}`);
-    return response.data.data;
-  },
-
-  async update(id: number, values: DrillReportFormValues): Promise<DrillReportDetail> {
-    const response = await axiosClient.put<ApiResource<DrillReportDetail>>(`/drill-reports/${id}`, values);
     return response.data.data;
   },
 };

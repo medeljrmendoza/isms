@@ -1,10 +1,8 @@
 import { useEffect, useState } from "react";
 import { drillService } from "./drillService";
 import type { DrillGridRow, DrillOption, DrillReportDetail } from "./drill";
-import { Modal } from "../../components/ui/Modal";
 import { Button } from "../../components/ui/Button";
 import { DrillCellModal } from "./DrillCellModal";
-import { DrillReportForm } from "./DrillReportForm";
 import { DrillReportViewModal } from "./DrillReportViewModal";
 
 const MONTHS = [
@@ -40,11 +38,9 @@ export function DrillCalendarPage() {
   const [rows, setRows] = useState<DrillGridRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [reloadKey, setReloadKey] = useState(0);
 
   const [cell, setCell] = useState<{ drillListId: number | string; drillName: string; month: number } | null>(null);
   const [viewing, setViewing] = useState<DrillReportDetail | null>(null);
-  const [editing, setEditing] = useState<DrillReportDetail | null>(null);
 
   useEffect(() => {
     drillService.options().then((data) => {
@@ -67,7 +63,7 @@ export function DrillCalendarPage() {
       })
       .catch(() => setError("Couldn't load the drill calendar. Please try again."))
       .finally(() => setLoading(false));
-  }, [appliedVesselId, appliedYear, reloadKey]);
+  }, [appliedVesselId, appliedYear]);
 
   const applyFilter = () => {
     if (!vesselId || !year) return;
@@ -75,18 +71,10 @@ export function DrillCalendarPage() {
     setAppliedYear(Number(year));
   };
 
-  const reload = () => setReloadKey((k) => k + 1);
-
   const openView = async (reportId: number | string) => {
     const detail = await drillService.show(reportId);
     setCell(null);
     setViewing(detail);
-  };
-
-  const openEdit = async (reportId: number | string) => {
-    const detail = await drillService.show(reportId);
-    setCell(null);
-    setEditing(detail);
   };
 
   return (
@@ -214,24 +202,10 @@ export function DrillCalendarPage() {
           month={cell.month}
           onClose={() => setCell(null)}
           onView={openView}
-          onEdit={openEdit}
         />
       )}
 
       {viewing && <DrillReportViewModal drillReport={viewing} onClose={() => setViewing(null)} />}
-
-      {editing && (
-        <Modal title={`Edit Drill Report — ${editing.vessel}`} onClose={() => setEditing(null)}>
-          <DrillReportForm
-            drillReport={editing}
-            onCancel={() => setEditing(null)}
-            onSuccess={() => {
-              setEditing(null);
-              reload();
-            }}
-          />
-        </Modal>
-      )}
     </div>
   );
 }
