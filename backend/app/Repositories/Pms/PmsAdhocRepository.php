@@ -31,10 +31,10 @@ use Illuminate\Validation\ValidationException;
  * entirely — dead, matching Pms_activities' dropped classification
  * fields. In-charge/Assignee are ported as plain strings rather than a
  * full pl_position lookup, consistent with Pms_activities' incharge
- * field. The list view's COMPONENT/PART columns render raw
- * equipmentID/partsID values in legacy (loadData() selects the FK
- * columns directly, never joining to their name) — ported here as the
- * actual joined names instead, since that's clearly the columns' intent.
+ * field. equipmentID/partsID on tb_pms_adhoc are free text, not real
+ * FKs (confirmed against live data — e.g. equipmentID="WATER BALLAST
+ * TANK"), so both loadData() and view_item() in legacy just echo them
+ * raw as COMPONENT/PART with no join. Ported the same way here.
  */
 class PmsAdhocRepository
 {
@@ -401,8 +401,6 @@ class PmsAdhocRepository
         $builder = DB::connection('legacy')->table('tb_pms_adhoc as ta')
             ->leftJoin('tb_pms_department', 'tb_pms_department.deptID', '=', 'ta.deptID')
             ->leftJoin('pl_position', 'pl_position.posID', '=', 'ta.work_plan_incharge')
-            ->leftJoin('tb_pms_equipment', 'tb_pms_equipment.equipmentID', '=', 'ta.equipmentID')
-            ->leftJoin('tb_pms_parts', 'tb_pms_parts.partsID', '=', 'ta.partsID')
             ->where('ta.vesID', $vesselId);
 
         if ($query->search !== null) {
@@ -411,8 +409,8 @@ class PmsAdhocRepository
                 $q->where('ta.work_plan_activity', 'like', $term)
                     ->orWhere('pl_position.long_posname', 'like', $term)
                     ->orWhere('tb_pms_department.department_name', 'like', $term)
-                    ->orWhere('tb_pms_equipment.equipment_name', 'like', $term)
-                    ->orWhere('tb_pms_parts.part_name', 'like', $term);
+                    ->orWhere('ta.equipmentID', 'like', $term)
+                    ->orWhere('ta.partsID', 'like', $term);
             });
         }
 
@@ -425,7 +423,7 @@ class PmsAdhocRepository
             ->select([
                 'ta.adhocID', 'ta.work_plan_activity', 'ta.dateof_activity',
                 'tb_pms_department.department_name', 'pl_position.long_posname as incharge',
-                'tb_pms_equipment.equipment_name', 'tb_pms_parts.part_name',
+                'ta.equipmentID as equipment_name', 'ta.partsID as part_name',
             ])
             ->paginate($query->perPage, page: $query->page);
     }
@@ -436,8 +434,6 @@ class PmsAdhocRepository
         $a = DB::connection('legacy')->table('tb_pms_adhoc as ta')
             ->leftJoin('tb_vessel', 'tb_vessel.vesID', '=', 'ta.vesID')
             ->leftJoin('tb_pms_department', 'tb_pms_department.deptID', '=', 'ta.deptID')
-            ->leftJoin('tb_pms_equipment', 'tb_pms_equipment.equipmentID', '=', 'ta.equipmentID')
-            ->leftJoin('tb_pms_parts', 'tb_pms_parts.partsID', '=', 'ta.partsID')
             ->leftJoin('pl_pms_job_class', 'pl_pms_job_class.jobID', '=', 'ta.work_plan_jobID')
             ->leftJoin('pl_pms_job_type', 'pl_pms_job_type.jobtypeID', '=', 'ta.work_plan_jobtypeID')
             ->leftJoin('pl_position', 'pl_position.posID', '=', 'ta.work_plan_incharge')
@@ -448,7 +444,6 @@ class PmsAdhocRepository
                 'ta.work_plan_jobID', 'ta.work_plan_jobtypeID', 'ta.work_plan_incharge', 'ta.work_plan_assignee',
                 'ta.work_plan_work_procedure', 'ta.dateof_activity', 'ta.description', 'ta.remarks',
                 'tb_vessel.vessel_name', 'tb_vessel.vessel_prefix', 'tb_pms_department.department_name',
-                'tb_pms_equipment.equipment_name', 'tb_pms_parts.part_name',
                 'pl_pms_job_class.job_class', 'pl_pms_job_type.job_type', 'pl_position.long_posname as incharge_name',
             ])
             ->first();
@@ -481,9 +476,9 @@ class PmsAdhocRepository
             'pms_department_id' => $a->deptID,
             'department' => $a->department_name,
             'pms_equipment_id' => $isEquipment && $a->equipmentID !== '' ? $a->equipmentID : null,
-            'equipment_name' => $isEquipment ? $a->equipment_name : null,
+            'equipment_name' => $isEquipment ? $a->equipmentID : null,
             'pms_part_id' => $isEquipment && $a->partsID !== '' ? $a->partsID : null,
-            'part_name' => $isEquipment ? $a->part_name : null,
+            'part_name' => $isEquipment ? $a->partsID : null,
             'location' => $a->work_plan_location,
             'sub_location' => $a->work_plan_sub_location,
             'activity_name' => $a->work_plan_activity,

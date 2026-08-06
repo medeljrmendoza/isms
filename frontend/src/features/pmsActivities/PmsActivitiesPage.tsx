@@ -3,8 +3,6 @@ import { pmsActivitiesService } from "./pmsActivitiesService";
 import { MONTH_LABELS } from "./pmsActivities";
 import type { PmsActivityDetail, PmsActivityOption, PmsActivityOptions, PmsActivityRow, PmsTicketDetail } from "./pmsActivities";
 import { Button } from "../../components/ui/Button";
-import { MarkDoneModal } from "./MarkDoneModal";
-import { PostponeModal } from "./PostponeModal";
 import { ViewActivityModal } from "./ViewActivityModal";
 import { ViewTicketModal } from "./ViewTicketModal";
 
@@ -65,10 +63,7 @@ export function PmsActivitiesPage() {
   const [rows, setRows] = useState<PmsActivityRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [reloadKey, setReloadKey] = useState(0);
 
-  const [markDoneRow, setMarkDoneRow] = useState<PmsActivityRow | null>(null);
-  const [postponeRow, setPostponeRow] = useState<PmsActivityRow | null>(null);
   const [viewingActivity, setViewingActivity] = useState<PmsActivityDetail | null>(null);
   const [viewingTicket, setViewingTicket] = useState<PmsTicketDetail | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -96,7 +91,7 @@ export function PmsActivitiesPage() {
       })
       .catch(() => setError("Couldn't load activities. Please try again."))
       .finally(() => setLoading(false));
-  }, [appliedVesselId, year, mainGroupId, criticalityId, search, reloadKey]);
+  }, [appliedVesselId, year, mainGroupId, criticalityId, search]);
 
   const applyFilter = () => {
     if (!vesselId) {
@@ -107,8 +102,6 @@ export function PmsActivitiesPage() {
     setAppliedVesselId(vesselId);
     setYear("");
   };
-
-  const reload = () => setReloadKey((k) => k + 1);
 
   const openView = async (id: number | string) => {
     setActionError(null);
@@ -256,7 +249,6 @@ export function PmsActivitiesPage() {
                       {m}
                     </th>
                   ))}
-                  <th className="whitespace-nowrap px-2 py-1.5 font-semibold text-slate-600">ACTIONS</th>
                 </tr>
               </thead>
               <tbody>
@@ -286,23 +278,11 @@ export function PmsActivitiesPage() {
                         <MonthCell month={row.months[m]} onViewTicket={openTicket} />
                       </td>
                     ))}
-                    <td className="whitespace-nowrap px-2 py-1.5">
-                      {!row.is_snapshot && (
-                        <div className="flex gap-1">
-                          <Button type="button" variant="secondary" className="!px-1.5 !py-0.5 text-xs" onClick={() => setMarkDoneRow(row)}>
-                            Done
-                          </Button>
-                          <Button type="button" variant="secondary" className="!px-1.5 !py-0.5 text-xs" onClick={() => setPostponeRow(row)}>
-                            Postpone
-                          </Button>
-                        </div>
-                      )}
-                    </td>
                   </tr>
                 ))}
                 {rows.length === 0 && (
                   <tr>
-                    <td colSpan={26} className="px-2 py-6 text-center text-sm text-slate-400">
+                    <td colSpan={25} className="px-2 py-6 text-center text-sm text-slate-400">
                       No activities found.
                     </td>
                   </tr>
@@ -313,26 +293,6 @@ export function PmsActivitiesPage() {
         </div>
       </div>
 
-      {markDoneRow && (
-        <MarkDoneModal
-          activity={markDoneRow}
-          onClose={() => setMarkDoneRow(null)}
-          onSuccess={() => {
-            setMarkDoneRow(null);
-            reload();
-          }}
-        />
-      )}
-      {postponeRow && (
-        <PostponeModal
-          activity={postponeRow}
-          onClose={() => setPostponeRow(null)}
-          onSuccess={() => {
-            setPostponeRow(null);
-            reload();
-          }}
-        />
-      )}
       {viewingActivity && <ViewActivityModal activity={viewingActivity} onClose={() => setViewingActivity(null)} />}
       {viewingTicket && <ViewTicketModal ticket={viewingTicket} onClose={() => setViewingTicket(null)} />}
     </div>
