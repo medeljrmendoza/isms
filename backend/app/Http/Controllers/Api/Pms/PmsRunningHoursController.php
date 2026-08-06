@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Pms;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Pms\PmsRunningHoursUpdateRequest;
 use App\Repositories\Pms\PmsRunningHoursRepository;
+use App\Support\LegacyDb;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -18,7 +19,9 @@ class PmsRunningHoursController extends Controller
      */
     public function options(): JsonResponse
     {
-        return response()->json(['data' => ['vessels' => $this->runningHours->vesselOptions()]]);
+        $vessels = LegacyDb::isConfigured() ? $this->runningHours->legacyVesselOptions() : $this->runningHours->vesselOptions();
+
+        return response()->json(['data' => ['vessels' => $vessels]]);
     }
 
     /**
@@ -26,9 +29,22 @@ class PmsRunningHoursController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $vesselId = (int) $request->query('vessel_id');
         $month = $this->intOrNull($request->query('month'));
         $year = $this->intOrNull($request->query('year'));
+
+        if (LegacyDb::isConfigured()) {
+            $vesselId = (string) $request->query('vessel_id');
+
+            return response()->json([
+                'data' => [
+                    'current_period' => $this->runningHours->legacyCurrentPeriod($vesselId),
+                    'period_options' => $this->runningHours->legacyPeriodOptions($vesselId),
+                    'rows' => $this->runningHours->legacyTable($vesselId, $month, $year),
+                ],
+            ]);
+        }
+
+        $vesselId = (int) $request->query('vessel_id');
 
         return response()->json([
             'data' => [
@@ -46,6 +62,12 @@ class PmsRunningHoursController extends Controller
     {
         $data = $request->validated();
 
+        if (LegacyDb::isConfigured()) {
+            $this->runningHours->legacyUpdateRunningHours((string) $data['equipment_id'], $data['date'], (float) $data['hours'], $data['remarks'] ?? null);
+
+            return response()->json(['data' => ['ok' => true]]);
+        }
+
         $this->runningHours->updateRunningHours($data['equipment_id'], $data['date'], (float) $data['hours'], $data['remarks'] ?? null);
 
         return response()->json(['data' => ['ok' => true]]);
@@ -56,6 +78,12 @@ class PmsRunningHoursController extends Controller
      */
     public function proceedNextMonth(Request $request): JsonResponse
     {
+        if (LegacyDb::isConfigured()) {
+            $this->runningHours->legacyProceedNextMonth((string) $request->input('vessel_id'));
+
+            return response()->json(['data' => ['ok' => true]]);
+        }
+
         $this->runningHours->proceedNextMonth((int) $request->input('vessel_id'));
 
         return response()->json(['data' => ['ok' => true]]);

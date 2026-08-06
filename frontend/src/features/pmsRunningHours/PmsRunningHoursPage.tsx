@@ -19,7 +19,7 @@ const MONTH_NAMES = [
 ];
 
 interface UpdateModalState {
-  equipmentId: number;
+  equipmentId: number | string;
   equipmentName: string;
 }
 
@@ -51,7 +51,7 @@ export function PmsRunningHoursPage() {
     pmsRunningHoursService.options().then((data) => setVessels(data.vessels)).catch(() => undefined);
   }, []);
 
-  const load = (vId: number, period?: string) => {
+  const load = (vId: number | string, period?: string) => {
     setLoading(true);
     const [month, year] = period ? period.split("-").map(Number) : [undefined, undefined];
     pmsRunningHoursService
@@ -77,13 +77,13 @@ export function PmsRunningHoursPage() {
     setFilterError(null);
     setAppliedVesselId(vesselId);
     setSelectedPeriod("");
-    load(Number(vesselId));
+    load(vesselId);
   };
 
   const handlePeriodChange = (value: string) => {
     setSelectedPeriod(value);
     if (appliedVesselId) {
-      load(Number(appliedVesselId), value);
+      load(appliedVesselId, value);
     }
   };
 
@@ -92,9 +92,9 @@ export function PmsRunningHoursPage() {
     if (!window.confirm("Proceed to next month? This archives the current month and resets the entry grid.")) return;
     setRollingOver(true);
     try {
-      await pmsRunningHoursService.proceedNextMonth(Number(appliedVesselId));
+      await pmsRunningHoursService.proceedNextMonth(appliedVesselId);
       setSelectedPeriod("");
-      load(Number(appliedVesselId));
+      load(appliedVesselId);
     } catch {
       setError("Couldn't proceed to next month. Please try again.");
     } finally {
@@ -132,7 +132,7 @@ export function PmsRunningHoursPage() {
       });
       setUpdateModal(null);
       if (appliedVesselId) {
-        load(Number(appliedVesselId), selectedPeriod || undefined);
+        load(appliedVesselId, selectedPeriod || undefined);
       }
     } catch (err) {
       if (axios.isAxiosError(err) && isApiValidationError(err.response?.data)) {

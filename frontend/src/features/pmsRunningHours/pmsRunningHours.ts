@@ -1,5 +1,5 @@
 export interface PmsRunningHoursOption {
-  id: number;
+  id: number | string;
   label: string;
 }
 
@@ -14,7 +14,7 @@ export interface PmsRunningHoursPeriod {
 }
 
 export interface PmsRunningHoursRow {
-  equipment_id: number;
+  equipment_id: number | string;
   equipment_code: string;
   equipment_name: string;
   update_by_component: boolean;
