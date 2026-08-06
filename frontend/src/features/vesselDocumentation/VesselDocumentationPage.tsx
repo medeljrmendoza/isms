@@ -1,9 +1,7 @@
 import { useEffect, useState } from "react";
 import { vesselDocumentationService } from "./vesselDocumentationService";
-import type { VesselDocumentationDetail, VesselDocumentationOption, VesselDocumentationRow } from "./vesselDocumentation";
-import { Modal } from "../../components/ui/Modal";
+import type { VesselDocumentationOption, VesselDocumentationRow } from "./vesselDocumentation";
 import { Button } from "../../components/ui/Button";
-import { VesselDocumentationForm } from "./VesselDocumentationForm";
 
 const PER_PAGE = 10;
 
@@ -25,7 +23,11 @@ function WarningIcon({ status }: { status: 0 | 1 | 2 }) {
   return <span className="text-slate-300">—</span>;
 }
 
-/** Ported from admin/vessel_documentation/vessel_documentation_v.php. */
+/**
+ * Ported from admin/vessel_documentation/vessel_documentation_v.php.
+ * Read-only: Add/Edit/Toggle Status/Delete have no legacy write-back
+ * path — see VesselDocumentationRepository.
+ */
 export function VesselDocumentationPage() {
   const [vessels, setVessels] = useState<VesselDocumentationOption[]>([]);
   const [types, setTypes] = useState<VesselDocumentationOption[]>([]);
@@ -42,17 +44,10 @@ export function VesselDocumentationPage() {
   const [direction, setDirection] = useState<"asc" | "desc">("desc");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [reloadKey, setReloadKey] = useState(0);
-
-  const [formOpen, setFormOpen] = useState(false);
-  const [editing, setEditing] = useState<VesselDocumentationDetail | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [canCreateRecord, setCanCreateRecord] = useState(false);
 
   useEffect(() => {
     vesselDocumentationService.options().then((data) => {
       setVessels(data.vessels);
-      setCanCreateRecord(data.can_create_record);
     }).catch(() => undefined);
   }, []);
 
@@ -85,7 +80,7 @@ export function VesselDocumentationPage() {
       })
       .catch(() => setError("Couldn't load documents. Please try again."))
       .finally(() => setLoading(false));
-  }, [appliedVesselId, appliedTypeId, page, sort, direction, reloadKey]);
+  }, [appliedVesselId, appliedTypeId, page, sort, direction]);
 
   const handleSort = (columnKey: string) => {
     if (sort === columnKey) {
@@ -104,43 +99,11 @@ export function VesselDocumentationPage() {
     setPage(1);
   };
 
-  const reload = () => setReloadKey((k) => k + 1);
-
-  const openEdit = async (id: number | string) => {
-    setActionError(null);
-    const detail = await vesselDocumentationService.show(id);
-    setEditing(detail);
-    setFormOpen(true);
-  };
-
-  const runAction = async (action: () => Promise<unknown>) => {
-    setActionError(null);
-    try {
-      await action();
-      reload();
-    } catch {
-      setActionError("Action failed. Please try again.");
-    }
-  };
-
   return (
     <div className="p-6">
       <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
           <h1 className="text-base font-semibold text-slate-800">Vessel Documentation</h1>
-          {canCreateRecord && (
-            <Button
-              type="button"
-              variant="success"
-              className="!px-3 !py-1.5 text-sm"
-              onClick={() => {
-                setEditing(null);
-                setFormOpen(true);
-              }}
-            >
-              + Add Document
-            </Button>
-          )}
         </div>
 
         <div className="flex flex-wrap items-end gap-3 border-b border-slate-100 px-4 py-3">
@@ -183,8 +146,6 @@ export function VesselDocumentationPage() {
           </Button>
         </div>
 
-        {actionError && <p className="px-4 pt-2 text-sm text-red-600">{actionError}</p>}
-
         {appliedVesselId === null ? (
           <p className="px-4 py-8 text-center text-sm text-slate-400">Select a vessel and click Filter to view its documents.</p>
         ) : (
@@ -204,7 +165,6 @@ export function VesselDocumentationPage() {
                       {sort === column.key && (direction === "asc" ? " ▲" : " ▼")}
                     </th>
                   ))}
-                  <th className="px-2 py-1.5 font-semibold text-slate-600">ACTIONS</th>
                 </tr>
               </thead>
               <tbody>
@@ -225,44 +185,11 @@ export function VesselDocumentationPage() {
                         {row.is_active ? "Active" : "Inactive"}
                       </span>
                     </td>
-                    <td className="px-2 py-1.5">
-                      <div className="flex flex-wrap gap-1">
-                        {row.can_edit && (
-                          <>
-                            <Button type="button" variant="secondary" className="!px-1.5 !py-0.5 text-xs" onClick={() => openEdit(row.id)}>
-                              Edit
-                            </Button>
-                            <Button
-                              type="button"
-                              variant={row.is_active ? "success" : "secondary"}
-                              className="!px-1.5 !py-0.5 text-xs"
-                              onClick={() => runAction(() => vesselDocumentationService.toggleStatus(row.id as number))}
-                            >
-                              {row.is_active ? "Inactivate" : "Activate"}
-                            </Button>
-                          </>
-                        )}
-                        {row.can_delete && (
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            className="!px-1.5 !py-0.5 text-xs text-red-600"
-                            onClick={() => {
-                              if (window.confirm(`Delete this document (${row.document})?`)) {
-                                runAction(() => vesselDocumentationService.destroy(row.id as number));
-                              }
-                            }}
-                          >
-                            Delete
-                          </Button>
-                        )}
-                      </div>
-                    </td>
                   </tr>
                 ))}
                 {rows.length === 0 && !loading && !error && (
                   <tr>
-                    <td colSpan={MODULE_COLUMNS.length + 1} className="px-2 py-6 text-center text-sm text-slate-400">
+                    <td colSpan={MODULE_COLUMNS.length} className="px-2 py-6 text-center text-sm text-slate-400">
                       No documents.
                     </td>
                   </tr>
@@ -307,19 +234,6 @@ export function VesselDocumentationPage() {
           </div>
         )}
       </div>
-
-      {formOpen && (
-        <Modal title={editing ? `Edit Document — ${editing.document}` : "Add Vessel Document"} onClose={() => setFormOpen(false)}>
-          <VesselDocumentationForm
-            record={editing ?? undefined}
-            onCancel={() => setFormOpen(false)}
-            onSuccess={() => {
-              setFormOpen(false);
-              reload();
-            }}
-          />
-        </Modal>
-      )}
     </div>
   );
 }

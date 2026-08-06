@@ -125,12 +125,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/committee-meetings/options', [CommitteeMeetingController::class, 'options']);
     Route::get('/committee-meetings', [CommitteeMeetingController::class, 'index']);
-    Route::post('/committee-meetings', [CommitteeMeetingController::class, 'store']);
     Route::get('/committee-meetings/{committeeMeeting}', [CommitteeMeetingController::class, 'show']);
-    Route::put('/committee-meetings/{committeeMeeting}', [CommitteeMeetingController::class, 'update']);
-    Route::delete('/committee-meetings/{committeeMeeting}', [CommitteeMeetingController::class, 'destroy']);
-    Route::post('/committee-meetings/{committeeMeeting}/publish', [CommitteeMeetingController::class, 'publish']);
-    Route::post('/committee-meetings/{committeeMeeting}/approve', [CommitteeMeetingController::class, 'approve']);
 
     Route::get('/drill-lists/options', [DrillReportController::class, 'options']);
     Route::get('/drill-lists/calendar', [DrillReportController::class, 'calendar']);
@@ -195,20 +190,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/vessel-documentation/type-options', [VesselDocumentationController::class, 'typeOptions']);
     Route::get('/vessel-documentation/document-options', [VesselDocumentationController::class, 'documentOptions']);
     Route::get('/vessel-documentation', [VesselDocumentationController::class, 'index']);
-    Route::post('/vessel-documentation', [VesselDocumentationController::class, 'store']);
     Route::get('/vessel-documentation/{vesselDocumentRecord}', [VesselDocumentationController::class, 'show']);
-    Route::put('/vessel-documentation/{vesselDocumentRecord}', [VesselDocumentationController::class, 'update']);
-    Route::post('/vessel-documentation/{vesselDocumentRecord}/toggle-status', [VesselDocumentationController::class, 'toggleStatus']);
-    Route::delete('/vessel-documentation/{vesselDocumentRecord}', [VesselDocumentationController::class, 'destroy']);
 
     Route::get('/company-documentation/type-options', [CompanyDocumentationController::class, 'typeOptions']);
     Route::get('/company-documentation/document-options', [CompanyDocumentationController::class, 'documentOptions']);
     Route::get('/company-documentation', [CompanyDocumentationController::class, 'index']);
-    Route::post('/company-documentation', [CompanyDocumentationController::class, 'store']);
     Route::get('/company-documentation/{companyDocumentationRecord}', [CompanyDocumentationController::class, 'show']);
-    Route::put('/company-documentation/{companyDocumentationRecord}', [CompanyDocumentationController::class, 'update']);
-    Route::post('/company-documentation/{companyDocumentationRecord}/toggle-status', [CompanyDocumentationController::class, 'toggleStatus']);
-    Route::delete('/company-documentation/{companyDocumentationRecord}', [CompanyDocumentationController::class, 'destroy']);
 
     Route::get('/master-review/options', [MasterReviewController::class, 'options']);
     Route::get('/master-review/document-options', [MasterReviewController::class, 'documentOptions']);
@@ -300,5 +287,4 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/defects', [DefectController::class, 'store']);
     Route::get('/defects/{defect}', [DefectController::class, 'show']);
     Route::put('/defects/{defect}', [DefectController::class, 'update']);
-    Route::delete('/defects/{defect}', [DefectController::class, 'destroy']);
 });

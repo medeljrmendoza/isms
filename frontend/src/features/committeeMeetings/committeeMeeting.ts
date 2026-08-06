@@ -60,5 +60,4 @@ export interface CommitteeMeetingOption {
 
 export interface CommitteeMeetingOptions {
   vessels: CommitteeMeetingOption[];
-  meeting_types: CommitteeMeetingOption[];
 }

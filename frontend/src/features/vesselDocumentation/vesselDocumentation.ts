@@ -7,7 +7,6 @@ export interface VesselDocumentationOption {
 
 export interface VesselDocumentationOptions {
   vessels: VesselDocumentationOption[];
-  can_create_record: boolean;
 }
 
 export interface VesselDocumentationRow {
@@ -24,15 +23,6 @@ export interface VesselDocumentationRow {
   is_active: boolean;
   can_edit: boolean;
   can_delete: boolean;
-}
-
-export interface VesselDocumentationDetail extends VesselDocumentationRow {
-  vessel_id: number | string;
-  vessel_document_id: number | string;
-  date_range_from: string | null;
-  date_range_to: string | null;
-  shore_remarks: string | null;
-  vessel_remarks: string | null;
 }
 
 export interface VesselDocumentationListResponse {

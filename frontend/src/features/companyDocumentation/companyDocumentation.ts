@@ -7,7 +7,6 @@ export interface CompanyDocumentationOption {
 
 export interface CompanyDocumentationTypeOptions {
   types: CompanyDocumentationOption[];
-  can_create_record: boolean;
 }
 
 export interface CompanyDocumentationRow {
@@ -24,13 +23,6 @@ export interface CompanyDocumentationRow {
   is_active: boolean;
   can_edit: boolean;
   can_delete: boolean;
-}
-
-export interface CompanyDocumentationDetail extends CompanyDocumentationRow {
-  company_document_id: number | string;
-  date_range_from: string | null;
-  date_range_to: string | null;
-  remarks: string | null;
 }
 
 export interface CompanyDocumentationListResponse {
