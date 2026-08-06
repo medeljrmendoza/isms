@@ -2,8 +2,6 @@ import { useEffect, useState } from "react";
 import { pscReportService } from "./pscReportService";
 import type { PscReportDetail, PscReportOption, PscReportRow } from "./pscReport";
 import { Button } from "../../components/ui/Button";
-import { Modal } from "../../components/ui/Modal";
-import { PscReportForm } from "./PscReportForm";
 import { PscReportViewModal } from "./PscReportViewModal";
 
 const PER_PAGE = 10;
@@ -16,6 +14,7 @@ const MODULE_COLUMNS = [
   { key: "nc", label: "NC", sortable: false },
 ];
 
+/** Read-only: Add/Edit/Delete/Reopen have no legacy write-back path — see PscReportRepository. */
 export function PscReportsPage() {
   const [vessels, setVessels] = useState<PscReportOption[]>([]);
   const [vesselId, setVesselId] = useState("ALL");
@@ -31,12 +30,8 @@ export function PscReportsPage() {
   const [direction, setDirection] = useState<"asc" | "desc">("desc");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [reloadKey, setReloadKey] = useState(0);
 
-  const [formOpen, setFormOpen] = useState(false);
-  const [editing, setEditing] = useState<PscReportDetail | null>(null);
   const [viewing, setViewing] = useState<PscReportDetail | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
     pscReportService.options().then((data) => {
@@ -82,7 +77,7 @@ export function PscReportsPage() {
     return () => {
       isMounted = false;
     };
-  }, [page, search, sort, direction, appliedVesselId, reloadKey]);
+  }, [page, search, sort, direction, appliedVesselId]);
 
   const handleSort = (columnKey: string) => {
     if (sort === columnKey) {
@@ -105,29 +100,9 @@ export function PscReportsPage() {
     setPage(1);
   };
 
-  const reload = () => setReloadKey((k) => k + 1);
-
   const openView = async (id: number | string) => {
-    setActionError(null);
     const detail = await pscReportService.show(id);
     setViewing(detail);
-  };
-
-  const openEdit = async (id: number | string) => {
-    setActionError(null);
-    const detail = await pscReportService.show(id);
-    setEditing(detail);
-    setFormOpen(true);
-  };
-
-  const runAction = async (action: () => Promise<unknown>) => {
-    setActionError(null);
-    try {
-      await action();
-      reload();
-    } catch {
-      setActionError("Action failed. Please try again.");
-    }
   };
 
   return (
@@ -135,17 +110,6 @@ export function PscReportsPage() {
       <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
           <h1 className="text-base font-semibold text-slate-800">PSC Inspections</h1>
-          <Button
-            type="button"
-            variant="success"
-            className="!px-3 !py-1.5 text-sm"
-            onClick={() => {
-              setEditing(null);
-              setFormOpen(true);
-            }}
-          >
-            + Add Report
-          </Button>
         </div>
 
         <div className="flex flex-wrap items-end gap-3 border-b border-slate-100 px-4 py-3">
@@ -183,8 +147,6 @@ export function PscReportsPage() {
           </div>
         </div>
 
-        {actionError && <p className="px-4 pt-2 text-sm text-red-600">{actionError}</p>}
-
         <div className="overflow-x-auto px-4 py-3">
           <table className="w-full text-left text-sm">
             <thead>
@@ -201,7 +163,6 @@ export function PscReportsPage() {
                     {sort === column.key && (direction === "asc" ? " ▲" : " ▼")}
                   </th>
                 ))}
-                <th className="px-2 py-1.5 font-semibold text-slate-600">ACTIONS</th>
               </tr>
             </thead>
             <tbody>
@@ -218,46 +179,11 @@ export function PscReportsPage() {
                   <td className="px-2 py-1.5 text-slate-700">
                     {row.total_nc_count > 0 ? `${row.pending_nc_count} / ${row.total_nc_count}` : "—"}
                   </td>
-                  <td className="px-2 py-1.5">
-                    <div className="flex flex-wrap gap-1">
-                      {row.can_edit && (
-                        <Button type="button" variant="secondary" className="!px-1.5 !py-0.5 text-xs" onClick={() => openEdit(row.id)}>
-                          Edit
-                        </Button>
-                      )}
-                      {row.can_reopen && (
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          className="!px-1.5 !py-0.5 text-xs"
-                          // row.id is always numeric here: can_reopen is only true for local rows.
-                          onClick={() => runAction(() => pscReportService.reopen(row.id as number))}
-                        >
-                          Re-open
-                        </Button>
-                      )}
-                      {row.can_delete && (
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          className="!px-1.5 !py-0.5 text-xs text-red-600"
-                          onClick={() => {
-                            if (window.confirm(`Delete this report for ${row.vessel}?`)) {
-                              // row.id is always numeric here: can_delete is only true for local rows.
-                              runAction(() => pscReportService.destroy(row.id as number));
-                            }
-                          }}
-                        >
-                          Delete
-                        </Button>
-                      )}
-                    </div>
-                  </td>
                 </tr>
               ))}
               {rows.length === 0 && !loading && !error && (
                 <tr>
-                  <td colSpan={MODULE_COLUMNS.length + 1} className="px-2 py-6 text-center text-sm text-slate-400">
+                  <td colSpan={MODULE_COLUMNS.length} className="px-2 py-6 text-center text-sm text-slate-400">
                     No items.
                   </td>
                 </tr>
@@ -301,19 +227,6 @@ export function PscReportsPage() {
           </div>
         </div>
       </div>
-
-      {formOpen && (
-        <Modal title={editing ? `Edit Report — ${editing.vessel}` : "Add PSC Inspection Report"} onClose={() => setFormOpen(false)}>
-          <PscReportForm
-            pscReport={editing ?? undefined}
-            onCancel={() => setFormOpen(false)}
-            onSuccess={() => {
-              setFormOpen(false);
-              reload();
-            }}
-          />
-        </Modal>
-      )}
 
       {viewing && <PscReportViewModal pscReport={viewing} onClose={() => setViewing(null)} />}
     </div>

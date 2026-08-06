@@ -2,13 +2,8 @@
 
 namespace App\Repositories\Claims;
 
-use App\Models\Claims\Claim;
-use App\Repositories\Nonconformities\NonconformityRepository;
 use App\Support\LegacyDb;
 use App\Support\TableQuery;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 
 class ClaimRepository
@@ -24,44 +19,6 @@ class ClaimRepository
     public static function columns(): array
     {
         return self::COLUMNS;
-    }
-
-    /**
-     * Ported from Controllers/Dashboard_claims.php's loadData() WHERE
-     * clause: any claim not yet closed. Not scoped by vessel/user — same
-     * deferral as NonconformityRepository.
-     */
-    public function openQuery(): Builder
-    {
-        return Claim::query()
-            ->with('vessel')
-            ->where('status', '!=', 'CLOSED');
-    }
-
-    public function open(): Collection
-    {
-        return $this->openQuery()->orderByDesc('report_date')->get();
-    }
-
-    public function table(TableQuery $query): LengthAwarePaginator
-    {
-        $builder = $this->openQuery();
-
-        if ($query->search !== null) {
-            $term = "%{$query->search}%";
-            $builder->where(function (Builder $q) use ($term) {
-                $q->where('claim_no', 'like', $term)
-                    ->orWhere('claims_category', 'like', $term)
-                    ->orWhere('report_date', 'like', $term)
-                    ->orWhereHas('vessel', fn (Builder $v) => $v->where('name', 'like', $term));
-            });
-        }
-
-        $sortable = array_column(array_filter(self::COLUMNS, fn ($c) => $c['sortable']), 'key');
-        $sort = in_array($query->sort, $sortable, true) ? $query->sort : 'report_date';
-
-        return $builder->orderBy($sort, $query->direction)
-            ->paginate($query->perPage, page: $query->page);
     }
 
     /** Ported from Dashboard_claims.php's loadData(): open claims scoped to the logged-in user's assigned vessels. */

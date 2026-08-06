@@ -155,19 +155,7 @@ export interface IncidentReportOption {
   label: string;
 }
 
-export interface RootCauseCategoryOption {
-  id: number;
-  label: string;
-  root_causes: IncidentReportOption[];
-}
-
 export interface IncidentReportOptions {
   vessels: IncidentReportOption[];
   years: string[];
-  nature_of_incidents: IncidentReportOption[];
-  incident_locations: IncidentReportOption[];
-  incident_operations: IncidentReportOption[];
-  types_of_injury: IncidentReportOption[];
-  locations_of_injury: IncidentReportOption[];
-  root_cause_categories: RootCauseCategoryOption[];
 }

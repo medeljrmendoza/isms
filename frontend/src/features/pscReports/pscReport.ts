@@ -45,5 +45,4 @@ export interface PscReportOption {
 
 export interface PscReportOptions {
   vessels: PscReportOption[];
-  mou_authorities: PscReportOption[];
 }

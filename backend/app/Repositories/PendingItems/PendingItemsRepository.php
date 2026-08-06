@@ -2,7 +2,6 @@
 
 namespace App\Repositories\PendingItems;
 
-use App\Models\Vessel;
 use App\Repositories\CompanyInspections\AuditReportRepository;
 use App\Repositories\Defects\DefectRepository;
 use App\Repositories\ExternalAudits\ExternalAuditReportRepository;
@@ -17,7 +16,6 @@ use App\Repositories\PscReports\PscReportRepository;
 use App\Repositories\RiskAssessment\RiskAssessmentRepository;
 use App\Repositories\Sire\SireReportRepository;
 use App\Support\LegacyDb;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -56,41 +54,6 @@ class PendingItemsRepository
         private readonly MasterReviewRepository $masterReviews,
         private readonly IspsReviewRepository $ispsReviews,
     ) {}
-
-    /** Local seed-data path: every vessel, no per-user scoping (same as every other dashlet's local path). */
-    public function table(): array
-    {
-        $vessels = Vessel::query()->orderBy('name')->get();
-
-        $counts = [
-            'incident' => $this->countsByVessel($this->incidentReports->pendingQuery()),
-            'company' => $this->countsByVessel($this->companyInspections->pendingQuery()),
-            'internal' => $this->countsByVessel($this->internalAudits->pendingQuery()),
-            'external' => $this->countsByVessel($this->externalAudits->pendingQuery()),
-            'psc' => $this->countsByVessel($this->pscReports->pendingQuery()),
-            'risk_assessment' => $this->countsByVessel($this->riskAssessments->pendingQuery()),
-            'sire' => $this->countsByVessel($this->sireReports->pendingQuery()),
-            'non_sire' => $this->countsByVessel($this->nonSireReports->pendingQuery()),
-            'flag_state' => $this->countsByVessel($this->flagStateReports->pendingQuery()),
-            'nc' => $this->countsByVessel($this->nonconformities->pendingQuery()),
-            'defect' => $this->countsByVessel($this->defects->pendingQuery()),
-            'master_review' => $this->countsByVessel($this->masterReviews->pendingQuery()),
-            'isps_review' => $this->countsByVessel($this->ispsReviews->pendingQuery()),
-        ];
-
-        return $vessels->map(fn (Vessel $v) => $this->row((string) $v->id, $v->display_name, $counts))->all();
-    }
-
-    /** @return array<int|string, int> vessel_id => pending count */
-    private function countsByVessel(Builder $builder): array
-    {
-        return $builder->toBase()
-            ->whereNotNull('vessel_id')
-            ->selectRaw('vessel_id, COUNT(*) as cnt')
-            ->groupBy('vessel_id')
-            ->pluck('cnt', 'vessel_id')
-            ->all();
-    }
 
     /**
      * Legacy path. Ported from index()'s summary_query: vessels the user

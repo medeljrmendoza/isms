@@ -5,7 +5,6 @@ import type {
   CompanyInspectionListResponse,
   CompanyInspectionOptions,
 } from "./companyInspection";
-import type { CompanyInspectionFormValues } from "./companyInspectionSchema";
 
 export interface CompanyInspectionListParams {
   page: number;
@@ -17,6 +16,7 @@ export interface CompanyInspectionListParams {
   vessel_id?: string;
 }
 
+/** Read-only: Add/Edit/Delete have no legacy write-back path — see CompanyInspectionsPage. */
 export const companyInspectionService = {
   async list(params: CompanyInspectionListParams): Promise<CompanyInspectionListResponse> {
     const response = await axiosClient.get<ApiResource<CompanyInspectionListResponse>>("/company-inspections", { params });
@@ -31,19 +31,5 @@ export const companyInspectionService = {
   async show(id: number | string): Promise<CompanyInspectionDetail> {
     const response = await axiosClient.get<ApiResource<CompanyInspectionDetail>>(`/company-inspections/${id}`);
     return response.data.data;
-  },
-
-  async create(values: CompanyInspectionFormValues): Promise<CompanyInspectionDetail> {
-    const response = await axiosClient.post<ApiResource<CompanyInspectionDetail>>("/company-inspections", values);
-    return response.data.data;
-  },
-
-  async update(id: number, values: CompanyInspectionFormValues): Promise<CompanyInspectionDetail> {
-    const response = await axiosClient.put<ApiResource<CompanyInspectionDetail>>(`/company-inspections/${id}`, values);
-    return response.data.data;
-  },
-
-  async destroy(id: number): Promise<void> {
-    await axiosClient.delete(`/company-inspections/${id}`);
   },
 };

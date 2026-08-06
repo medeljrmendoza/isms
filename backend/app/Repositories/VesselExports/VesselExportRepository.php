@@ -2,10 +2,7 @@
 
 namespace App\Repositories\VesselExports;
 
-use App\Models\VesselExports\VesselExport;
 use App\Support\TableQuery;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -27,27 +24,6 @@ class VesselExportRepository
     public static function columns(): array
     {
         return self::COLUMNS;
-    }
-
-    /** loadImportData() always filters flag='0' — both the compact dashlet and the "Show Larger" modal call the exact same endpoint. */
-    private function pendingQuery(): Builder
-    {
-        return VesselExport::query()->where('status', false);
-    }
-
-    public function table(TableQuery $query): LengthAwarePaginator
-    {
-        $builder = $this->pendingQuery();
-
-        if ($query->search !== null) {
-            $builder->where('vessel_file', 'like', "%{$query->search}%");
-        }
-
-        $sortable = array_column(array_filter(self::COLUMNS, fn ($c) => $c['sortable']), 'key');
-        $sort = in_array($query->sort, $sortable, true) ? $query->sort : 'vessel_file';
-
-        return $builder->orderBy($sort, $query->direction)
-            ->paginate($query->perPage, page: $query->page);
     }
 
     /** Ported from loadImportData(): vessel_file is truncated to its first 19 characters (the vessel code + export timestamp) before display. */

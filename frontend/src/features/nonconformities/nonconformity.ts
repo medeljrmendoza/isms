@@ -71,5 +71,4 @@ export interface NonconformityOption {
 
 export interface NonconformityOptions {
   vessels: NonconformityOption[];
-  manual_chapters: NonconformityOption[];
 }

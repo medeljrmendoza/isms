@@ -42,6 +42,4 @@ export interface CompanyInspectionOption {
 
 export interface CompanyInspectionOptions {
   vessels: CompanyInspectionOption[];
-  audit_types: CompanyInspectionOption[];
-  audit_kinds: CompanyInspectionOption[];
 }

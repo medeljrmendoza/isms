@@ -17,7 +17,7 @@ return [
     |
     */
 
-    'default' => env('DB_CONNECTION', 'sqlite'),
+    'default' => env('DB_CONNECTION', 'legacy'),
 
     /*
     |--------------------------------------------------------------------------
@@ -31,18 +31,6 @@ return [
     */
 
     'connections' => [
-
-        'sqlite' => [
-            'driver' => 'sqlite',
-            'url' => env('DB_URL'),
-            'database' => env('DB_DATABASE', database_path('database.sqlite')),
-            'prefix' => '',
-            'foreign_key_constraints' => env('DB_FOREIGN_KEYS', true),
-            'busy_timeout' => null,
-            'journal_mode' => null,
-            'synchronous' => null,
-            'transaction_mode' => 'DEFERRED',
-        ],
 
         'mysql' => [
             'driver' => 'mysql',
@@ -99,10 +87,10 @@ return [
             'sslmode' => env('DB_SSLMODE', 'prefer'),
         ],
 
-        // Read-only connection to the legacy CI-ISMS staging database (real
-        // client data — no migrations are ever run against this connection,
-        // it's never the default, and only queried directly for the login
-        // bridge and the demo dashlets that read legacy tables as-is).
+        // The live CI-ISMS staging database — the app's only real data
+        // store. Also aliased as the default connection below so
+        // DB::connection('legacy') and an unqualified DB::/Eloquent call
+        // hit the same database; no local database of any kind is used.
         'legacy' => [
             'driver' => 'mysql',
             'host' => env('DB_LEGACY_HOST', '127.0.0.1'),

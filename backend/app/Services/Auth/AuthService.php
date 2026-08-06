@@ -3,7 +3,6 @@
 namespace App\Services\Auth;
 
 use App\Models\User;
-use App\Repositories\Auth\LegacyUserRepository;
 use App\Repositories\Auth\UserRepository;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -25,7 +24,6 @@ class AuthService
 
     public function __construct(
         private readonly UserRepository $users,
-        private readonly LegacyUserRepository $legacyUsers,
     ) {}
 
     /**
@@ -43,20 +41,14 @@ class AuthService
 
         $user = $this->users->findActiveByUsername($username);
 
-        if ($user && $this->verifyPassword($user, $password)) {
-            return $this->completeLogin($user, $ipKey, $usernameKey, $request);
-        }
-
-        $legacyUser = $this->legacyUsers->findActiveByUsername($username);
-
-        if (! $legacyUser || ! Hash::check($password, $legacyUser->password)) {
+        if (! $user || ! $this->verifyPassword($user, $password)) {
             RateLimiter::hit($ipKey, self::DECAY_SECONDS);
             RateLimiter::hit($usernameKey, self::DECAY_SECONDS);
 
             throw $this->invalidCredentialsException();
         }
 
-        return $this->completeLogin($this->users->syncFromLegacy($legacyUser), $ipKey, $usernameKey, $request);
+        return $this->completeLogin($user, $ipKey, $usernameKey, $request);
     }
 
     private function completeLogin(User $user, string $ipKey, string $usernameKey, Request $request): User

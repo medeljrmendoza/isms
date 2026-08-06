@@ -5,7 +5,6 @@ import type {
   InternalAuditListResponse,
   InternalAuditOptions,
 } from "./internalAudit";
-import type { InternalAuditFormValues } from "./internalAuditSchema";
 
 export interface InternalAuditListParams {
   page: number;
@@ -16,6 +15,7 @@ export interface InternalAuditListParams {
   vessel_id?: string;
 }
 
+/** Read-only: Add/Edit/Delete have no legacy write-back path — see InternalAuditsPage. */
 export const internalAuditService = {
   async list(params: InternalAuditListParams): Promise<InternalAuditListResponse> {
     const response = await axiosClient.get<ApiResource<InternalAuditListResponse>>("/internal-audits", { params });
@@ -30,19 +30,5 @@ export const internalAuditService = {
   async show(id: number | string): Promise<InternalAuditDetail> {
     const response = await axiosClient.get<ApiResource<InternalAuditDetail>>(`/internal-audits/${id}`);
     return response.data.data;
-  },
-
-  async create(values: InternalAuditFormValues): Promise<InternalAuditDetail> {
-    const response = await axiosClient.post<ApiResource<InternalAuditDetail>>("/internal-audits", values);
-    return response.data.data;
-  },
-
-  async update(id: number, values: InternalAuditFormValues): Promise<InternalAuditDetail> {
-    const response = await axiosClient.put<ApiResource<InternalAuditDetail>>(`/internal-audits/${id}`, values);
-    return response.data.data;
-  },
-
-  async destroy(id: number): Promise<void> {
-    await axiosClient.delete(`/internal-audits/${id}`);
   },
 };

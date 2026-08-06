@@ -89,54 +89,27 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/nonconformities/options', [NonconformityController::class, 'options']);
     Route::get('/nonconformities', [NonconformityController::class, 'index']);
-    Route::post('/nonconformities', [NonconformityController::class, 'store']);
     Route::get('/nonconformities/{nonconformity}', [NonconformityController::class, 'show']);
-    Route::put('/nonconformities/{nonconformity}', [NonconformityController::class, 'update']);
-    Route::delete('/nonconformities/{nonconformity}', [NonconformityController::class, 'destroy']);
-    Route::post('/nonconformities/{nonconformity}/publish', [NonconformityController::class, 'publish']);
-    Route::post('/nonconformities/{nonconformity}/approve', [NonconformityController::class, 'approve']);
-    Route::post('/nonconformities/{nonconformity}/reopen', [NonconformityController::class, 'reopen']);
 
     Route::get('/incident-reports/options', [IncidentReportController::class, 'options']);
     Route::get('/incident-reports', [IncidentReportController::class, 'index']);
-    Route::post('/incident-reports', [IncidentReportController::class, 'store']);
     Route::get('/incident-reports/{incidentReport}', [IncidentReportController::class, 'show']);
-    Route::put('/incident-reports/{incidentReport}', [IncidentReportController::class, 'update']);
-    Route::delete('/incident-reports/{incidentReport}', [IncidentReportController::class, 'destroy']);
-    Route::post('/incident-reports/{incidentReport}/publish', [IncidentReportController::class, 'publish']);
-    Route::post('/incident-reports/{incidentReport}/approve', [IncidentReportController::class, 'approve']);
-    Route::post('/incident-reports/{incidentReport}/reopen', [IncidentReportController::class, 'reopen']);
 
     Route::get('/psc-reports/options', [PscReportController::class, 'options']);
     Route::get('/psc-reports', [PscReportController::class, 'index']);
-    Route::post('/psc-reports', [PscReportController::class, 'store']);
     Route::get('/psc-reports/{pscReport}', [PscReportController::class, 'show']);
-    Route::put('/psc-reports/{pscReport}', [PscReportController::class, 'update']);
-    Route::delete('/psc-reports/{pscReport}', [PscReportController::class, 'destroy']);
-    Route::post('/psc-reports/{pscReport}/reopen', [PscReportController::class, 'reopen']);
 
     Route::get('/company-inspections/options', [CompanyInspectionController::class, 'options']);
     Route::get('/company-inspections', [CompanyInspectionController::class, 'index']);
-    Route::post('/company-inspections', [CompanyInspectionController::class, 'store']);
     Route::get('/company-inspections/{auditReport}', [CompanyInspectionController::class, 'show']);
-    Route::put('/company-inspections/{auditReport}', [CompanyInspectionController::class, 'update']);
-    Route::delete('/company-inspections/{auditReport}', [CompanyInspectionController::class, 'destroy']);
 
     Route::get('/internal-audits/options', [InternalAuditController::class, 'options']);
     Route::get('/internal-audits', [InternalAuditController::class, 'index']);
-    Route::post('/internal-audits', [InternalAuditController::class, 'store']);
     Route::get('/internal-audits/{internalAuditReport}', [InternalAuditController::class, 'show']);
-    Route::put('/internal-audits/{internalAuditReport}', [InternalAuditController::class, 'update']);
-    Route::delete('/internal-audits/{internalAuditReport}', [InternalAuditController::class, 'destroy']);
 
     Route::get('/external-audits/options', [ExternalAuditController::class, 'options']);
     Route::get('/external-audits', [ExternalAuditController::class, 'index']);
-    Route::post('/external-audits', [ExternalAuditController::class, 'store']);
     Route::get('/external-audits/{externalAuditReport}', [ExternalAuditController::class, 'show']);
-    Route::put('/external-audits/{externalAuditReport}', [ExternalAuditController::class, 'update']);
-    Route::delete('/external-audits/{externalAuditReport}', [ExternalAuditController::class, 'destroy']);
-    Route::post('/external-audits/{externalAuditReport}/publish', [ExternalAuditController::class, 'publish']);
-    Route::post('/external-audits/{externalAuditReport}/approve', [ExternalAuditController::class, 'approve']);
 
     Route::get('/sire-reports/options', [SireReportController::class, 'options']);
     Route::get('/sire-reports', [SireReportController::class, 'index']);
