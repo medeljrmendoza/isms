@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Defects;
 
+use App\Support\LegacyDb;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -40,7 +41,7 @@ class DefectRequest extends FormRequest
         ];
 
         if ($this->isMethod('post')) {
-            $rules['vessel_id'] = ['required', 'exists:vessels,id'];
+            $rules['vessel_id'] = LegacyDb::isConfigured() ? ['required', 'string'] : ['required', 'exists:vessels,id'];
         }
 
         return $rules;

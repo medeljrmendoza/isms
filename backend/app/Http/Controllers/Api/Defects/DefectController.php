@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Defects\DefectRequest;
 use App\Models\Defects\Defect;
 use App\Repositories\Defects\DefectRepository;
+use App\Support\LegacyDb;
 use App\Support\TableQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -30,11 +31,9 @@ class DefectController extends Controller
      */
     public function options(): JsonResponse
     {
-        return response()->json([
-            'data' => [
-                'vessels' => $this->defects->vesselOptions(),
-            ],
-        ]);
+        $vessels = LegacyDb::isConfigured() ? $this->defects->legacyVesselOptions() : $this->defects->vesselOptions();
+
+        return response()->json(['data' => ['vessels' => $vessels]]);
     }
 
     /**
@@ -42,6 +41,25 @@ class DefectController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        if (LegacyDb::isConfigured()) {
+            $result = $this->defects->legacyFullTable(
+                $this->stringOrNull($request->query('vessel_id')),
+                $request->query('date_from') ?: null,
+                $request->query('date_to') ?: null,
+                $request->query('priority') ?: null,
+                TableQuery::fromRequest($request),
+                $request->user()?->legacy_user_id,
+            );
+
+            return response()->json([
+                'data' => [
+                    'columns' => DefectRepository::columns(),
+                    'rows' => $result['rows'],
+                    'meta' => $result['meta'],
+                ],
+            ]);
+        }
+
         $paginator = $this->defects->fullTable(
             $this->intOrNull($request->query('vessel_id')),
             $request->query('date_from') ?: null,
@@ -61,12 +79,22 @@ class DefectController extends Controller
 
     /**
      * GET /api/defects/{defect}
+     *
+     * String param (not an Eloquent-bound model) so a legacy defectID —
+     * a string with no matching local row — can reach legacyDetail().
      */
-    public function show(Defect $defect): JsonResponse
+    public function show(string $defect): JsonResponse
     {
-        $defect->load('vessel');
+        if (LegacyDb::isConfigured()) {
+            $detail = $this->defects->legacyDetail($defect);
+            abort_if($detail === null, 404);
 
-        return response()->json(['data' => $this->mapDetail($defect)]);
+            return response()->json(['data' => $detail]);
+        }
+
+        $model = Defect::query()->with('vessel')->findOrFail((int) $defect);
+
+        return response()->json(['data' => $this->mapDetail($model)]);
     }
 
     /**
@@ -74,6 +102,10 @@ class DefectController extends Controller
      */
     public function store(DefectRequest $request): JsonResponse
     {
+        if (LegacyDb::isConfigured()) {
+            return response()->json(['data' => $this->defects->legacyCreate($request->validated())], 201);
+        }
+
         $defect = $this->defects->create($request->validated());
         $defect->load('vessel');
 
@@ -83,16 +115,25 @@ class DefectController extends Controller
     /**
      * PUT /api/defects/{defect}
      */
-    public function update(DefectRequest $request, Defect $defect): JsonResponse
+    public function update(DefectRequest $request, string $defect): JsonResponse
     {
-        $defect = $this->defects->update($defect, $request->validated());
-        $defect->load('vessel');
+        if (LegacyDb::isConfigured()) {
+            return response()->json(['data' => $this->defects->legacyUpdate($defect, $request->validated())]);
+        }
 
-        return response()->json(['data' => $this->mapDetail($defect)]);
+        $model = $this->defects->update(Defect::query()->findOrFail((int) $defect), $request->validated());
+        $model->load('vessel');
+
+        return response()->json(['data' => $this->mapDetail($model)]);
     }
 
     /**
      * DELETE /api/defects/{defect}
+     *
+     * Legacy has no delete endpoint for tb_defect_list (confirmed via
+     * Defect_list.php) — the frontend never offers delete for
+     * legacy-sourced (string-ID) rows, matching the "no unreachable
+     * actions" rule used throughout this migration.
      */
     public function destroy(Defect $defect): JsonResponse
     {
@@ -104,6 +145,11 @@ class DefectController extends Controller
     private function intOrNull(mixed $value): ?int
     {
         return $value === null || $value === '' ? null : (int) $value;
+    }
+
+    private function stringOrNull(mixed $value): ?string
+    {
+        return $value === null || $value === '' ? null : (string) $value;
     }
 
     private function mapRow(Defect $d): array
@@ -120,6 +166,7 @@ class DefectController extends Controller
             'present_status' => $d->present_status,
             'expected_compl_date' => $d->expected_compl_date?->format('Y-m-d'),
             'compl_date' => $d->compl_date?->format('Y-m-d'),
+            'can_edit' => true,
         ];
     }
 

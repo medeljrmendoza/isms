@@ -1,5 +1,5 @@
 export interface DefectOption {
-  id: number;
+  id: number | string;
   label: string;
 }
 
@@ -8,7 +8,7 @@ export interface DefectOptions {
 }
 
 export interface DefectRow {
-  id: number;
+  id: number | string;
   sl_no: string;
   vessel: string;
   defect_date: string;
@@ -19,10 +19,11 @@ export interface DefectRow {
   present_status: string | null;
   expected_compl_date: string | null;
   compl_date: string | null;
+  can_edit: boolean;
 }
 
 export interface DefectDetail extends DefectRow {
-  vessel_id: number;
+  vessel_id: number | string;
   raised_by: string | null;
   vessel_remarks: string | null;
   shore_remarks: string | null;

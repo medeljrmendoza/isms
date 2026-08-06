@@ -14,7 +14,7 @@ const optionalCode = z.union([z.literal(""), z.string()]).optional();
 export function buildDefectSchema(isCreate: boolean) {
   return z.object({
     vessel_id: isCreate
-      ? z.union([z.number(), z.string()]).transform((v) => Number(v)).refine((v) => v > 0, "Please select a Vessel.")
+      ? z.union([z.number(), z.string()]).refine((v) => String(v).length > 0, "Please select a Vessel.")
       : z.union([z.number(), z.string()]).optional(),
     sl_no: z.string().trim().min(1, "Required Field"),
     defect_date: z.string().trim().min(1, "Required Field"),

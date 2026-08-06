@@ -4,7 +4,7 @@ import type { DefectDetail, DefectListResponse, DefectOptions } from "./defects"
 import type { DefectFormValues } from "./defectsSchema";
 
 export interface DefectListParams {
-  vessel_id?: number;
+  vessel_id?: number | string;
   date_from?: string;
   date_to?: string;
   priority?: string;
@@ -26,7 +26,7 @@ export const defectsService = {
     return response.data.data;
   },
 
-  async show(id: number): Promise<DefectDetail> {
+  async show(id: number | string): Promise<DefectDetail> {
     const response = await axiosClient.get<ApiResource<DefectDetail>>(`/defects/${id}`);
     return response.data.data;
   },
@@ -36,7 +36,7 @@ export const defectsService = {
     return response.data.data;
   },
 
-  async update(id: number, values: DefectFormValues): Promise<DefectDetail> {
+  async update(id: number | string, values: DefectFormValues): Promise<DefectDetail> {
     const response = await axiosClient.put<ApiResource<DefectDetail>>(`/defects/${id}`, values);
     return response.data.data;
   },

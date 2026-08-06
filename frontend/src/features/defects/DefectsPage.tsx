@@ -63,7 +63,7 @@ export function DefectsPage() {
     setLoading(true);
     defectsService
       .list({
-        vessel_id: applied.vesselId ? Number(applied.vesselId) : undefined,
+        vessel_id: applied.vesselId || undefined,
         date_from: applied.dateFrom || undefined,
         date_to: applied.dateTo || undefined,
         priority: applied.priority || undefined,
@@ -118,7 +118,7 @@ export function DefectsPage() {
 
   const reload = () => setReloadKey((k) => k + 1);
 
-  const openEdit = async (id: number) => {
+  const openEdit = async (id: number | string) => {
     setActionError(null);
     try {
       const detail = await defectsService.show(id);
@@ -129,7 +129,7 @@ export function DefectsPage() {
     }
   };
 
-  const openView = async (id: number) => {
+  const openView = async (id: number | string) => {
     setActionError(null);
     try {
       const detail = await defectsService.show(id);
@@ -250,9 +250,11 @@ export function DefectsPage() {
                   <td className="whitespace-nowrap px-2 py-1.5 text-slate-700">{row.expected_compl_date ?? "—"}</td>
                   <td className="whitespace-nowrap px-2 py-1.5 text-slate-700">{row.compl_date ?? "—"}</td>
                   <td className="px-2 py-1.5">
-                    <Button type="button" variant="secondary" className="!px-1.5 !py-0.5 text-xs" onClick={() => openEdit(row.id)}>
-                      Edit
-                    </Button>
+                    {row.can_edit && (
+                      <Button type="button" variant="secondary" className="!px-1.5 !py-0.5 text-xs" onClick={() => openEdit(row.id)}>
+                        Edit
+                      </Button>
+                    )}
                   </td>
                 </tr>
               ))}
