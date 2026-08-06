@@ -25,7 +25,7 @@ class PmsDepartmentController extends Controller
             $result = $this->departments->legacyTable(TableQuery::fromRequest($request));
 
             return response()->json([
-                'data' => ['rows' => $result['rows'], 'meta' => $result['meta'], 'can_create_record' => false],
+                'data' => ['rows' => $result['rows'], 'meta' => $result['meta'], 'can_create_record' => true],
             ]);
         }
 
@@ -48,6 +48,10 @@ class PmsDepartmentController extends Controller
         $data = $request->validate(['name' => 'required|string|max:255']);
         $data['name'] = strtoupper($data['name']);
 
+        if (LegacyDb::isConfigured()) {
+            return response()->json(['data' => $this->departments->legacyCreate($data)], 201);
+        }
+
         $department = $this->departments->create($data);
 
         return response()->json(['data' => $this->mapRow($department)], 201);
@@ -55,13 +59,20 @@ class PmsDepartmentController extends Controller
 
     /**
      * PUT /api/pms-departments/{pmsDepartment}
+     *
+     * String param (not an Eloquent-bound model) so a legacy deptID — a
+     * string with no matching local row — can reach legacyUpdate().
      */
-    public function update(Request $request, PmsDepartment $pmsDepartment): JsonResponse
+    public function update(Request $request, string $pmsDepartment): JsonResponse
     {
         $data = $request->validate(['name' => 'required|string|max:255']);
         $data['name'] = strtoupper($data['name']);
 
-        $department = $this->departments->update($pmsDepartment, $data);
+        if (LegacyDb::isConfigured()) {
+            return response()->json(['data' => $this->departments->legacyUpdate($pmsDepartment, $data)]);
+        }
+
+        $department = $this->departments->update(PmsDepartment::query()->findOrFail((int) $pmsDepartment), $data);
 
         return response()->json(['data' => $this->mapRow($department)]);
     }
@@ -69,9 +80,13 @@ class PmsDepartmentController extends Controller
     /**
      * POST /api/pms-departments/{pmsDepartment}/toggle-status
      */
-    public function toggleStatus(PmsDepartment $pmsDepartment): JsonResponse
+    public function toggleStatus(string $pmsDepartment): JsonResponse
     {
-        $department = $this->departments->toggleStatus($pmsDepartment);
+        if (LegacyDb::isConfigured()) {
+            return response()->json(['data' => $this->departments->legacyToggleStatus($pmsDepartment)]);
+        }
+
+        $department = $this->departments->toggleStatus(PmsDepartment::query()->findOrFail((int) $pmsDepartment));
 
         return response()->json(['data' => $this->mapRow($department)]);
     }

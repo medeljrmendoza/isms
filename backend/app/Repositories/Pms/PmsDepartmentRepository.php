@@ -12,6 +12,9 @@ use Illuminate\Support\Facades\DB;
  * exists in legacy but has no reachable button in loadData()'s render
  * (only Edit + activate/inactivate) — dropped here per the
  * no-unreachable-actions convention used throughout this migration.
+ * Add/Edit/toggle-status DO write to the legacy connection when reading
+ * from legacy — legacy genuinely supports these actions on
+ * tb_pms_department, so read-only-by-default doesn't apply here.
  */
 class PmsDepartmentRepository
 {
@@ -49,12 +52,7 @@ class PmsDepartmentRepository
 
         $paginator = $builder->orderBy($sort, $query->direction)->paginate($query->perPage, page: $query->page);
 
-        $rows = collect($paginator->items())->map(fn ($d) => [
-            'id' => $d->deptID,
-            'name' => $d->department_name,
-            'is_active' => (bool) $d->status,
-            'can_edit' => false,
-        ])->all();
+        $rows = collect($paginator->items())->map(fn ($d) => $this->mapLegacyRow($d))->all();
 
         return [
             'rows' => $rows,
@@ -64,6 +62,59 @@ class PmsDepartmentRepository
                 'per_page' => $paginator->perPage(),
                 'total' => $paginator->total(),
             ],
+        ];
+    }
+
+    /** Ported from add_department()'s insert branch, writing to the legacy connection. */
+    public function legacyCreate(array $data): array
+    {
+        $deptId = 'pdept'.uniqid();
+
+        DB::connection('legacy')->table('tb_pms_department')->insert([
+            'deptID' => $deptId,
+            'department_name' => $data['name'],
+            'status' => 1,
+            'datetime' => now(),
+        ]);
+
+        return $this->legacyFind($deptId);
+    }
+
+    /** Ported from add_department()'s edit branch, writing to the legacy connection. */
+    public function legacyUpdate(string $deptId, array $data): array
+    {
+        DB::connection('legacy')->table('tb_pms_department')
+            ->where('deptID', $deptId)
+            ->update(['department_name' => $data['name']]);
+
+        return $this->legacyFind($deptId);
+    }
+
+    /** Ported from edit_stat(): flips active/inactive on the legacy connection. */
+    public function legacyToggleStatus(string $deptId): array
+    {
+        $legacy = DB::connection('legacy');
+        $current = (int) $legacy->table('tb_pms_department')->where('deptID', $deptId)->value('status');
+
+        $legacy->table('tb_pms_department')->where('deptID', $deptId)->update(['status' => $current ? 0 : 1]);
+
+        return $this->legacyFind($deptId);
+    }
+
+    private function legacyFind(string $deptId): array
+    {
+        $d = DB::connection('legacy')->table('tb_pms_department')->where('deptID', $deptId)->first();
+
+        return $this->mapLegacyRow($d);
+    }
+
+    private function mapLegacyRow(object $d): array
+    {
+        return [
+            'id' => $d->deptID,
+            'name' => $d->department_name,
+            'is_active' => (bool) $d->status,
+            'can_edit' => true,
         ];
     }
 

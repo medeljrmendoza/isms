@@ -24,7 +24,7 @@ class PmsClassificationController extends Controller
         return response()->json(['data' => [
             'departments' => $legacy ? $this->classifications->legacyDepartmentOptions() : $this->classifications->departmentOptions(),
             'vessel_types' => $legacy ? $this->classifications->legacyVesselTypeOptions() : $this->classifications->vesselTypeOptions(),
-            'can_create_record' => ! $legacy,
+            'can_create_record' => true,
         ]]);
     }
 
@@ -55,28 +55,59 @@ class PmsClassificationController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        $data = $this->validateData($request);
+        if (LegacyDb::isConfigured()) {
+            $data = $this->validateData($request, legacy: true);
+
+            return response()->json(['data' => $this->classifications->legacyCreate($data)], 201);
+        }
+
+        $data = $this->validateData($request, legacy: false);
         $classification = $this->classifications->create($data);
 
         return response()->json(['data' => $this->mapDetail($this->classifications->detail($classification))], 201);
     }
 
-    public function show(PmsClassification $pmsClassification): JsonResponse
+    /**
+     * GET /api/pms-classifications/{pmsClassification}
+     *
+     * String param (not an Eloquent-bound model) so a legacy classID —
+     * a string with no matching local row — can reach legacyDetail().
+     */
+    public function show(string $pmsClassification): JsonResponse
     {
-        return response()->json(['data' => $this->mapDetail($this->classifications->detail($pmsClassification))]);
-    }
+        if (LegacyDb::isConfigured()) {
+            $detail = $this->classifications->legacyDetail($pmsClassification);
+            abort_if($detail === null, 404);
 
-    public function update(Request $request, PmsClassification $pmsClassification): JsonResponse
-    {
-        $data = $this->validateData($request);
-        $classification = $this->classifications->update($pmsClassification, $data);
+            return response()->json(['data' => $detail]);
+        }
+
+        $classification = PmsClassification::query()->findOrFail((int) $pmsClassification);
 
         return response()->json(['data' => $this->mapDetail($this->classifications->detail($classification))]);
     }
 
-    public function toggleStatus(PmsClassification $pmsClassification): JsonResponse
+    public function update(Request $request, string $pmsClassification): JsonResponse
     {
-        $classification = $this->classifications->toggleStatus($pmsClassification);
+        if (LegacyDb::isConfigured()) {
+            $data = $this->validateData($request, legacy: true);
+
+            return response()->json(['data' => $this->classifications->legacyUpdate($pmsClassification, $data)]);
+        }
+
+        $data = $this->validateData($request, legacy: false);
+        $classification = $this->classifications->update(PmsClassification::query()->findOrFail((int) $pmsClassification), $data);
+
+        return response()->json(['data' => $this->mapDetail($this->classifications->detail($classification))]);
+    }
+
+    public function toggleStatus(string $pmsClassification): JsonResponse
+    {
+        if (LegacyDb::isConfigured()) {
+            return response()->json(['data' => $this->classifications->legacyToggleStatus($pmsClassification)]);
+        }
+
+        $classification = $this->classifications->toggleStatus(PmsClassification::query()->findOrFail((int) $pmsClassification));
 
         return response()->json(['data' => $this->mapRow($classification->loadCount(['departments', 'vesselTypes', 'subClassifications']))]);
     }
@@ -92,7 +123,7 @@ class PmsClassificationController extends Controller
         if (LegacyDb::isConfigured()) {
             $result = $this->classifications->legacySubTable($pmsClassification, TableQuery::fromRequest($request));
 
-            return response()->json(['data' => [...$result, 'can_create_record' => false]]);
+            return response()->json(['data' => [...$result, 'can_create_record' => true]]);
         }
 
         $classification = PmsClassification::query()->findOrFail((int) $pmsClassification);
@@ -108,30 +139,57 @@ class PmsClassificationController extends Controller
         ]);
     }
 
-    public function subStore(Request $request, PmsClassification $pmsClassification): JsonResponse
+    public function subStore(Request $request, string $pmsClassification): JsonResponse
     {
         $data = $this->validateSubData($request);
-        $sub = $this->classifications->createSub($pmsClassification, $data);
+
+        if (LegacyDb::isConfigured()) {
+            return response()->json(['data' => $this->classifications->legacyCreateSub($pmsClassification, $data)], 201);
+        }
+
+        $classification = PmsClassification::query()->findOrFail((int) $pmsClassification);
+        $sub = $this->classifications->createSub($classification, $data);
 
         return response()->json(['data' => $this->mapSubRow($sub)], 201);
     }
 
-    public function subShow(PmsSubClassification $pmsSubClassification): JsonResponse
+    /**
+     * GET /api/pms-sub-classifications/{pmsSubClassification}
+     *
+     * String param so a legacy subClassID can be handled without an
+     * Eloquent-bound model.
+     */
+    public function subShow(string $pmsSubClassification): JsonResponse
     {
-        return response()->json(['data' => $this->mapSubRow($pmsSubClassification)]);
-    }
+        if (LegacyDb::isConfigured()) {
+            return response()->json(['data' => $this->classifications->legacySubRow($pmsSubClassification)]);
+        }
 
-    public function subUpdate(Request $request, PmsSubClassification $pmsSubClassification): JsonResponse
-    {
-        $data = $this->validateSubData($request);
-        $sub = $this->classifications->updateSub($pmsSubClassification, $data);
+        $sub = PmsSubClassification::query()->findOrFail((int) $pmsSubClassification);
 
         return response()->json(['data' => $this->mapSubRow($sub)]);
     }
 
-    public function subToggleStatus(PmsSubClassification $pmsSubClassification): JsonResponse
+    public function subUpdate(Request $request, string $pmsSubClassification): JsonResponse
     {
-        $sub = $this->classifications->toggleSubStatus($pmsSubClassification);
+        $data = $this->validateSubData($request);
+
+        if (LegacyDb::isConfigured()) {
+            return response()->json(['data' => $this->classifications->legacyUpdateSub($pmsSubClassification, $data)]);
+        }
+
+        $sub = $this->classifications->updateSub(PmsSubClassification::query()->findOrFail((int) $pmsSubClassification), $data);
+
+        return response()->json(['data' => $this->mapSubRow($sub)]);
+    }
+
+    public function subToggleStatus(string $pmsSubClassification): JsonResponse
+    {
+        if (LegacyDb::isConfigured()) {
+            return response()->json(['data' => $this->classifications->legacyToggleSubStatus($pmsSubClassification)]);
+        }
+
+        $sub = $this->classifications->toggleSubStatus(PmsSubClassification::query()->findOrFail((int) $pmsSubClassification));
 
         return response()->json(['data' => $this->mapSubRow($sub)]);
     }
@@ -141,15 +199,15 @@ class PmsClassificationController extends Controller
         return $value === null || $value === '' ? null : (string) $value;
     }
 
-    private function validateData(Request $request): array
+    private function validateData(Request $request, bool $legacy): array
     {
         $data = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
             'department_ids' => 'array',
-            'department_ids.*' => 'integer|exists:pms_departments,id',
+            'department_ids.*' => $legacy ? 'string' : 'integer|exists:pms_departments,id',
             'vessel_type_ids' => 'array',
-            'vessel_type_ids.*' => 'integer|exists:vessel_types,id',
+            'vessel_type_ids.*' => $legacy ? 'string' : 'integer|exists:vessel_types,id',
         ]);
 
         $data['name'] = strtoupper($data['name']);
