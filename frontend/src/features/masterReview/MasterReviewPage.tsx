@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
 import { masterReviewService } from "./masterReviewService";
 import type { MasterReviewDetail, MasterReviewOption, MasterReviewRow } from "./masterReview";
-import { Modal } from "../../components/ui/Modal";
 import { Button } from "../../components/ui/Button";
-import { MasterReviewForm } from "./MasterReviewForm";
+import { MasterReviewViewModal } from "./MasterReviewViewModal";
 
 const PER_PAGE = 10;
 
@@ -33,7 +32,12 @@ function StatusBadge({ status }: { status: string }) {
   return <span className={`text-xs font-semibold ${color}`}>{status}</span>;
 }
 
-/** Ported from admin/master_review/master_review_v.php. */
+/**
+ * Ported from admin/master_review/master_review_v.php. Read-only: Add/
+ * Edit/Approve/Disapprove/Disregard/Recommend Approval/Under Review/
+ * Reopen/Delete have no legacy write-back path — see
+ * MasterReviewRepository.
+ */
 export function MasterReviewPage() {
   const [vessels, setVessels] = useState<MasterReviewOption[]>([]);
   const [chapters, setChapters] = useState<MasterReviewOption[]>([]);
@@ -65,18 +69,13 @@ export function MasterReviewPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dateError, setDateError] = useState<string | null>(null);
-  const [reloadKey, setReloadKey] = useState(0);
 
-  const [formOpen, setFormOpen] = useState(false);
-  const [editing, setEditing] = useState<MasterReviewDetail | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [canCreateRecord, setCanCreateRecord] = useState(false);
+  const [viewing, setViewing] = useState<MasterReviewDetail | null>(null);
 
   useEffect(() => {
     masterReviewService.options().then((data) => {
       setVessels(data.vessels);
       setChapters(data.chapters);
-      setCanCreateRecord(data.can_create_record);
     }).catch(() => undefined);
   }, []);
 
@@ -104,7 +103,7 @@ export function MasterReviewPage() {
       })
       .catch(() => setError("Couldn't load Master Review records. Please try again."))
       .finally(() => setLoading(false));
-  }, [applied, page, sort, direction, reloadKey]);
+  }, [applied, page, sort, direction]);
 
   const handleSort = (columnKey: string) => {
     if (sort === columnKey) {
@@ -139,23 +138,9 @@ export function MasterReviewPage() {
     setPage(1);
   };
 
-  const reload = () => setReloadKey((k) => k + 1);
-
-  const openEdit = async (id: number | string) => {
-    setActionError(null);
+  const openView = async (id: number | string) => {
     const detail = await masterReviewService.show(id);
-    setEditing(detail);
-    setFormOpen(true);
-  };
-
-  const runAction = async (action: () => Promise<unknown>) => {
-    setActionError(null);
-    try {
-      await action();
-      reload();
-    } catch {
-      setActionError("Action failed. Please try again.");
-    }
+    setViewing(detail);
   };
 
   return (
@@ -163,19 +148,6 @@ export function MasterReviewPage() {
       <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
           <h1 className="text-base font-semibold text-slate-800">SMS Master Review</h1>
-          {canCreateRecord && (
-            <Button
-              type="button"
-              variant="success"
-              className="!px-3 !py-1.5 text-sm"
-              onClick={() => {
-                setEditing(null);
-                setFormOpen(true);
-              }}
-            >
-              + Add Record
-            </Button>
-          )}
         </div>
 
         <div className="flex flex-wrap items-end gap-3 border-b border-slate-100 px-4 py-3">
@@ -261,8 +233,6 @@ export function MasterReviewPage() {
           {dateError && <p className="text-sm text-red-600">{dateError}</p>}
         </div>
 
-        {actionError && <p className="px-4 pt-2 text-sm text-red-600">{actionError}</p>}
-
         <div className="overflow-x-auto px-4 py-3">
           <table className="w-full text-left text-sm">
             <thead>
@@ -279,14 +249,17 @@ export function MasterReviewPage() {
                     {sort === column.key && (direction === "asc" ? " ▲" : " ▼")}
                   </th>
                 ))}
-                <th className="px-2 py-1.5 font-semibold text-slate-600">ACTIONS</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((row) => (
                 <tr key={row.id} className="border-b border-slate-100">
                   <td className="px-2 py-1.5 text-slate-700">{row.vessel || "—"}</td>
-                  <td className="px-2 py-1.5 text-slate-700">{row.review_date}</td>
+                  <td className="px-2 py-1.5">
+                    <button type="button" className="text-blue-600 hover:underline" onClick={() => openView(row.id)}>
+                      {row.review_date}
+                    </button>
+                  </td>
                   <td className="px-2 py-1.5 text-slate-700">{row.added_by}</td>
                   <td className="px-2 py-1.5 text-slate-700">{row.review_quarter}</td>
                   <td className="px-2 py-1.5 text-slate-700">{row.review_year}</td>
@@ -299,94 +272,11 @@ export function MasterReviewPage() {
                   <td className="px-2 py-1.5">
                     <StatusBadge status={row.shore_status} />
                   </td>
-                  <td className="px-2 py-1.5">
-                    <div className="flex flex-wrap gap-1">
-                      {row.can_edit && (
-                        <Button type="button" variant="secondary" className="!px-1.5 !py-0.5 text-xs" onClick={() => openEdit(row.id)}>
-                          Edit
-                        </Button>
-                      )}
-                      {row.can_approve && (
-                        <Button
-                          type="button"
-                          variant="success"
-                          className="!px-1.5 !py-0.5 text-xs"
-                          onClick={() => runAction(() => masterReviewService.approve(row.id as number))}
-                        >
-                          Approve
-                        </Button>
-                      )}
-                      {row.can_recommend_approval && (
-                        <Button
-                          type="button"
-                          variant="success"
-                          className="!px-1.5 !py-0.5 text-xs"
-                          onClick={() => runAction(() => masterReviewService.recommendApproval(row.id as number))}
-                        >
-                          Recommend
-                        </Button>
-                      )}
-                      {row.can_under_review && (
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          className="!px-1.5 !py-0.5 text-xs"
-                          onClick={() => runAction(() => masterReviewService.underReview(row.id as number))}
-                        >
-                          Under Review
-                        </Button>
-                      )}
-                      {row.can_disapprove && (
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          className="!px-1.5 !py-0.5 text-xs text-red-600"
-                          onClick={() => runAction(() => masterReviewService.disapprove(row.id as number))}
-                        >
-                          Disapprove
-                        </Button>
-                      )}
-                      {row.can_disregard && (
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          className="!px-1.5 !py-0.5 text-xs text-red-600"
-                          onClick={() => runAction(() => masterReviewService.disregard(row.id as number))}
-                        >
-                          Disregard
-                        </Button>
-                      )}
-                      {row.can_reopen && (
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          className="!px-1.5 !py-0.5 text-xs"
-                          onClick={() => runAction(() => masterReviewService.reopen(row.id as number))}
-                        >
-                          Re-open
-                        </Button>
-                      )}
-                      {row.can_delete && (
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          className="!px-1.5 !py-0.5 text-xs text-red-600"
-                          onClick={() => {
-                            if (window.confirm(`Delete this review (${row.sms || row.review_date})?`)) {
-                              runAction(() => masterReviewService.destroy(row.id as number));
-                            }
-                          }}
-                        >
-                          Delete
-                        </Button>
-                      )}
-                    </div>
-                  </td>
                 </tr>
               ))}
               {rows.length === 0 && !loading && !error && (
                 <tr>
-                  <td colSpan={MODULE_COLUMNS.length + 1} className="px-2 py-6 text-center text-sm text-slate-400">
+                  <td colSpan={MODULE_COLUMNS.length} className="px-2 py-6 text-center text-sm text-slate-400">
                     No records.
                   </td>
                 </tr>
@@ -425,18 +315,7 @@ export function MasterReviewPage() {
         </div>
       </div>
 
-      {formOpen && (
-        <Modal title={editing ? `Edit Review — ${editing.sms || editing.review_date}` : "Add Master Review"} onClose={() => setFormOpen(false)}>
-          <MasterReviewForm
-            review={editing ?? undefined}
-            onCancel={() => setFormOpen(false)}
-            onSuccess={() => {
-              setFormOpen(false);
-              reload();
-            }}
-          />
-        </Modal>
-      )}
+      {viewing && <MasterReviewViewModal review={viewing} onClose={() => setViewing(null)} />}
     </div>
   );
 }

@@ -200,16 +200,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/master-review/options', [MasterReviewController::class, 'options']);
     Route::get('/master-review/document-options', [MasterReviewController::class, 'documentOptions']);
     Route::get('/master-review', [MasterReviewController::class, 'index']);
-    Route::post('/master-review', [MasterReviewController::class, 'store']);
     Route::get('/master-review/{masterReview}', [MasterReviewController::class, 'show']);
-    Route::put('/master-review/{masterReview}', [MasterReviewController::class, 'update']);
-    Route::post('/master-review/{masterReview}/approve', [MasterReviewController::class, 'approve']);
-    Route::post('/master-review/{masterReview}/disapprove', [MasterReviewController::class, 'disapprove']);
-    Route::post('/master-review/{masterReview}/disregard', [MasterReviewController::class, 'disregard']);
-    Route::post('/master-review/{masterReview}/recommend-approval', [MasterReviewController::class, 'recommendApproval']);
-    Route::post('/master-review/{masterReview}/under-review', [MasterReviewController::class, 'underReview']);
-    Route::post('/master-review/{masterReview}/reopen', [MasterReviewController::class, 'reopen']);
-    Route::delete('/master-review/{masterReview}', [MasterReviewController::class, 'destroy']);
 
     Route::get('/pms-running-hours/options', [PmsRunningHoursController::class, 'options']);
     Route::get('/pms-running-hours/parts', [PmsRunningHoursController::class, 'parts']);
@@ -264,23 +255,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/isps-review/options', [IspsReviewController::class, 'options']);
     Route::get('/isps-review/document-options', [IspsReviewController::class, 'documentOptions']);
     Route::get('/isps-review', [IspsReviewController::class, 'index']);
-    Route::post('/isps-review', [IspsReviewController::class, 'store']);
     Route::get('/isps-review/{ispsReview}', [IspsReviewController::class, 'show']);
-    Route::put('/isps-review/{ispsReview}', [IspsReviewController::class, 'update']);
-    Route::post('/isps-review/{ispsReview}/approve', [IspsReviewController::class, 'approve']);
-    Route::post('/isps-review/{ispsReview}/disapprove', [IspsReviewController::class, 'disapprove']);
-    Route::post('/isps-review/{ispsReview}/disregard', [IspsReviewController::class, 'disregard']);
-    Route::post('/isps-review/{ispsReview}/recommend-approval', [IspsReviewController::class, 'recommendApproval']);
-    Route::post('/isps-review/{ispsReview}/reopen', [IspsReviewController::class, 'reopen']);
-    Route::delete('/isps-review/{ispsReview}', [IspsReviewController::class, 'destroy']);
 
     Route::get('/revision-history/options', [RevisionHistoryController::class, 'options']);
     Route::get('/revision-history/document-options', [RevisionHistoryController::class, 'documentOptions']);
     Route::get('/revision-history', [RevisionHistoryController::class, 'index']);
-    Route::post('/revision-history', [RevisionHistoryController::class, 'store']);
     Route::get('/revision-history/{manualRevision}', [RevisionHistoryController::class, 'show']);
-    Route::put('/revision-history/{manualRevision}', [RevisionHistoryController::class, 'update']);
-    Route::delete('/revision-history/{manualRevision}', [RevisionHistoryController::class, 'destroy']);
 
     Route::get('/defects/options', [DefectController::class, 'options']);
     Route::get('/defects', [DefectController::class, 'index']);

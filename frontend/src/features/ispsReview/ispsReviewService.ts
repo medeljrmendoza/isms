@@ -1,7 +1,6 @@
 import { axiosClient } from "../../api/axiosClient";
 import type { ApiResource } from "../auth/auth";
-import type { IspsReviewDetail, IspsReviewListResponse, IspsReviewOption, IspsReviewOptions } from "./ispsReview";
-import type { IspsReviewFormValues } from "./ispsReviewSchema";
+import type { IspsReviewDetail, IspsReviewListResponse, IspsReviewOptions } from "./ispsReview";
 
 export interface IspsReviewListParams {
   vessel_id?: number | string;
@@ -18,16 +17,10 @@ export interface IspsReviewListParams {
   direction?: "asc" | "desc";
 }
 
+/** Read-only: Add/Edit/Approve/Disapprove/Disregard/Recommend Approval/Reopen/Delete have no legacy write-back path — see IspsReviewPage. */
 export const ispsReviewService = {
   async options(): Promise<IspsReviewOptions> {
     const response = await axiosClient.get<ApiResource<IspsReviewOptions>>("/isps-review/options");
-    return response.data.data;
-  },
-
-  async documentOptions(chapterId: number | string): Promise<IspsReviewOption[]> {
-    const response = await axiosClient.get<ApiResource<IspsReviewOption[]>>("/isps-review/document-options", {
-      params: { chapter_id: chapterId },
-    });
     return response.data.data;
   },
 
@@ -39,44 +32,5 @@ export const ispsReviewService = {
   async show(id: number | string): Promise<IspsReviewDetail> {
     const response = await axiosClient.get<ApiResource<IspsReviewDetail>>(`/isps-review/${id}`);
     return response.data.data;
-  },
-
-  async create(values: IspsReviewFormValues): Promise<IspsReviewDetail> {
-    const response = await axiosClient.post<ApiResource<IspsReviewDetail>>("/isps-review", values);
-    return response.data.data;
-  },
-
-  async update(id: number, values: IspsReviewFormValues): Promise<IspsReviewDetail> {
-    const response = await axiosClient.put<ApiResource<IspsReviewDetail>>(`/isps-review/${id}`, values);
-    return response.data.data;
-  },
-
-  async approve(id: number): Promise<IspsReviewDetail> {
-    const response = await axiosClient.post<ApiResource<IspsReviewDetail>>(`/isps-review/${id}/approve`);
-    return response.data.data;
-  },
-
-  async disapprove(id: number): Promise<IspsReviewDetail> {
-    const response = await axiosClient.post<ApiResource<IspsReviewDetail>>(`/isps-review/${id}/disapprove`);
-    return response.data.data;
-  },
-
-  async disregard(id: number): Promise<IspsReviewDetail> {
-    const response = await axiosClient.post<ApiResource<IspsReviewDetail>>(`/isps-review/${id}/disregard`);
-    return response.data.data;
-  },
-
-  async recommendApproval(id: number): Promise<IspsReviewDetail> {
-    const response = await axiosClient.post<ApiResource<IspsReviewDetail>>(`/isps-review/${id}/recommend-approval`);
-    return response.data.data;
-  },
-
-  async reopen(id: number): Promise<IspsReviewDetail> {
-    const response = await axiosClient.post<ApiResource<IspsReviewDetail>>(`/isps-review/${id}/reopen`);
-    return response.data.data;
-  },
-
-  async destroy(id: number): Promise<void> {
-    await axiosClient.delete(`/isps-review/${id}`);
   },
 };

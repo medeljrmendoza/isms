@@ -7,7 +7,6 @@ export interface IspsReviewOption {
 export interface IspsReviewOptions {
   vessels: IspsReviewOption[];
   chapters: IspsReviewOption[];
-  can_create_record: boolean;
 }
 
 export interface IspsReviewPresentRow {

@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api\ManualBrowser;
 
 use App\Http\Controllers\Controller;
 use App\Repositories\ManualPublish\ManualBrowserRepository;
-use App\Support\LegacyDb;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -20,9 +19,7 @@ class ManualBrowserController extends Controller
     {
         return response()->json([
             'data' => [
-                'vessels' => LegacyDb::isConfigured()
-                    ? $this->manuals->legacyVesselOptions($request->user()?->legacy_user_id)
-                    : $this->manuals->vesselOptions(),
+                'vessels' => $this->manuals->legacyVesselOptions($request->user()?->legacy_user_id),
             ],
         ]);
     }
@@ -34,14 +31,8 @@ class ManualBrowserController extends Controller
     {
         $smsType = $request->query('sms_type') ?: null;
 
-        if (LegacyDb::isConfigured()) {
-            return response()->json([
-                'data' => $this->manuals->legacyTree($smsType, $this->stringOrNull($request->query('vessel_id'))),
-            ]);
-        }
-
         return response()->json([
-            'data' => $this->manuals->tree($smsType, $this->intOrNull($request->query('vessel_id'))),
+            'data' => $this->manuals->legacyTree($smsType, $this->stringOrNull($request->query('vessel_id'))),
         ]);
     }
 
@@ -58,20 +49,9 @@ class ManualBrowserController extends Controller
 
         $smsType = $request->query('sms_type') ?: null;
 
-        if (LegacyDb::isConfigured()) {
-            return response()->json([
-                'data' => $this->manuals->legacySearch($term, $smsType, $this->stringOrNull($request->query('vessel_id'))),
-            ]);
-        }
-
         return response()->json([
-            'data' => $this->manuals->search($term, $smsType, $this->intOrNull($request->query('vessel_id'))),
+            'data' => $this->manuals->legacySearch($term, $smsType, $this->stringOrNull($request->query('vessel_id'))),
         ]);
-    }
-
-    private function intOrNull(mixed $value): ?int
-    {
-        return $value === null || $value === '' ? null : (int) $value;
     }
 
     private function stringOrNull(mixed $value): ?string

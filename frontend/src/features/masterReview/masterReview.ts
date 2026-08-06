@@ -9,7 +9,6 @@ export interface MasterReviewOption {
 export interface MasterReviewOptions {
   vessels: MasterReviewOption[];
   chapters: MasterReviewOption[];
-  can_create_record: boolean;
 }
 
 export interface MasterReviewPresentDetail {

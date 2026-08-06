@@ -6,7 +6,6 @@ export interface RevisionHistoryOption {
 
 export interface RevisionHistoryOptions {
   chapters: RevisionHistoryOption[];
-  can_create_record: boolean;
 }
 
 export interface RevisionHistoryColumn {
@@ -28,12 +27,6 @@ export interface RevisionHistoryRow {
   approved_by: string;
   can_edit: boolean;
   can_delete: boolean;
-}
-
-export interface RevisionHistoryDetail extends RevisionHistoryRow {
-  manual_chapter_id: number | null;
-  manual_document_id: number;
-  procedure_label: string;
 }
 
 export interface RevisionHistoryListResponse {
