@@ -4,14 +4,14 @@ import type { PmsPartSearchResult, PmsWorkPlanDetail, PmsWorkPlanListResponse, P
 import type { PmsWorkPlanFormValues } from "./pmsWorkPlanSchema";
 
 export const pmsWorkPlanService = {
-  async options(vesselId?: number): Promise<PmsWorkPlanOptions> {
+  async options(vesselId?: number | string): Promise<PmsWorkPlanOptions> {
     const response = await axiosClient.get<ApiResource<PmsWorkPlanOptions>>("/pms-work-plan/options", {
       params: { vessel_id: vesselId },
     });
     return response.data.data;
   },
 
-  async parts(equipmentId: number): Promise<PmsWorkPlanOption[]> {
+  async parts(equipmentId: number | string): Promise<PmsWorkPlanOption[]> {
     const response = await axiosClient.get<ApiResource<PmsWorkPlanOption[]>>("/pms-work-plan/parts", {
       params: { equipment_id: equipmentId },
     });
@@ -23,12 +23,12 @@ export const pmsWorkPlanService = {
     return response.data.data;
   },
 
-  async list(params: { vessel_id: number; page: number; per_page: number; search?: string; sort?: string; direction?: "asc" | "desc" }): Promise<PmsWorkPlanListResponse> {
+  async list(params: { vessel_id: number | string; page: number; per_page: number; search?: string; sort?: string; direction?: "asc" | "desc" }): Promise<PmsWorkPlanListResponse> {
     const response = await axiosClient.get<ApiResource<PmsWorkPlanListResponse>>("/pms-work-plan", { params });
     return response.data.data;
   },
 
-  async show(id: number): Promise<PmsWorkPlanDetail> {
+  async show(id: number | string): Promise<PmsWorkPlanDetail> {
     const response = await axiosClient.get<ApiResource<PmsWorkPlanDetail>>(`/pms-work-plan/${id}`);
     return response.data.data;
   },
@@ -38,12 +38,12 @@ export const pmsWorkPlanService = {
     return response.data.data;
   },
 
-  async update(id: number, values: PmsWorkPlanFormValues): Promise<PmsWorkPlanDetail> {
+  async update(id: number | string, values: PmsWorkPlanFormValues): Promise<PmsWorkPlanDetail> {
     const response = await axiosClient.put<ApiResource<PmsWorkPlanDetail>>(`/pms-work-plan/${id}`, values);
     return response.data.data;
   },
 
-  async destroy(id: number): Promise<void> {
+  async destroy(id: number | string): Promise<void> {
     await axiosClient.delete(`/pms-work-plan/${id}`);
   },
 };

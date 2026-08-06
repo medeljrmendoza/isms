@@ -3,7 +3,7 @@ import { z } from "zod";
 const optionalText = z.string().trim().optional().or(z.literal(""));
 
 const inventoryLineSchema = z.object({
-  pms_part_id: z.number(),
+  pms_part_id: z.union([z.number(), z.string()]),
   part_name: z.string().optional(),
   equipment_name: z.string().optional(),
   new_qty: z.union([z.number(), z.string()]).transform((v) => (v === "" ? 0 : Number(v))),
@@ -15,7 +15,7 @@ export function buildPmsWorkPlanSchema(isCreate: boolean) {
   return z
     .object({
       vessel_id: isCreate
-        ? z.union([z.number(), z.string()]).transform((v) => Number(v)).refine((v) => v > 0, "Please select a Vessel.")
+        ? z.union([z.number(), z.string()]).refine((v) => String(v).length > 0, "Please select a Vessel.")
         : z.union([z.number(), z.string()]).optional(),
       type: z.enum(["EQUIPMENT", "LOCATION"]),
       pms_department_id: z.union([z.number(), z.string()]).nullable().optional(),

@@ -1,5 +1,5 @@
 export interface PmsWorkPlanOption {
-  id: number;
+  id: number | string;
   label: string;
 }
 
@@ -12,7 +12,7 @@ export interface PmsWorkPlanOptions {
 }
 
 export interface PmsWorkPlanRow {
-  id: number;
+  id: number | string;
   ticket_no: string;
   department: string | null;
   component: string | null;
@@ -23,7 +23,7 @@ export interface PmsWorkPlanRow {
 }
 
 export interface PmsWorkPlanInventoryLine {
-  pms_part_id: number;
+  pms_part_id: number | string;
   part_name: string | null;
   equipment_name: string | null;
   new_qty: number;
@@ -31,23 +31,23 @@ export interface PmsWorkPlanInventoryLine {
 }
 
 export interface PmsWorkPlanDetail {
-  id: number;
+  id: number | string;
   ticket_no: string;
-  vessel_id: number;
+  vessel_id: number | string;
   vessel: string;
   type: "EQUIPMENT" | "LOCATION";
-  pms_department_id: number | null;
+  pms_department_id: number | string | null;
   department: string | null;
-  pms_equipment_id: number | null;
+  pms_equipment_id: number | string | null;
   equipment_name: string | null;
-  pms_part_id: number | null;
+  pms_part_id: number | string | null;
   part_name: string | null;
   location: string | null;
   sub_location: string | null;
   activity_name: string;
-  pms_job_class_id: number | null;
+  pms_job_class_id: number | string | null;
   job_class: string | null;
-  pms_job_type_id: number | null;
+  pms_job_type_id: number | string | null;
   job_type: string | null;
   incharge: string;
   assignee: string | null;
@@ -70,7 +70,7 @@ export interface PmsWorkPlanListResponse {
 }
 
 export interface PmsPartSearchResult {
-  id: number;
+  id: number | string;
   part_name: string;
   equipment_name: string | null;
   required_qty: number | null;

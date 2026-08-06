@@ -48,7 +48,7 @@ export function PmsWorkPlanPage() {
     if (!appliedVesselId) return;
     setLoading(true);
     pmsWorkPlanService
-      .list({ vessel_id: Number(appliedVesselId), page, per_page: PER_PAGE, sort, direction })
+      .list({ vessel_id: appliedVesselId, page, per_page: PER_PAGE, sort, direction })
       .then((data) => {
         setRows(data.rows);
         setLastPage(data.meta.last_page);
@@ -81,7 +81,7 @@ export function PmsWorkPlanPage() {
 
   const reload = () => setReloadKey((k) => k + 1);
 
-  const openEdit = async (id: number) => {
+  const openEdit = async (id: number | string) => {
     setActionError(null);
     try {
       const detail = await pmsWorkPlanService.show(id);
@@ -92,7 +92,7 @@ export function PmsWorkPlanPage() {
     }
   };
 
-  const openView = async (id: number) => {
+  const openView = async (id: number | string) => {
     setActionError(null);
     try {
       setViewing(await pmsWorkPlanService.show(id));

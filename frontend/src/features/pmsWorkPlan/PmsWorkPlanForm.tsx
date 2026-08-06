@@ -77,7 +77,7 @@ export function PmsWorkPlanForm({ adhoc, vessels, onSuccess, onCancel }: PmsWork
   const [options, setOptions] = useState<PmsWorkPlanOptions>(emptyOptions);
   const [partOptions, setPartOptions] = useState<PmsWorkPlanOption[]>([]);
   const [searchKey, setSearchKey] = useState("");
-  const [searchResults, setSearchResults] = useState<{ id: number; part_name: string; equipment_name: string | null }[]>([]);
+  const [searchResults, setSearchResults] = useState<{ id: number | string; part_name: string; equipment_name: string | null }[]>([]);
   const [formError, setFormError] = useState<string | null>(null);
 
   const {
@@ -100,7 +100,7 @@ export function PmsWorkPlanForm({ adhoc, vessels, onSuccess, onCancel }: PmsWork
   const equipmentId = watch("pms_equipment_id");
 
   useEffect(() => {
-    const vId = isCreate ? (vesselId ? Number(vesselId) : undefined) : adhoc?.vessel_id;
+    const vId = isCreate ? (vesselId ? vesselId : undefined) : adhoc?.vessel_id;
     pmsWorkPlanService.options(vId).then(setOptions).catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isCreate ? vesselId : adhoc?.vessel_id]);
@@ -120,7 +120,7 @@ export function PmsWorkPlanForm({ adhoc, vessels, onSuccess, onCancel }: PmsWork
       setPartOptions([]);
       return;
     }
-    pmsWorkPlanService.parts(Number(equipmentId)).then(setPartOptions).catch(() => undefined);
+    pmsWorkPlanService.parts(equipmentId).then(setPartOptions).catch(() => undefined);
   }, [equipmentId]);
 
   // Same async-options issue for the Part <select>, one level further removed.
@@ -145,7 +145,7 @@ export function PmsWorkPlanForm({ adhoc, vessels, onSuccess, onCancel }: PmsWork
     return () => clearTimeout(handle);
   }, [searchKey]);
 
-  const addInventoryItem = (item: { id: number; part_name: string; equipment_name: string | null }) => {
+  const addInventoryItem = (item: { id: number | string; part_name: string; equipment_name: string | null }) => {
     if (inventoryArray.fields.some((f) => f.pms_part_id === item.id)) return;
     inventoryArray.append({ pms_part_id: item.id, part_name: item.part_name, equipment_name: item.equipment_name ?? undefined, new_qty: 0, reconditioned_qty: 0 });
     setSearchKey("");
@@ -213,14 +213,14 @@ export function PmsWorkPlanForm({ adhoc, vessels, onSuccess, onCancel }: PmsWork
             placeholder="Select component..."
             options={options.components.map((c) => ({ value: String(c.id), label: c.label }))}
             error={errors.pms_equipment_id?.message}
-            {...register("pms_equipment_id", { setValueAs: (v) => (v ? Number(v) : null) })}
+            {...register("pms_equipment_id", { setValueAs: (v) => (v ? v : null) })}
           />
           <SelectField
             label="Part"
             placeholder="Select part..."
             options={partOptions.map((p) => ({ value: String(p.id), label: p.label }))}
             error={errors.pms_part_id?.message}
-            {...register("pms_part_id", { setValueAs: (v) => (v ? Number(v) : null) })}
+            {...register("pms_part_id", { setValueAs: (v) => (v ? v : null) })}
           />
         </div>
       ) : (
@@ -230,7 +230,7 @@ export function PmsWorkPlanForm({ adhoc, vessels, onSuccess, onCancel }: PmsWork
             placeholder="Select department..."
             options={options.departments.map((d) => ({ value: String(d.id), label: d.label }))}
             error={errors.pms_department_id?.message}
-            {...register("pms_department_id", { setValueAs: (v) => (v ? Number(v) : null) })}
+            {...register("pms_department_id", { setValueAs: (v) => (v ? v : null) })}
           />
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <TextField label="Location" error={errors.location?.message} {...register("location")} />
@@ -247,14 +247,14 @@ export function PmsWorkPlanForm({ adhoc, vessels, onSuccess, onCancel }: PmsWork
           placeholder="Select..."
           options={options.job_classes.map((c) => ({ value: String(c.id), label: c.label }))}
           error={errors.pms_job_class_id?.message}
-          {...register("pms_job_class_id", { setValueAs: (v) => (v ? Number(v) : null) })}
+          {...register("pms_job_class_id", { setValueAs: (v) => (v ? v : null) })}
         />
         <SelectField
           label="Job Type"
           placeholder="Select..."
           options={options.job_types.map((t) => ({ value: String(t.id), label: t.label }))}
           error={errors.pms_job_type_id?.message}
-          {...register("pms_job_type_id", { setValueAs: (v) => (v ? Number(v) : null) })}
+          {...register("pms_job_type_id", { setValueAs: (v) => (v ? v : null) })}
         />
       </div>
 
