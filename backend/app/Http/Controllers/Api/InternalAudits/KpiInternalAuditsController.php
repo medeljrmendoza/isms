@@ -3,14 +3,10 @@
 namespace App\Http\Controllers\Api\InternalAudits;
 
 use App\Http\Controllers\Controller;
-use App\Models\InternalAudits\InternalAuditReport;
-use App\Models\Nonconformities\Nonconformity;
 use App\Repositories\InternalAudits\KpiInternalAuditsRepository;
-use App\Support\LegacyDb;
 use App\Support\TableQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Pagination\LengthAwarePaginator;
 
 /**
  * Ported from Controllers/Kpi_internal.php. Read-only reporting layer,
@@ -29,11 +25,7 @@ class KpiInternalAuditsController extends Controller
     public function options(Request $request): JsonResponse
     {
         return response()->json([
-            'data' => [
-                'vessels' => LegacyDb::isConfigured()
-                    ? $this->kpi->legacyVesselOptions($request->user()?->legacy_user_id)
-                    : $this->kpi->vesselOptions(),
-            ],
+            'data' => ['vessels' => $this->kpi->legacyVesselOptions($request->user()?->legacy_user_id)],
         ]);
     }
 
@@ -45,19 +37,11 @@ class KpiInternalAuditsController extends Controller
         $from = $request->query('from') ?: null;
         $to = $request->query('to') ?: null;
         $isNc = $request->query('filter') === 'nonconformities';
-
-        if (LegacyDb::isConfigured()) {
-            $legacyUserId = $request->user()?->legacy_user_id;
-            $rows = $isNc
-                ? $this->kpi->legacyNonConformitiesPerVessel($from, $to, $legacyUserId)
-                : $this->kpi->legacyReportsPerVessel($from, $to, $legacyUserId);
-
-            return response()->json(['data' => $rows]);
-        }
+        $legacyUserId = $request->user()?->legacy_user_id;
 
         $rows = $isNc
-            ? $this->kpi->nonConformitiesPerVessel($from, $to)
-            : $this->kpi->reportsPerVessel($from, $to);
+            ? $this->kpi->legacyNonConformitiesPerVessel($from, $to, $legacyUserId)
+            : $this->kpi->legacyReportsPerVessel($from, $to, $legacyUserId);
 
         return response()->json(['data' => $rows]);
     }
@@ -70,32 +54,9 @@ class KpiInternalAuditsController extends Controller
         $from = $request->query('from') ?: null;
         $to = $request->query('to') ?: null;
 
-        if (LegacyDb::isConfigured()) {
-            $result = $this->kpi->legacyReportsByVessel((string) $request->query('vessel_id'), $from, $to, TableQuery::fromRequest($request));
+        $result = $this->kpi->legacyReportsByVessel((string) $request->query('vessel_id'), $from, $to, TableQuery::fromRequest($request));
 
-            return response()->json(['data' => ['columns' => KpiInternalAuditsRepository::reportColumns(), 'rows' => $result['rows'], 'meta' => $result['meta']]]);
-        }
-
-        $paginator = $this->kpi->reportsByVessel(
-            (int) $request->query('vessel_id'),
-            $from,
-            $to,
-            TableQuery::fromRequest($request),
-        );
-
-        return response()->json([
-            'data' => [
-                'columns' => KpiInternalAuditsRepository::reportColumns(),
-                'rows' => collect($paginator->items())->map(fn (InternalAuditReport $r) => [
-                    'id' => $r->id,
-                    'audit_ref' => $r->audit_ref,
-                    'this_date' => $r->this_date?->format('Y-m-d'),
-                    'placeof_audit' => $r->placeof_audit,
-                    'typeof_audit' => $r->typeof_audit,
-                ])->all(),
-                'meta' => $this->meta($paginator),
-            ],
-        ]);
+        return response()->json(['data' => ['columns' => KpiInternalAuditsRepository::reportColumns(), 'rows' => $result['rows'], 'meta' => $result['meta']]]);
     }
 
     /**
@@ -106,44 +67,8 @@ class KpiInternalAuditsController extends Controller
         $from = $request->query('from') ?: null;
         $to = $request->query('to') ?: null;
 
-        if (LegacyDb::isConfigured()) {
-            $result = $this->kpi->legacyNonConformitiesByVessel((string) $request->query('vessel_id'), $from, $to, TableQuery::fromRequest($request));
+        $result = $this->kpi->legacyNonConformitiesByVessel((string) $request->query('vessel_id'), $from, $to, TableQuery::fromRequest($request));
 
-            return response()->json(['data' => ['columns' => KpiInternalAuditsRepository::nonconformityColumns(), 'rows' => $result['rows'], 'meta' => $result['meta']]]);
-        }
-
-        $paginator = $this->kpi->nonConformitiesByVessel(
-            (int) $request->query('vessel_id'),
-            $from,
-            $to,
-            TableQuery::fromRequest($request),
-        );
-
-        return response()->json([
-            'data' => [
-                'columns' => KpiInternalAuditsRepository::nonconformityColumns(),
-                'rows' => collect($paginator->items())->map(fn (Nonconformity $n) => [
-                    'id' => $n->id,
-                    'ncr_no' => $n->ncr_no,
-                    'date_of_nc' => $n->date_of_nc?->format('Y-m-d'),
-                    'source_of_nc_ref_no' => $n->source_of_nc_ref_no,
-                    'description' => $n->description,
-                    'root_cause' => $n->root_cause,
-                    'corrective_action' => $n->corrective_action,
-                    'verification' => $n->verification,
-                ])->all(),
-                'meta' => $this->meta($paginator),
-            ],
-        ]);
-    }
-
-    private function meta(LengthAwarePaginator $paginator): array
-    {
-        return [
-            'current_page' => $paginator->currentPage(),
-            'last_page' => $paginator->lastPage(),
-            'per_page' => $paginator->perPage(),
-            'total' => $paginator->total(),
-        ];
+        return response()->json(['data' => ['columns' => KpiInternalAuditsRepository::nonconformityColumns(), 'rows' => $result['rows'], 'meta' => $result['meta']]]);
     }
 }
