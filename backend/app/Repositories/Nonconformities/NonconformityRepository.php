@@ -379,7 +379,12 @@ class NonconformityRepository
         $hasVessel = $nc->vesID !== '';
         $isPublished = self::isFlagSet($nc->is_published);
         $isApproved = self::isFlagSet($nc->is_approved);
-        $isClosed = $nc->close_out_date !== '0000-00-00' && $nc->close_out_date !== null && $nc->close_out_date !== '';
+        $isInactive = self::isFlagSet($nc->is_inactive);
+        // Ported from loadData()'s `status` column callback — driven by the `status` column itself
+        // (set at save time from whether close_out_date was filled in), not recomputed from
+        // close_out_date here. Legacy data can have the two drift apart (status=1 with no
+        // close_out_date), and the STATUS icon follows `status` in that case, not the date.
+        $isClosed = self::isFlagSet($nc->status);
 
         $publishedDisplay = match (true) {
             $approvedElsewhere => null,
@@ -390,8 +395,9 @@ class NonconformityRepository
         $approvedDisplay = ($approvedElsewhere || ! $hasVessel || ! $isPublished) ? null : $isApproved;
 
         $statusColor = match (true) {
+            $approvedElsewhere => $isClosed ? 'green' : 'yellow',
             ! $isClosed => 'yellow',
-            $hasVessel && $isPublished && ! $isApproved => 'yellow',
+            $hasVessel && $isPublished && ! $isInactive && ! $isApproved => 'yellow',
             default => 'green',
         };
 
