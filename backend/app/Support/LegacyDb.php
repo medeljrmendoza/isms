@@ -6,18 +6,12 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Helpers shared by the dashlet repositories that can optionally read
- * from the real legacy CI-ISMS staging database (connection 'legacy')
- * instead of local seed data, for demoing genuine cloud connectivity.
- * Read-only — nothing here ever writes to the legacy connection.
+ * Read helpers shared by repositories that query the real legacy
+ * CI-ISMS staging database directly (connection 'legacy') — the app's
+ * only data source, since there is no local database.
  */
 class LegacyDb
 {
-    public static function isConfigured(): bool
-    {
-        return config('database.connections.legacy.database') !== '';
-    }
-
     /** @return array<string, string> vesID => "PREFIX Name" */
     public static function vesselNames(): array
     {

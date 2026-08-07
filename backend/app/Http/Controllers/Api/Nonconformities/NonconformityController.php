@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api\Nonconformities;
 
 use App\Http\Controllers\Controller;
 use App\Repositories\Nonconformities\NonconformityRepository;
-use App\Support\LegacyDb;
 use App\Support\TableQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;

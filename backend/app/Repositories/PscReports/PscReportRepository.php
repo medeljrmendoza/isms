@@ -41,7 +41,6 @@ class PscReportRepository
         return self::MODULE_COLUMNS;
     }
 
-
     /**
      * Ported from Controllers/Dashboard_psc.php's loadData(): visible
      * when there's at least one pending NC or pending observation,
