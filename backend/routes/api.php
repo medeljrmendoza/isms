@@ -100,7 +100,13 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/incident-reports/options', [IncidentReportController::class, 'options']);
     Route::get('/incident-reports', [IncidentReportController::class, 'index']);
+    Route::post('/incident-reports', [IncidentReportController::class, 'store']);
     Route::get('/incident-reports/{incidentReport}', [IncidentReportController::class, 'show']);
+    Route::put('/incident-reports/{incidentReport}', [IncidentReportController::class, 'update']);
+    Route::delete('/incident-reports/{incidentReport}', [IncidentReportController::class, 'destroy']);
+    Route::post('/incident-reports/{incidentReport}/publish', [IncidentReportController::class, 'publish']);
+    Route::post('/incident-reports/{incidentReport}/approve', [IncidentReportController::class, 'approve']);
+    Route::post('/incident-reports/{incidentReport}/reopen', [IncidentReportController::class, 'reopen']);
 
     Route::get('/psc-reports/options', [PscReportController::class, 'options']);
     Route::get('/psc-reports', [PscReportController::class, 'index']);

@@ -8,6 +8,28 @@ use Illuminate\Support\Facades\DB;
 
 class IncidentReportRepository
 {
+    /** Only meaningful when nature_type = 'accident' — cleared on save otherwise. */
+    private const ACCIDENT_ONLY_FIELDS = [
+        'nature_of_incident_id', 'others', 'accident_collision',
+        'bac', 'vdr', 'dateof_event', 'timeof_event', 'zone', 'country', 'speed', 'course',
+        'draft_forward', 'draft_alt', 'wind_direction', 'direction_sea', 'direction_swell', 'geographical_location',
+        'port_departure', 'date_departure', 'port_which_bound', 'type_cargo', 'cargo_quantity', 'special_requirement',
+        'atmospheric_clear', 'atmospheric_partly_cloudy', 'atmospheric_overcast', 'atmospheric_fog', 'atmospheric_rain',
+        'atmospheric_snow', 'atmospheric_other', 'atmospheric_other_name', 'distance1', 'distance2', 'distance3',
+        'sea1', 'sea2', 'sea3', 'crew_onboard', 'other_onboard', 'total_onboard', 'crew_dead', 'other_dead', 'total_dead',
+        'crew_missing', 'other_missing', 'total_missing', 'crew_injured', 'other_injured', 'total_injured', 'fs_ro',
+    ];
+
+    /** Only meaningful when nature_type = 'hazardous_occurrence' — cleared on save otherwise. */
+    private const HAZARDOUS_OCCURRENCE_ONLY_FIELDS = [
+        'hazardous_occurrence_type', 'incident_location_id', 'location_other', 'ship_position', 'incident_operation_id',
+        'ship_operation_other', 'hazardous_occurrence_ppe_used', 'hazardous_occurrence_ppe_used_comment',
+        'hazardous_occurrence_severity', 'hazardous_occurrence_severity_comment', 'hazardous_occurrence_likelihood',
+        'hazardous_occurrence_likelihood_comment', 'subject_investigation', 'evidence_safety_meeting', 'evidence_certificate',
+        'evidence_logbook', 'evidence_delivery', 'evidence_photo', 'evidence_company', 'evidence_others', 'evidence_others_name',
+        'causal_factor', 'intermediate_cause', 'shore_root_cause_summary',
+    ];
+
     /**
      * "vessel" and "type" aren't real sortable columns — vessel is
      * resolved from a relation, and "type" is a computed label combining
@@ -213,8 +235,8 @@ class IncidentReportRepository
     private function legacyRow(object $r, array $vessels): array
     {
         $isClosed = $r->closing_date !== '0000-00-00' && $r->closing_date !== null && $r->closing_date !== '';
-        $isPublished = $r->published === '1';
-        $isApproved = $r->is_approved === '1';
+        $isPublished = self::isFlagSet($r->published);
+        $isApproved = self::isFlagSet($r->is_approved);
         $published = $r->added_by === 'SHORE' ? $isPublished : null;
 
         $statusColor = match (true) {
@@ -235,12 +257,360 @@ class IncidentReportRepository
             'is_approved' => $isApproved,
             'status' => $isClosed ? 'CLOSED' : 'IN PROGRESS',
             'status_color' => $statusColor,
-            'can_edit' => false,
-            'can_publish' => false,
-            'can_approve' => false,
-            'can_reopen' => false,
-            'can_delete' => false,
+            ...$this->computeFlags($r->added_by, $isClosed, $isApproved),
         ];
+    }
+
+    /**
+     * tb_incident_report's is_approved/published/closing_date-derived
+     * flags are real SQL `int` columns, and this connection's PDO
+     * returns native-typed ints for them, so comparing against the
+     * string '1' silently and always fails — see the identical fix in
+     * NonconformityRepository.
+     */
+    private static function isFlagSet(mixed $value): bool
+    {
+        return (string) $value === '1';
+    }
+
+    /**
+     * Ported verbatim from loadData()'s `incidentid` column callback:
+     * Edit/Delete only show while open, Publish/Approve are available
+     * regardless of open/closed, Reopen only shows once closed.
+     * user_level (MEMBER vs SUPERADMIN/BTSOLVE) gating is intentionally
+     * dropped, matching the no-roles-yet precedent used by every other
+     * write-enabled module in this migration.
+     */
+    private function computeFlags(string $addedBy, bool $isClosed, bool $isApproved): array
+    {
+        return [
+            'can_edit' => ! $isClosed,
+            'can_publish' => $addedBy === 'SHORE',
+            'can_approve' => ! $isApproved,
+            'can_reopen' => $isClosed,
+            'can_delete' => $addedBy === 'SHORE' && ! $isClosed,
+        ];
+    }
+
+    /**
+     * Ported from add_incident_report(): create (incidentid empty) and
+     * edit share one delete-then-reinsert save, plus a full
+     * delete-then-reinsert of the root-cause/person sub-tables (fresh
+     * uniqid-based row IDs each time — matches legacy exactly, unlike
+     * the elaborate mark-inactive/reinsert/purge dance publish/approve/
+     * reopen do to those same tables purely to poke their S3 file-sync
+     * watcher, which this migration doesn't model — see class docblock
+     * precedent). On create, added_by/published/is_approved are always
+     * SHORE/false/true (new shore reports start pre-approved — a real
+     * difference from Nonconformities, not an inconsistency). On edit,
+     * vesid/added_by are frozen from the existing row, and is_approved
+     * is recomputed: an unpublished SHORE report stays approved, a
+     * published SHORE report needs re-approval, and any VESSEL-added
+     * report always needs re-approval after edit.
+     */
+    public function legacySave(?string $incidentid, array $data, array $rootCauses, array $persons): array
+    {
+        $legacy = DB::connection('legacy');
+        $isEdit = $incidentid !== null;
+        $newId = $incidentid ?? ('incident'.uniqid());
+        $existing = $isEdit ? $legacy->table('tb_incident_report')->where('incidentid', $newId)->first() : null;
+
+        if ($isEdit && $existing === null) {
+            abort(404);
+        }
+
+        $data = $this->clearInapplicableFields($data);
+
+        if ($isEdit) {
+            $vesid = $existing->vesid;
+            $addedBy = $existing->added_by;
+            $isApproved = $addedBy === 'SHORE' ? ! self::isFlagSet($existing->published) : false;
+            $published = $existing->published;
+        } else {
+            $vesid = $data['vessel_id'];
+            $addedBy = 'SHORE';
+            $isApproved = true;
+            $published = '0';
+        }
+
+        $closingDate = $data['closing_date'] ?? '';
+        $reportStatus = ($closingDate !== '' && $closingDate !== '0000-00-00') ? '1' : '0';
+
+        $row = [
+            'incidentid' => $newId,
+            'vesid' => $vesid,
+            'voyage_no' => $data['voyage_no'] ?? '',
+            'dateof_report' => $data['dateof_report'],
+            'report_no' => $data['report_no'] ?? '',
+            'master_id' => $data['master_name'] ?? '',
+            'ce_id' => $data['chief_engineer_name'] ?? '',
+            'person_reporting' => $data['person_reporting'] ?? '',
+            'nature_type' => $data['nature_type'],
+            'natureof_incidentid' => $data['nature_of_incident_id'] ?? '',
+            'accident_collision' => $data['accident_collision'] ?? '',
+            'others' => $data['others'] ?? '',
+            'hazardous_occurrence_type' => $data['hazardous_occurrence_type'] ?? '',
+            'statementof_work' => $data['statementof_work'] ?? '',
+            'location' => $data['incident_location_id'] ?? '',
+            'location_other' => $data['location_other'] ?? '',
+            'ship_position' => $data['ship_position'] ?? '',
+            'ship_operation' => $data['incident_operation_id'] ?? '',
+            'ship_operation_other' => $data['ship_operation_other'] ?? '',
+            'hazardous_occurrence_ppe_used' => $data['hazardous_occurrence_ppe_used'] ?? '',
+            'hazardous_occurrence_ppe_used_comment' => $data['hazardous_occurrence_ppe_used_comment'] ?? '',
+            'hazardous_occurrence_severity' => $data['hazardous_occurrence_severity'] ?? '',
+            'hazardous_occurrence_severity_comment' => $data['hazardous_occurrence_severity_comment'] ?? '',
+            'hazardous_occurrence_likelihood' => $data['hazardous_occurrence_likelihood'] ?? '',
+            'hazardous_occurrence_likelihood_comment' => $data['hazardous_occurrence_likelihood_comment'] ?? '',
+            'severity_itp' => $data['severity_itp'] ?? '',
+            'comment_itp' => $data['comment_itp'] ?? '',
+            'location_itp' => $data['location_of_injury_id'] ?? '',
+            'type_itp' => $data['type_of_injury_id'] ?? '',
+            'other_typeof_injury' => $data['other_typeof_injury'] ?? '',
+            'other_affected_area' => $data['other_affected_area'] ?? '',
+            'severity_itv' => $data['severity_itv'] ?? '',
+            'comment_itv' => $data['comment_itv'] ?? '',
+            'signed_by' => $data['signed_by'],
+            'date_signed' => $data['date_signed'],
+            'remarks' => $data['vessel_remarks'] ?? '',
+            'subject_investigation' => $data['subject_investigation'] ?? '',
+            'evidence_safety_meeting' => $data['evidence_safety_meeting'] ?? '0',
+            'evidence_certificate' => $data['evidence_certificate'] ?? '0',
+            'evidence_logbook' => $data['evidence_logbook'] ?? '0',
+            'evidence_delivery' => $data['evidence_delivery'] ?? '0',
+            'evidence_photo' => $data['evidence_photo'] ?? '0',
+            'evidence_company' => $data['evidence_company'] ?? '0',
+            'evidence_others' => $data['evidence_others'] ?? '0',
+            'evidence_others_name' => $data['evidence_others_name'] ?? '',
+            'causal_factor' => $data['causal_factor'] ?? '',
+            'intermediate_cause' => $data['intermediate_cause'] ?? '',
+            'root_cause' => $data['shore_root_cause_summary'] ?? '',
+            'bac' => $data['bac'] ?? '',
+            'vdr' => $data['vdr'] ?? '',
+            'dateof_event' => $data['dateof_event'] ?? '',
+            'timeof_event' => $data['timeof_event'] ?? '',
+            'zone' => $data['zone'] ?? '',
+            'country' => $data['country'] ?? '',
+            'speed' => $data['speed'] ?? '',
+            'course' => $data['course'] ?? '',
+            'draft_forward' => $data['draft_forward'] ?? '',
+            'draft_alt' => $data['draft_alt'] ?? '',
+            'wind_direction' => $data['wind_direction'] ?? '',
+            'direction_sea' => $data['direction_sea'] ?? '',
+            'direction_swell' => $data['direction_swell'] ?? '',
+            'geographical_location' => $data['geographical_location'] ?? '',
+            'port_departure' => $data['port_departure'] ?? '',
+            'type_cargo' => $data['type_cargo'] ?? '',
+            'date_departure' => $data['date_departure'] ?? '',
+            'cargo_quantity' => $data['cargo_quantity'] ?? '',
+            'port_which_bound' => $data['port_which_bound'] ?? '',
+            'special_requirement' => $data['special_requirement'] ?? '',
+            'atmospheric_clear' => $data['atmospheric_clear'] ?? '0',
+            'atmospheric_partly_cloudy' => $data['atmospheric_partly_cloudy'] ?? '0',
+            'atmospheric_overcast' => $data['atmospheric_overcast'] ?? '0',
+            'atmospheric_fog' => $data['atmospheric_fog'] ?? '0',
+            'atmospheric_rain' => $data['atmospheric_rain'] ?? '0',
+            'atmospheric_snow' => $data['atmospheric_snow'] ?? '0',
+            'atmospheric_other' => $data['atmospheric_other'] ?? '0',
+            'atmospheric_other_name' => $data['atmospheric_other_name'] ?? '',
+            'distance1' => $data['distance1'] ?? '0',
+            'distance2' => $data['distance2'] ?? '0',
+            'distance3' => $data['distance3'] ?? '0',
+            'sea1' => $data['sea1'] ?? '0',
+            'sea2' => $data['sea2'] ?? '0',
+            'sea3' => $data['sea3'] ?? '0',
+            'crew_onboard' => $data['crew_onboard'] ?? '',
+            'other_onboard' => $data['other_onboard'] ?? '',
+            'total_onboard' => $data['total_onboard'] ?? '',
+            'crew_dead' => $data['crew_dead'] ?? '',
+            'other_dead' => $data['other_dead'] ?? '',
+            'total_dead' => $data['total_dead'] ?? '',
+            'crew_missing' => $data['crew_missing'] ?? '',
+            'other_missing' => $data['other_missing'] ?? '',
+            'total_missing' => $data['total_missing'] ?? '',
+            'crew_injured' => $data['crew_injured'] ?? '',
+            'other_injured' => $data['other_injured'] ?? '',
+            'total_injured' => $data['total_injured'] ?? '',
+            'fs_ro' => $data['fs_ro'] ?? '',
+            'date_received' => $data['date_received'],
+            'reviewed_by' => $data['reviewed_by'] ?? '',
+            'investigator' => $data['investigator'] ?? '',
+            'dpa' => $data['dpa'],
+            'closing_date' => $closingDate,
+            'added_by' => $addedBy,
+            'report_status' => $reportStatus,
+            'is_approved' => $isApproved ? '1' : '0',
+            'published' => $published,
+        ];
+
+        $legacy->table('tb_incident_report')->where('incidentid', $newId)->delete();
+        $legacy->table('tb_incident_report')->insert($row);
+
+        $legacy->table('tb_incident_root_cause')->where('incidentID', $newId)->delete();
+        foreach (array_values($rootCauses) as $index => $rc) {
+            $legacy->table('tb_incident_root_cause')->insert([
+                'incidentRCID' => 'rootcause'.uniqid().$index,
+                'incidentID' => $newId,
+                'arrangement' => $index,
+                'rootCauseID' => $rc['root_cause_id'] ?? '',
+                'investigation' => $rc['investigation'] ?? '',
+                'analysis' => $rc['analysis'] ?? '',
+                'corrective_actions' => $rc['corrective_actions'] ?? '',
+                'root_cause_other' => $rc['root_cause_other'] ?? '',
+                'is_inactive' => '0',
+            ]);
+        }
+
+        $legacy->table('tb_incident_person_participated')->where('incidentID', $newId)->delete();
+        foreach (array_values($persons) as $index => $p) {
+            $legacy->table('tb_incident_person_participated')->insert([
+                'personID' => 'per'.uniqid().$index,
+                'incidentID' => $newId,
+                'arrangement' => $index,
+                'person_name' => $p['person_name'],
+                'position' => $p['position'] ?? '',
+                'is_inactive' => '0',
+            ]);
+        }
+
+        return $this->legacyDetail($newId);
+    }
+
+    /** Ported from publish_incident_report(): delete-then-reinsert toggling published, forcing is_approved to '1' regardless of direction. Sub-tables untouched (see legacySave()'s docblock). */
+    public function legacyPublish(string $incidentid): array
+    {
+        $legacy = DB::connection('legacy');
+        $r = $legacy->table('tb_incident_report')->where('incidentid', $incidentid)->first();
+        abort_if($r === null, 404);
+
+        $row = (array) $r;
+        $row['published'] = self::isFlagSet($r->published) ? '0' : '1';
+        $row['is_approved'] = '1';
+
+        $legacy->table('tb_incident_report')->where('incidentid', $incidentid)->delete();
+        $legacy->table('tb_incident_report')->insert($row);
+
+        return $this->legacyDetail($incidentid);
+    }
+
+    /** Ported from approve_incident_report(): delete-then-reinsert forcing is_approved to '1'. */
+    public function legacyApprove(string $incidentid): array
+    {
+        $legacy = DB::connection('legacy');
+        $r = $legacy->table('tb_incident_report')->where('incidentid', $incidentid)->first();
+        abort_if($r === null, 404);
+
+        $row = (array) $r;
+        $row['is_approved'] = '1';
+
+        $legacy->table('tb_incident_report')->where('incidentid', $incidentid)->delete();
+        $legacy->table('tb_incident_report')->insert($row);
+
+        return $this->legacyDetail($incidentid);
+    }
+
+    /** Ported from reopen_incident_report(): delete-then-reinsert clearing closing_date/report_status and forcing is_approved to '1' (legacy re-approves on reopen, unlike Nonconformities). published is left untouched. */
+    public function legacyReopen(string $incidentid): array
+    {
+        $legacy = DB::connection('legacy');
+        $r = $legacy->table('tb_incident_report')->where('incidentid', $incidentid)->first();
+        abort_if($r === null, 404);
+
+        $row = (array) $r;
+        $row['closing_date'] = '0000-00-00';
+        $row['report_status'] = '0';
+        $row['is_approved'] = '1';
+
+        $legacy->table('tb_incident_report')->where('incidentid', $incidentid)->delete();
+        $legacy->table('tb_incident_report')->insert($row);
+
+        return $this->legacyDetail($incidentid);
+    }
+
+    /** Ported from delete_incident_report(): a real delete, not a soft one — cascades to root-cause/person sub-tables like legacy does. */
+    public function legacyDelete(string $incidentid): void
+    {
+        $legacy = DB::connection('legacy');
+        abort_if($legacy->table('tb_incident_report')->where('incidentid', $incidentid)->doesntExist(), 404);
+
+        $legacy->table('tb_incident_report')->where('incidentid', $incidentid)->delete();
+        $legacy->table('tb_incident_root_cause')->where('incidentID', $incidentid)->delete();
+        $legacy->table('tb_incident_person_participated')->where('incidentID', $incidentid)->delete();
+    }
+
+    /**
+     * Ported from add_incident_report()'s nature_type branch: when
+     * nature_type is 'accident', hazardous-occurrence-only fields are
+     * blanked; otherwise accident-only fields are blanked. Matches
+     * legacy exactly — its else-branches set every one of these to "".
+     */
+    private function clearInapplicableFields(array $data): array
+    {
+        $blank = fn (string $field) => in_array($field, ['distance1', 'distance2', 'distance3', 'sea1', 'sea2', 'sea3'], true)
+            || str_starts_with($field, 'atmospheric_') || str_starts_with($field, 'evidence_')
+            ? '0'
+            : '';
+
+        if (($data['nature_type'] ?? null) === 'accident') {
+            foreach (self::HAZARDOUS_OCCURRENCE_ONLY_FIELDS as $field) {
+                $data[$field] = $blank($field);
+            }
+        } else {
+            foreach (self::ACCIDENT_ONLY_FIELDS as $field) {
+                $data[$field] = $blank($field);
+            }
+        }
+
+        return $data;
+    }
+
+    /** @return array<int, array{id:string,label:string}> */
+    public function legacyNatureOfIncidentOptions(): array
+    {
+        return DB::connection('legacy')->table('tb_natureof_incident')->orderBy('name')->get()
+            ->map(fn ($n) => ['id' => $n->natureID, 'label' => $n->name])->all();
+    }
+
+    /** @return array<int, array{id:string,label:string}> */
+    public function legacyIncidentLocationOptions(): array
+    {
+        return DB::connection('legacy')->table('tb_incident_location_occurences')->orderBy('location_occurences')->get()
+            ->map(fn ($l) => ['id' => $l->incidentLocationID, 'label' => $l->location_occurences])->all();
+    }
+
+    /** @return array<int, array{id:string,label:string}> */
+    public function legacyIncidentOperationOptions(): array
+    {
+        return DB::connection('legacy')->table('tb_incident_operations')->orderBy('operation_name')->get()
+            ->map(fn ($o) => ['id' => $o->incidentOperationID, 'label' => $o->operation_name])->all();
+    }
+
+    /** @return array<int, array{id:string,label:string}> */
+    public function legacyTypeOfInjuryOptions(): array
+    {
+        return DB::connection('legacy')->table('tb_typeof_injury')->orderBy('type')->get()
+            ->map(fn ($t) => ['id' => $t->type_ID, 'label' => $t->type])->all();
+    }
+
+    /** @return array<int, array{id:string,label:string}> */
+    public function legacyLocationOfInjuryOptions(): array
+    {
+        return DB::connection('legacy')->table('tb_locationof_injuries')->orderBy('body_part')->get()
+            ->map(fn ($l) => ['id' => $l->locationID, 'label' => $l->body_part])->all();
+    }
+
+    /** @return array<int, array{id:string,label:string,root_causes:array<int,array{id:string,label:string}>}> */
+    public function legacyRootCauseCategoryOptions(): array
+    {
+        $rootCauses = DB::connection('legacy')->table('tb_root_cause')->orderBy('root_cause')->get();
+
+        return DB::connection('legacy')->table('tb_root_cause_category')->orderBy('category')->get()
+            ->map(fn ($c) => [
+                'id' => $c->rootCauseCatID,
+                'label' => $c->category,
+                'root_causes' => $rootCauses->where('rootCauseCatID', $c->rootCauseCatID)
+                    ->map(fn ($rc) => ['id' => $rc->rootCauseID, 'label' => $rc->root_cause])->values()->all(),
+            ])->all();
     }
 
     /** @return array<int, array{id:string,label:string}> */
@@ -329,23 +699,23 @@ class IncidentReportRepository
             ->map(fn ($p) => ['person_name' => $p->person_name, 'position' => $p->position])
             ->all();
 
-        return $this->toDetailArray([
+        return $this->toDetailArray($incidentid, [
             'vessel' => $vessels[$r->vesid] ?? '',
             'dateof_report' => $r->dateof_report,
             'report_no' => $r->report_no,
             'nature' => $r->nature_type === 'accident' ? 'ACCIDENT' : 'HAZARDOUS OCCURRENCE',
             'type' => $typeLabel,
             'added_by' => $r->added_by,
-            'published' => $r->added_by === 'SHORE' ? $r->published === '1' : null,
-            'is_approved' => $r->is_approved === '1',
+            'published' => $r->added_by === 'SHORE' ? self::isFlagSet($r->published) : null,
+            'is_approved' => self::isFlagSet($r->is_approved),
             'is_closed' => $isClosed,
-            'vessel_id' => null,
+            'vessel_id' => $r->vesid !== '' ? $r->vesid : null,
             'voyage_no' => $r->voyage_no,
-            'master_name' => LegacyDb::addressBookEntry($r->master_id)['name'] ?? $r->master_id,
-            'chief_engineer_name' => LegacyDb::addressBookEntry($r->ce_id)['name'] ?? $r->ce_id,
+            'master_name' => $r->master_id,
+            'chief_engineer_name' => $r->ce_id,
             'person_reporting' => $r->person_reporting,
             'nature_type' => $r->nature_type,
-            'nature_of_incident_id' => null,
+            'nature_of_incident_id' => $r->natureof_incidentid !== '' ? $r->natureof_incidentid : null,
             'nature_of_incident_label' => $r->nature_name,
             'hazardous_occurrence_type' => $r->hazardous_occurrence_type,
             'others' => $r->others,
@@ -398,11 +768,11 @@ class IncidentReportRepository
             'other_injured' => $r->other_injured,
             'total_injured' => $r->total_injured,
             'fs_ro' => $r->fs_ro,
-            'incident_location_id' => null,
+            'incident_location_id' => $r->location !== '' ? $r->location : null,
             'incident_location_label' => $r->location_occurences,
             'location_other' => $r->location_other,
             'ship_position' => $r->ship_position,
-            'incident_operation_id' => null,
+            'incident_operation_id' => $r->ship_operation !== '' ? $r->ship_operation : null,
             'incident_operation_label' => $r->operation_name,
             'ship_operation_other' => $r->ship_operation_other,
             'hazardous_occurrence_ppe_used' => $r->hazardous_occurrence_ppe_used,
@@ -425,9 +795,9 @@ class IncidentReportRepository
             'shore_root_cause_summary' => null,
             'severity_itp' => $r->severity_itp,
             'comment_itp' => $r->comment_itp,
-            'location_of_injury_id' => null,
+            'location_of_injury_id' => $r->location_itp !== '' ? $r->location_itp : null,
             'location_of_injury_label' => $r->body_part,
-            'type_of_injury_id' => null,
+            'type_of_injury_id' => $r->type_itp !== '' ? $r->type_itp : null,
             'type_of_injury_label' => $r->type_of_injury_name,
             'other_typeof_injury' => $r->other_typeof_injury,
             'other_affected_area' => $r->other_affected_area,
@@ -443,6 +813,7 @@ class IncidentReportRepository
             'closing_date' => $zeroDateToNull($r->closing_date),
             'root_causes' => $rootCauses,
             'persons' => $persons,
+            'flags' => $this->computeFlags($r->added_by, $isClosed, self::isFlagSet($r->is_approved)),
         ]);
     }
 
@@ -467,13 +838,14 @@ class IncidentReportRepository
     }
 
     /** @param array<string, mixed> $r */
-    private function toDetailArray(array $r): array
+    private function toDetailArray(string $incidentid, array $r): array
     {
         $isClosed = $r['is_closed'];
         $statusColor = ! $isClosed ? 'yellow' : (($r['published'] ?? false) && ! $r['is_approved'] ? 'yellow' : 'green');
+        $flags = $r['flags'] ?? ['can_edit' => false, 'can_publish' => false, 'can_approve' => false, 'can_reopen' => false, 'can_delete' => false];
 
         return [
-            'id' => 0,
+            'id' => $incidentid,
             'vessel' => $r['vessel'],
             'dateof_report' => $r['dateof_report'],
             'report_no' => $r['report_no'],
@@ -484,11 +856,7 @@ class IncidentReportRepository
             'is_approved' => $r['is_approved'],
             'status' => $isClosed ? 'CLOSED' : 'IN PROGRESS',
             'status_color' => $statusColor,
-            'can_edit' => false,
-            'can_publish' => false,
-            'can_approve' => false,
-            'can_reopen' => false,
-            'can_delete' => false,
+            ...$flags,
             'vessel_id' => $r['vessel_id'],
             'voyage_no' => $r['voyage_no'],
             'master_name' => $r['master_name'],

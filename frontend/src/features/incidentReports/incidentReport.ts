@@ -22,7 +22,7 @@ export interface IncidentReportRow {
 
 export interface IncidentRootCauseRow {
   id?: number;
-  root_cause_id: number | null;
+  root_cause_id: string | null;
   root_cause_category_label?: string | null;
   root_cause_label?: string | null;
   root_cause_other: string | null;
@@ -38,13 +38,13 @@ export interface IncidentPersonRow {
 }
 
 export interface IncidentReportDetail extends IncidentReportRow {
-  vessel_id: number | null;
+  vessel_id: string | null;
   voyage_no: string | null;
   master_name: string | null;
   chief_engineer_name: string | null;
   person_reporting: string | null;
   nature_type: "accident" | "hazardous_occurrence";
-  nature_of_incident_id: number | null;
+  nature_of_incident_id: string | null;
   nature_of_incident_label: string | null;
   hazardous_occurrence_type: "unsafe_act" | "unsafe_condition" | "near_miss" | null;
   others: string | null;
@@ -97,11 +97,11 @@ export interface IncidentReportDetail extends IncidentReportRow {
   other_injured: number | null;
   total_injured: number | null;
   fs_ro: "NO" | "YES" | null;
-  incident_location_id: number | null;
+  incident_location_id: string | null;
   incident_location_label: string | null;
   location_other: string | null;
   ship_position: string | null;
-  incident_operation_id: number | null;
+  incident_operation_id: string | null;
   incident_operation_label: string | null;
   ship_operation_other: string | null;
   hazardous_occurrence_ppe_used: "NO" | "YES" | "NA" | null;
@@ -124,9 +124,9 @@ export interface IncidentReportDetail extends IncidentReportRow {
   shore_root_cause_summary: string | null;
   severity_itp: "FATALITY" | "FAC" | "LWC" | "MTC" | "PPD" | "PTD" | "RWC" | null;
   comment_itp: string | null;
-  location_of_injury_id: number | null;
+  location_of_injury_id: string | null;
   location_of_injury_label: string | null;
-  type_of_injury_id: number | null;
+  type_of_injury_id: string | null;
   type_of_injury_label: string | null;
   other_typeof_injury: string | null;
   other_affected_area: string | null;
@@ -155,7 +155,19 @@ export interface IncidentReportOption {
   label: string;
 }
 
+export interface RootCauseCategoryOption {
+  id: string;
+  label: string;
+  root_causes: IncidentReportOption[];
+}
+
 export interface IncidentReportOptions {
   vessels: IncidentReportOption[];
   years: string[];
+  nature_of_incidents: IncidentReportOption[];
+  incident_locations: IncidentReportOption[];
+  incident_operations: IncidentReportOption[];
+  types_of_injury: IncidentReportOption[];
+  locations_of_injury: IncidentReportOption[];
+  root_cause_categories: RootCauseCategoryOption[];
 }
