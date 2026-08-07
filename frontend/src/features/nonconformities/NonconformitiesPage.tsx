@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import { nonconformityService } from "./nonconformityService";
 import type { NonconformityDetail, NonconformityOption, NonconformityRow } from "./nonconformity";
 import { Button } from "../../components/ui/Button";
+import { Modal } from "../../components/ui/Modal";
 import { NonconformityViewModal } from "./NonconformityViewModal";
+import { NonconformityForm } from "./NonconformityForm";
 
-const PER_PAGE = 10;
+const PER_PAGE = 100;
 
 const MODULE_COLUMNS = [
   { key: "ncr_no", label: "NCR NO.", sortable: true },
@@ -17,6 +19,7 @@ const MODULE_COLUMNS = [
   { key: "is_published", label: "PUBLISHED", sortable: false },
   { key: "is_approved", label: "APPROVED", sortable: false },
   { key: "status", label: "STATUS", sortable: false },
+  { key: "actions", label: "ACTIONS", sortable: false },
 ];
 
 function FlagIcon({ value }: { value: boolean | null }) {
@@ -24,9 +27,19 @@ function FlagIcon({ value }: { value: boolean | null }) {
   return value ? <span className="text-green-600">✓</span> : <span className="text-red-500">✕</span>;
 }
 
-/** Read-only: Add/Edit/Publish/Approve/Delete/Reopen never had a legacy write-back path built, so they're not offered here — see NonconformityRepository. */
+/** Ported from admin/nonconformities/nonconformities_v.php: STATUS is legacy's colored exclamation icon (In Progress = amber, Closed = green) — see the LEGEND in the filter row. */
+function StatusIcon({ row }: { row: NonconformityRow }) {
+  return (
+    <span
+      title={row.status}
+      className={`glyphicon glyphicon-exclamation-sign ${row.status_color === "green" ? "text-green-600" : "text-amber-400"}`}
+    />
+  );
+}
+
 export function NonconformitiesPage() {
   const [vessels, setVessels] = useState<NonconformityOption[]>([]);
+  const [chapters, setChapters] = useState<NonconformityOption[]>([]);
   const [vesselCompany, setVesselCompany] = useState("ALL");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -42,11 +55,21 @@ export function NonconformitiesPage() {
   const [direction, setDirection] = useState<"asc" | "desc">("desc");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
 
   const [viewing, setViewing] = useState<NonconformityDetail | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
+  const [editing, setEditing] = useState<NonconformityDetail | null>(null);
 
   useEffect(() => {
-    nonconformityService.options().then((data) => setVessels(data.vessels)).catch(() => undefined);
+    nonconformityService
+      .options()
+      .then((data) => {
+        setVessels(data.vessels);
+        setChapters(data.chapters);
+      })
+      .catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -89,7 +112,7 @@ export function NonconformitiesPage() {
     return () => {
       isMounted = false;
     };
-  }, [page, search, sort, direction, appliedFilters]);
+  }, [page, search, sort, direction, appliedFilters, reloadToken]);
 
   const handleSort = (columnKey: string) => {
     if (sort === columnKey) {
@@ -119,11 +142,41 @@ export function NonconformitiesPage() {
     setViewing(detail);
   };
 
+  const openAdd = () => {
+    setEditing(null);
+    setFormOpen(true);
+  };
+
+  const openEdit = async (id: number | string) => {
+    const detail = await nonconformityService.show(id);
+    setEditing(detail);
+    setFormOpen(true);
+  };
+
+  const onFormSuccess = () => {
+    setFormOpen(false);
+    setEditing(null);
+    setReloadToken((t) => t + 1);
+  };
+
+  const runAction = async (action: () => Promise<unknown>) => {
+    setActionError(null);
+    try {
+      await action();
+      setReloadToken((t) => t + 1);
+    } catch {
+      setActionError("Action failed. Please try again.");
+    }
+  };
+
   return (
     <div className="p-6">
       <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
           <h1 className="text-base font-semibold text-slate-800">Nonconformities</h1>
+          <Button type="button" variant="success" className="!px-3 !py-1.5 text-sm" onClick={openAdd}>
+            + Add Non Conformity
+          </Button>
         </div>
 
         <div className="flex flex-wrap items-end gap-3 border-b border-slate-100 px-4 py-3">
@@ -167,18 +220,30 @@ export function NonconformitiesPage() {
           <Button type="button" variant="info" className="!px-3 !py-1.5 text-sm" onClick={resetFilters}>
             View All
           </Button>
+          <Button type="button" variant="info" className="!px-3 !py-1.5 text-sm" onClick={() => window.print()}>
+            PRINT
+          </Button>
 
-          <div className="ml-auto flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-500">Search</label>
-            <input
-              type="text"
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Search..."
-              className="rounded-md border border-slate-300 px-2 py-1.5 text-sm"
-            />
+          <div className="ml-auto flex items-center gap-4">
+            <div className="flex items-center gap-1.5 text-xs text-slate-600">
+              <b className="rounded bg-yellow-100 px-1">LEGEND:</b>
+              <span className="glyphicon glyphicon-exclamation-sign text-amber-400" /> In Progress
+              <span className="glyphicon glyphicon-exclamation-sign text-green-600" /> Closed
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-slate-500">Search</label>
+              <input
+                type="text"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                placeholder="Search..."
+                className="rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+              />
+            </div>
           </div>
         </div>
+
+        {actionError && <p className="px-4 pt-2 text-xs text-red-600">{actionError}</p>}
 
         <div className="overflow-x-auto px-4 py-3">
           <table className="w-full text-left text-sm">
@@ -220,14 +285,62 @@ export function NonconformitiesPage() {
                   <td className="px-2 py-1.5 text-center">
                     <FlagIcon value={row.is_approved} />
                   </td>
+                  <td className="px-2 py-1.5 text-center">
+                    <StatusIcon row={row} />
+                  </td>
                   <td className="px-2 py-1.5">
-                    <span
-                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
-                        row.status_color === "green" ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"
-                      }`}
-                    >
-                      {row.status}
-                    </span>
+                    <div className="flex flex-wrap gap-1">
+                      {row.can_edit && (
+                        <Button variant="secondary" className="!px-2 !py-0.5 text-xs" onClick={() => openEdit(row.id)}>
+                          Edit
+                        </Button>
+                      )}
+                      {row.inactive_action && (
+                        <Button
+                          variant="secondary"
+                          className="!px-2 !py-0.5 text-xs"
+                          onClick={() => runAction(() => nonconformityService.toggleInactive(row.id))}
+                        >
+                          {row.inactive_action === "inactivate" ? "Inactivate" : "Activate"}
+                        </Button>
+                      )}
+                      {row.publish_action && (
+                        <Button
+                          variant="info"
+                          className="!px-2 !py-0.5 text-xs"
+                          onClick={() => runAction(() => nonconformityService.togglePublish(row.id))}
+                        >
+                          {row.publish_action === "publish" ? "Publish" : "Unpublish"}
+                        </Button>
+                      )}
+                      {row.can_approve && (
+                        <Button
+                          variant="success"
+                          className="!px-2 !py-0.5 text-xs"
+                          onClick={() => runAction(() => nonconformityService.approve(row.id))}
+                        >
+                          Approve
+                        </Button>
+                      )}
+                      {row.can_reopen && (
+                        <Button
+                          variant="secondary"
+                          className="!px-2 !py-0.5 text-xs"
+                          onClick={() => runAction(() => nonconformityService.reopen(row.id))}
+                        >
+                          Re-open
+                        </Button>
+                      )}
+                      {row.can_delete && (
+                        <Button
+                          variant="secondary"
+                          className="!px-2 !py-0.5 text-xs !text-red-600"
+                          onClick={() => runAction(() => nonconformityService.remove(row.id))}
+                        >
+                          Delete
+                        </Button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -279,6 +392,18 @@ export function NonconformitiesPage() {
       </div>
 
       {viewing && <NonconformityViewModal nonconformity={viewing} onClose={() => setViewing(null)} />}
+
+      {formOpen && (
+        <Modal title={editing ? `Edit Non Conformity — ${editing.ncr_no}` : "Add Non Conformity"} onClose={() => setFormOpen(false)}>
+          <NonconformityForm
+            nonconformity={editing ?? undefined}
+            vessels={vessels}
+            chapters={chapters}
+            onSuccess={onFormSuccess}
+            onCancel={() => setFormOpen(false)}
+          />
+        </Modal>
+      )}
     </div>
   );
 }

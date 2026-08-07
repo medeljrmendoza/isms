@@ -15,13 +15,17 @@ export interface NonconformityRow {
   status: "CLOSED" | "IN PROGRESS";
   status_color: "green" | "yellow";
   can_edit: boolean;
-  can_publish: boolean;
   can_approve: boolean;
   can_reopen: boolean;
+  can_delete: boolean;
+  /** null hides the button; otherwise picks its label, mirroring legacy's Inactivate/Activate toggle. */
+  inactive_action: "inactivate" | "activate" | null;
+  /** null hides the button; otherwise picks its label, mirroring legacy's Publish/Unpublish toggle. */
+  publish_action: "publish" | "unpublish" | null;
 }
 
 export interface NonconformityDetail extends NonconformityRow {
-  vessel_id: number | null;
+  vessel_id: string | null;
   vessel_company_raw: "VESSEL" | "COMPANY";
   company: string | null;
   department_name: string | null;
@@ -30,7 +34,7 @@ export interface NonconformityDetail extends NonconformityRow {
   source_of_nc_raw: string;
   source_of_nc_others: string | null;
   source_of_nc_ref_no: string | null;
-  manual_chapter_id: number | null;
+  manual_chapter_id: string | null;
   manual_chapter_label: string | null;
   sms_details: string | null;
   root_cause: string | null;
@@ -71,4 +75,5 @@ export interface NonconformityOption {
 
 export interface NonconformityOptions {
   vessels: NonconformityOption[];
+  chapters: NonconformityOption[];
 }

@@ -89,7 +89,14 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/nonconformities/options', [NonconformityController::class, 'options']);
     Route::get('/nonconformities', [NonconformityController::class, 'index']);
+    Route::post('/nonconformities', [NonconformityController::class, 'store']);
     Route::get('/nonconformities/{nonconformity}', [NonconformityController::class, 'show']);
+    Route::put('/nonconformities/{nonconformity}', [NonconformityController::class, 'update']);
+    Route::delete('/nonconformities/{nonconformity}', [NonconformityController::class, 'destroy']);
+    Route::post('/nonconformities/{nonconformity}/toggle-inactive', [NonconformityController::class, 'toggleInactive']);
+    Route::post('/nonconformities/{nonconformity}/toggle-publish', [NonconformityController::class, 'togglePublish']);
+    Route::post('/nonconformities/{nonconformity}/approve', [NonconformityController::class, 'approve']);
+    Route::post('/nonconformities/{nonconformity}/reopen', [NonconformityController::class, 'reopen']);
 
     Route::get('/incident-reports/options', [IncidentReportController::class, 'options']);
     Route::get('/incident-reports', [IncidentReportController::class, 'index']);

@@ -121,7 +121,7 @@ class NonconformityRepository
         ];
     }
 
-    /** Powers the dashlet's "click NCR No. to view" — ported from Nonconformities::view_item()'s field set, minus report header/footer and file attachments (both already dropped everywhere else in this migration) and the tb_logs write. */
+    /** Powers the View modal and the Add/Edit form's prefill — ported from Nonconformities::view_item()'s field set, minus report header/footer and file attachments (both already dropped everywhere else in this migration) and the tb_logs write. */
     public function legacyDetail(string $ncID): ?array
     {
         $nc = DB::connection('legacy')->table('tb_nonconformities')->where('ncID', $ncID)->first();
@@ -137,7 +137,7 @@ class NonconformityRepository
 
         $zeroDateToNull = fn (?string $date) => ($date === null || $date === '0000-00-00') ? null : $date;
 
-        return $this->toDetailArray([
+        return $this->toDetailArray($nc->ncID, [
             'ncr_no' => $nc->ncr_no,
             'date_of_nc' => $zeroDateToNull($nc->date_of_nc),
             'added_by' => $nc->added_by,
@@ -146,10 +146,12 @@ class NonconformityRepository
             'reporter_name' => $nc->reporter_name,
             'vessel_or_company_name' => $nc->vessel_company === 'VESSEL' ? ($vessels[$nc->vesID] ?? '') : ($nc->company ?? ''),
             'vessel_company' => $nc->vessel_company,
+            'vesID' => $nc->vesID,
             'company' => $nc->company,
             'department_name' => $nc->department_name,
             'source_of_nc_others' => $nc->source_of_nc_others,
             'source_of_nc_ref_no' => $nc->source_of_nc_ref_no,
+            'sms_chapterID' => $nc->sms_chapterID,
             'manual_chapter_label' => $chapter ? "({$chapter->reference_no}) {$chapter->chapter_name}" : null,
             'sms_details' => $nc->sms_details,
             'description' => $nc->description,
@@ -176,14 +178,14 @@ class NonconformityRepository
             'attach_company_forms' => $nc->attach_company_forms,
             'attach_others' => $nc->attach_others,
             'attach_others_details' => $nc->attach_others_details,
-        ]);
+        ], $this->computeFlags($nc));
     }
 
     /** @param array<string, mixed> $r */
-    private function toDetailArray(array $r): array
+    private function toDetailArray(string $ncID, array $r, array $flags): array
     {
         return [
-            'id' => 0,
+            'id' => $ncID,
             'ncr_no' => $r['ncr_no'],
             'date_of_nc' => $r['date_of_nc'],
             'added_by' => $r['added_by'],
@@ -195,11 +197,8 @@ class NonconformityRepository
             'is_approved' => null,
             'status' => 'IN PROGRESS',
             'status_color' => 'yellow',
-            'can_edit' => false,
-            'can_publish' => false,
-            'can_approve' => false,
-            'can_reopen' => false,
-            'vessel_id' => null,
+            ...$flags,
+            'vessel_id' => $r['vesID'] !== '' ? $r['vesID'] : null,
             'vessel_company_raw' => $r['vessel_company'],
             'company' => $r['company'],
             'department_name' => $r['department_name'],
@@ -208,7 +207,7 @@ class NonconformityRepository
             'source_of_nc_raw' => $r['source_of_nc'],
             'source_of_nc_others' => $r['source_of_nc_others'],
             'source_of_nc_ref_no' => $r['source_of_nc_ref_no'],
-            'manual_chapter_id' => null,
+            'manual_chapter_id' => $r['sms_chapterID'] !== '' ? $r['sms_chapterID'] : null,
             'manual_chapter_label' => $r['manual_chapter_label'],
             'sms_details' => $r['sms_details'],
             'root_cause' => $r['root_cause'],
@@ -238,6 +237,63 @@ class NonconformityRepository
     }
 
     /**
+     * Ported verbatim from loadData()'s `ncID` column callback — the
+     * legacy Actions-column button visibility logic. The five sources
+     * in SOURCES_APPROVED_ELSEWHERE also blank out Publish/Approve AND
+     * Inactivate (all three sit inside the same source_of_nc branch in
+     * the legacy PHP, not just Publish/Approve as it first appears).
+     * user_level (MEMBER vs SUPERADMIN/BTSOLVE) gating is intentionally
+     * dropped, matching the no-roles-yet precedent used by every other
+     * write-enabled module in this migration (Defects, PMS Department/
+     * Classifications, ExposureHours, Drills).
+     */
+    private function computeFlags(object $nc): array
+    {
+        $isInactive = self::isFlagSet($nc->is_inactive);
+        $isClosed = self::isFlagSet($nc->status);
+        $addedByShore = $nc->added_by === 'SHORE';
+        $hasVessel = $nc->vesID !== '';
+        $isPublished = self::isFlagSet($nc->is_published);
+        $isApproved = self::isFlagSet($nc->is_approved);
+        // SOURCES_APPROVED_ELSEWHERE covers 4 of the 5 legacy special sources; EXTERNAL AUDIT is the 5th (loadData()'s ncID column checks all five).
+        $specialSource = in_array($nc->source_of_nc, self::SOURCES_APPROVED_ELSEWHERE, true) || $nc->source_of_nc === 'EXTERNAL AUDIT';
+
+        $canEdit = ! $isClosed && ! $isInactive;
+
+        if ($specialSource) {
+            $publishAction = null;
+            $inactiveAction = null;
+            $canApprove = false;
+        } else {
+            $publishAction = ($addedByShore && $hasVessel && ! $isInactive) ? ($isPublished ? 'unpublish' : 'publish') : null;
+            $inactiveAction = $addedByShore ? ($isInactive ? 'activate' : 'inactivate') : null;
+            $canApprove = $hasVessel && $isPublished && ! $isInactive && ! $isApproved;
+        }
+
+        return [
+            'can_edit' => $canEdit,
+            'can_approve' => $canApprove,
+            'can_reopen' => $isClosed,
+            'can_delete' => true,
+            'publish_action' => $publishAction,
+            'inactive_action' => $inactiveAction,
+        ];
+    }
+
+    /**
+     * tb_nonconformities' is_inactive/is_published/is_approved/status
+     * flag columns are real SQL `int` columns, and this connection's PDO
+     * returns native-typed ints for them (not the all-strings behavior
+     * some MySQL PDO configurations default to) — so comparing against
+     * the string '1' silently and always fails. Every flag read in this
+     * class goes through here instead of a raw `=== '1'`.
+     */
+    private static function isFlagSet(mixed $value): bool
+    {
+        return (string) $value === '1';
+    }
+
+    /**
      * The legacy table stores an empty close_out_date as the zero-date
      * sentinel '0000-00-00' (column is NOT NULL) rather than true NULL —
      * matches the same convention seen throughout legacy's PHP source.
@@ -257,8 +313,7 @@ class NonconformityRepository
      * reading tb_nonconformities directly from the legacy connection.
      * Keeps legacy's vesID-in-assigned-vessels scoping — a real legacy
      * user should only see their own fleet's non-conformities, same as
-     * every dashlet's legacy path. Read-only: can_edit/can_publish/
-     * can_approve/can_reopen are always false — there is no write path.
+     * every dashlet's legacy path.
      */
     public function legacyFullTable(TableQuery $query, ?string $vesselOrCompany, ?string $dateFrom, ?string $dateTo, ?string $legacyUserId): array
     {
@@ -322,8 +377,8 @@ class NonconformityRepository
     {
         $approvedElsewhere = in_array($nc->source_of_nc, self::SOURCES_APPROVED_ELSEWHERE, true);
         $hasVessel = $nc->vesID !== '';
-        $isPublished = $nc->is_published === '1';
-        $isApproved = $nc->is_approved === '1';
+        $isPublished = self::isFlagSet($nc->is_published);
+        $isApproved = self::isFlagSet($nc->is_approved);
         $isClosed = $nc->close_out_date !== '0000-00-00' && $nc->close_out_date !== null && $nc->close_out_date !== '';
 
         $publishedDisplay = match (true) {
@@ -359,11 +414,213 @@ class NonconformityRepository
             'is_approved' => $approvedDisplay,
             'status' => $isClosed ? 'CLOSED' : 'IN PROGRESS',
             'status_color' => $statusColor,
-            'can_edit' => false,
-            'can_publish' => false,
-            'can_approve' => false,
-            'can_reopen' => false,
+            ...$this->computeFlags($nc),
         ];
+    }
+
+    /**
+     * Ported from save_item(): create (ncID empty) and edit share one
+     * delete-then-reinsert save. Only reachable with source_of_nc
+     * OPERATIONAL/OTHERS from the Add form (the other 5 sources are
+     * auto-generated from their own modules and never exposed on this
+     * form) and edits of a FLAG STATE-sourced record carry that source
+     * through unchanged (locked in the frontend, see NonconformityForm).
+     * added_by/is_inactive/is_published/module are frozen from the
+     * existing row on edit, exactly like legacy's `$ncID == ""` branch.
+     * is_approved is unconditionally reset to '0' on every save, per
+     * legacy — editing an approved record un-approves it. Not ported:
+     * tb_logs audit write and S3 file upload (no infra anywhere in this
+     * migration — see class docblock precedent in DefectRepository).
+     */
+    public function legacySave(?string $ncID, array $data): array
+    {
+        $legacy = DB::connection('legacy');
+        $isEdit = $ncID !== null;
+        $newNcId = $ncID ?? ('nc'.uniqid());
+        $existing = $isEdit ? $legacy->table('tb_nonconformities')->where('ncID', $newNcId)->first() : null;
+
+        if ($isEdit && $existing === null) {
+            abort(404);
+        }
+
+        if ($isEdit) {
+            $vesselCompany = $existing->vessel_company;
+            $vesId = $existing->vesID;
+            $company = $data['company'] ?? '';
+            $addedBy = $existing->added_by;
+            $isInactive = $existing->is_inactive;
+            $isPublished = $existing->is_published;
+            $module = $existing->module;
+            $sourceOfNc = $data['source_of_nc'];
+        } else {
+            $vesselCompany = $data['vessel_company'];
+            $vesId = $vesselCompany === 'VESSEL' ? $data['vessel_id'] : '';
+            $company = $vesselCompany === 'VESSEL' ? '' : ($data['company'] ?? '');
+            $addedBy = 'SHORE';
+            $isInactive = '0';
+            $isPublished = '0';
+            $module = 'nonconformities';
+            $sourceOfNc = $data['source_of_nc'];
+        }
+
+        $closeOutDate = $data['close_out_date'] ?? '';
+        $status = ($closeOutDate !== '' && $closeOutDate !== '0000-00-00') ? '1' : '0';
+
+        $row = [
+            'ncID' => $newNcId,
+            'added_by' => $addedBy,
+            'module' => $module,
+            'ncr_no' => $data['ncr_no'],
+            'date_of_nc' => $data['date_of_nc'],
+            'vessel_company' => $vesselCompany,
+            'vesID' => $vesId,
+            'company' => $company,
+            'department_name' => $data['department_name'] ?? '',
+            'reported_by' => $data['reported_by'],
+            'reporter_name' => $data['reporter_name'] ?? '',
+            'source_of_nc' => $sourceOfNc,
+            'source_of_nc_others' => $data['source_of_nc_others'] ?? '',
+            'source_of_nc_ref_no' => $data['source_of_nc_ref_no'] ?? '',
+            'sms_chapterID' => $data['sms_chapterID'] ?? '',
+            'sms_details' => $data['sms_details'] ?? '',
+            'description' => $data['description'],
+            'root_cause' => $data['root_cause'] ?? '',
+            'root_cause_incharge' => $data['root_cause_incharge'] ?? '',
+            'corrective_action' => $data['corrective_action'] ?? '',
+            'corrective_action_incharge' => $data['corrective_action_incharge'] ?? '',
+            'corrective_action_date' => $data['corrective_action_date'] ?? '',
+            'verification' => $data['verification'] ?? '',
+            'verification_followup' => $data['verification_followup'] ?? '',
+            'verification_assistance' => $data['verification_assistance'] ?? '',
+            'verification_dpa' => $data['verification_dpa'] ?? '',
+            'verification_date' => $data['verification_date'] ?? '',
+            'close_out_completed' => $data['close_out_completed'] ?? '0',
+            'close_out_followup' => $data['close_out_followup'] ?? '0',
+            'close_out_followup_nature' => $data['close_out_followup_nature'] ?? '',
+            'close_out_dpa' => $data['close_out_dpa'] ?? '',
+            'close_out_date' => $closeOutDate,
+            'attach_safety_meeting' => $data['attach_safety_meeting'] ?? '0',
+            'attach_record_training' => $data['attach_record_training'] ?? '0',
+            'attach_logbook' => $data['attach_logbook'] ?? '0',
+            'attach_delivery_note' => $data['attach_delivery_note'] ?? '0',
+            'attach_photo' => $data['attach_photo'] ?? '0',
+            'attach_company_forms' => $data['attach_company_forms'] ?? '0',
+            'attach_others' => $data['attach_others'] ?? '0',
+            'attach_others_details' => $data['attach_others_details'] ?? '',
+            'status' => $status,
+            'is_inactive' => $isInactive,
+            'is_published' => $isPublished,
+            'is_approved' => '0',
+        ];
+
+        $legacy->table('tb_nonconformities')->where('ncID', $newNcId)->delete();
+        $legacy->table('tb_nonconformities')->insert($row);
+
+        if ($sourceOfNc === 'FLAG STATE') {
+            $legacy->table('tb_flag_state')->where('ref_no', $data['source_of_nc_ref_no'] ?? '')->update(['is_approved' => '0']);
+        }
+        if ($sourceOfNc === 'EXTERNAL AUDIT') {
+            $legacy->table('tb_external_audit_report')->where('ref_no', $data['source_of_nc_ref_no'] ?? '')->update(['is_approved' => '0']);
+        }
+
+        return $this->legacyDetail($newNcId);
+    }
+
+    /** Ported from edit_stat(): toggles is_inactive, and unconditionally resets a linked Flag State/External Audit record's approval — matches legacy exactly, including that this reset fires regardless of which direction the toggle went. */
+    public function legacyToggleInactive(string $ncID): array
+    {
+        $legacy = DB::connection('legacy');
+        $nc = $legacy->table('tb_nonconformities')->where('ncID', $ncID)->first();
+        abort_if($nc === null, 404);
+
+        $legacy->table('tb_nonconformities')->where('ncID', $ncID)->update([
+            'is_inactive' => self::isFlagSet($nc->is_inactive) ? '0' : '1',
+        ]);
+
+        $this->resetLinkedApproval($nc);
+
+        return $this->legacyDetail($ncID);
+    }
+
+    /** Ported from publish_nonconformity(): delete-then-reinsert toggling is_published, forcing is_approved to '1' regardless of direction (a legacy quirk, kept as-is). */
+    public function legacyTogglePublish(string $ncID): array
+    {
+        $legacy = DB::connection('legacy');
+        $nc = $legacy->table('tb_nonconformities')->where('ncID', $ncID)->first();
+        abort_if($nc === null, 404);
+
+        $row = (array) $nc;
+        $row['is_published'] = self::isFlagSet($nc->is_published) ? '0' : '1';
+        $row['is_approved'] = '1';
+
+        $legacy->table('tb_nonconformities')->where('ncID', $ncID)->delete();
+        $legacy->table('tb_nonconformities')->insert($row);
+
+        return $this->legacyDetail($ncID);
+    }
+
+    /** Ported from approve_nonconformity(): delete-then-reinsert forcing is_approved to '1'. */
+    public function legacyApprove(string $ncID): array
+    {
+        $legacy = DB::connection('legacy');
+        $nc = $legacy->table('tb_nonconformities')->where('ncID', $ncID)->first();
+        abort_if($nc === null, 404);
+
+        $row = (array) $nc;
+        $row['is_approved'] = '1';
+
+        $legacy->table('tb_nonconformities')->where('ncID', $ncID)->delete();
+        $legacy->table('tb_nonconformities')->insert($row);
+
+        return $this->legacyDetail($ncID);
+    }
+
+    /** Ported from reopen_nonconformity(): plain UPDATE resetting is_approved/close_out_date/status, plus the same linked Flag State/External Audit reset as toggleInactive(). */
+    public function legacyReopen(string $ncID): array
+    {
+        $legacy = DB::connection('legacy');
+        $nc = $legacy->table('tb_nonconformities')->where('ncID', $ncID)->first();
+        abort_if($nc === null, 404);
+
+        $legacy->table('tb_nonconformities')->where('ncID', $ncID)->update([
+            'is_approved' => '0',
+            'close_out_date' => '0000-00-00',
+            'status' => '0',
+        ]);
+
+        $this->resetLinkedApproval($nc);
+
+        return $this->legacyDetail($ncID);
+    }
+
+    /** Ported from delete_nonconformity(): soft-delete via is_inactive, not a real SQL delete — tb_nonconformities has no hard-delete path in legacy. */
+    public function legacyDelete(string $ncID): array
+    {
+        $legacy = DB::connection('legacy');
+        abort_if($legacy->table('tb_nonconformities')->where('ncID', $ncID)->doesntExist(), 404);
+
+        $legacy->table('tb_nonconformities')->where('ncID', $ncID)->update(['is_inactive' => '1']);
+
+        return $this->legacyDetail($ncID);
+    }
+
+    private function resetLinkedApproval(object $nc): void
+    {
+        $legacy = DB::connection('legacy');
+        if ($nc->source_of_nc === 'FLAG STATE') {
+            $legacy->table('tb_flag_state')->where('ref_no', $nc->source_of_nc_ref_no)->update(['is_approved' => '0']);
+        }
+        if ($nc->source_of_nc === 'EXTERNAL AUDIT') {
+            $legacy->table('tb_external_audit_report')->where('ref_no', $nc->source_of_nc_ref_no)->update(['is_approved' => '0']);
+        }
+    }
+
+    /** @return array<int, array{id:string,label:string}> */
+    public function legacyChapterOptions(): array
+    {
+        return DB::connection('legacy')->table('tb_manual_chapter')->orderBy('reference_no')->get()
+            ->map(fn ($c) => ['id' => $c->chapterID, 'label' => "({$c->reference_no}) {$c->chapter_name}"])
+            ->all();
     }
 
     /** @return array<int, array{id:string,label:string}> */
