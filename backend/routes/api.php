@@ -110,7 +110,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/psc-reports/options', [PscReportController::class, 'options']);
     Route::get('/psc-reports', [PscReportController::class, 'index']);
+    Route::post('/psc-reports', [PscReportController::class, 'store']);
     Route::get('/psc-reports/{pscReport}', [PscReportController::class, 'show']);
+    Route::put('/psc-reports/{pscReport}', [PscReportController::class, 'update']);
+    Route::delete('/psc-reports/{pscReport}', [PscReportController::class, 'destroy']);
 
     Route::get('/company-inspections/options', [CompanyInspectionController::class, 'options']);
     Route::get('/company-inspections', [CompanyInspectionController::class, 'index']);

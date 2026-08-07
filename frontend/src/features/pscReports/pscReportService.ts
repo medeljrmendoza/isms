@@ -1,6 +1,7 @@
 import { axiosClient } from "../../api/axiosClient";
 import type { ApiResource } from "../auth/auth";
 import type { PscReportDetail, PscReportListResponse, PscReportOptions } from "./pscReport";
+import type { PscReportFormValues } from "./pscReportSchema";
 
 export interface PscReportListParams {
   page: number;
@@ -11,7 +12,7 @@ export interface PscReportListParams {
   vessel_id?: string;
 }
 
-/** Read-only: Add/Edit/Delete/Reopen have no legacy write-back path — see PscReportsPage. */
+/** No reopen(): legacy's own Reopen button is dead code — see PscReportRepository. */
 export const pscReportService = {
   async list(params: PscReportListParams): Promise<PscReportListResponse> {
     const response = await axiosClient.get<ApiResource<PscReportListResponse>>("/psc-reports", { params });
@@ -23,8 +24,22 @@ export const pscReportService = {
     return response.data.data;
   },
 
-  async show(id: number | string): Promise<PscReportDetail> {
+  async show(id: string): Promise<PscReportDetail> {
     const response = await axiosClient.get<ApiResource<PscReportDetail>>(`/psc-reports/${id}`);
     return response.data.data;
+  },
+
+  async create(values: PscReportFormValues): Promise<PscReportDetail> {
+    const response = await axiosClient.post<ApiResource<PscReportDetail>>("/psc-reports", values);
+    return response.data.data;
+  },
+
+  async update(id: string, values: PscReportFormValues): Promise<PscReportDetail> {
+    const response = await axiosClient.put<ApiResource<PscReportDetail>>(`/psc-reports/${id}`, values);
+    return response.data.data;
+  },
+
+  async destroy(id: string): Promise<void> {
+    await axiosClient.delete(`/psc-reports/${id}`);
   },
 };

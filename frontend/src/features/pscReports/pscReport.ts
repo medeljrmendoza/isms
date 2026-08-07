@@ -1,25 +1,26 @@
 import type { DashletColumn, TableMeta } from "../dashboard/dashboard";
 
 export interface PscReportRow {
-  /** A local numeric id normally, but a legacy pscreportid string when reading from the legacy connection. */
-  id: number | string;
+  /** A legacy pscreportid varchar string. */
+  id: string;
   ref_no: string;
   vessel: string;
   dateof_inspection: string;
+  placeof_inspection: string | null;
+  name_psco: string | null;
   mou: string | null;
   pending_nc_count: number;
   total_nc_count: number;
+  pending_obs_count: number;
+  total_obs_count: number;
   can_edit: boolean;
   can_delete: boolean;
-  can_reopen: boolean;
 }
 
 export interface PscReportDetail extends PscReportRow {
-  vessel_id: number | null;
-  placeof_inspection: string | null;
-  mou_id: number | null;
+  vessel_id: string | null;
+  mou_id: string | null;
   mou_others: string | null;
-  name_psco: string | null;
   master_name: string | null;
   chief_engineer: string | null;
   is_detained: boolean;
@@ -39,10 +40,11 @@ export interface PscReportListResponse {
 }
 
 export interface PscReportOption {
-  id: number | string;
+  id: string;
   label: string;
 }
 
 export interface PscReportOptions {
   vessels: PscReportOption[];
+  mou_authorities: PscReportOption[];
 }
