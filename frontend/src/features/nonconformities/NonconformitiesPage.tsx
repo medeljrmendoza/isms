@@ -30,10 +30,9 @@ function FlagIcon({ value }: { value: boolean | null }) {
 /** Ported from admin/nonconformities/nonconformities_v.php: STATUS is legacy's colored exclamation icon (In Progress = amber, Closed = green) — see the LEGEND in the filter row. */
 function StatusIcon({ row }: { row: NonconformityRow }) {
   return (
-    <span
-      title={row.status}
-      className={`glyphicon glyphicon-exclamation-sign ${row.status_color === "green" ? "text-green-600" : "text-amber-400"}`}
-    />
+    <span title={row.status} className={row.status_color === "green" ? "text-green-600" : "text-amber-500"}>
+      ⚠
+    </span>
   );
 }
 
@@ -227,8 +226,8 @@ export function NonconformitiesPage() {
           <div className="ml-auto flex items-center gap-4">
             <div className="flex items-center gap-1.5 text-xs text-slate-600">
               <b className="rounded bg-yellow-100 px-1">LEGEND:</b>
-              <span className="glyphicon glyphicon-exclamation-sign text-amber-400" /> In Progress
-              <span className="glyphicon glyphicon-exclamation-sign text-green-600" /> Closed
+              <span className="text-amber-500">⚠</span> In Progress
+              <span className="text-green-600">⚠</span> Closed
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-slate-500">Search</label>
