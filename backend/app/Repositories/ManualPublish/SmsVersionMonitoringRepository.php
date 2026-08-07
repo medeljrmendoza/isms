@@ -2,16 +2,8 @@
 
 namespace App\Repositories\ManualPublish;
 
-use App\Models\ManualPublish\ManualDocument;
-use App\Models\ManualPublish\ManualForm;
-use App\Models\ManualPublish\VesselFormSync;
-use App\Models\ManualPublish\VesselManualSync;
-use App\Models\Vessel;
-use App\Repositories\Drills\DrillRepository;
 use App\Support\LegacyDb;
 use App\Support\TableQuery;
-use Illuminate\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -35,73 +27,16 @@ class SmsVersionMonitoringRepository
         return self::COLUMNS;
     }
 
-    /** @return Collection<int, array{vessel: Vessel, procedures: int, forms: int}> */
-    public function summaries(): Collection
-    {
-        $documents = ManualDocument::query()->where('is_published', true)->with('vessels')->get();
-        $forms = ManualForm::query()->where('is_active', true)->where('is_deleted', false)->with('vessels')->get();
-        $manualSyncs = VesselManualSync::query()->get()->groupBy('vessel_id');
-        $formSyncs = VesselFormSync::query()->get()->groupBy('vessel_id');
-
-        return Vessel::query()->orderBy('name')->get()->map(function (Vessel $vessel) use ($documents, $forms, $manualSyncs, $formSyncs) {
-            $vesselManualSyncs = $manualSyncs->get($vessel->id, collect());
-            $vesselFormSyncs = $formSyncs->get($vessel->id, collect());
-
-            $procedures = $documents
-                ->filter(fn (ManualDocument $doc) => $doc->vessel_access === 'ALL' || $doc->vessels->contains('id', $vessel->id))
-                ->filter(fn (ManualDocument $doc) => ! $vesselManualSyncs->contains(fn ($sync) => $sync->manual_document_id === $doc->id && $sync->file_hash === $doc->file_hash))
-                ->count();
-
-            $formsPending = $forms
-                ->filter(fn (ManualForm $form) => $form->vessel_access === 'ALL' || $form->vessels->contains('id', $vessel->id))
-                ->filter(fn (ManualForm $form) => ! $vesselFormSyncs->contains(fn ($sync) => $sync->manual_form_id === $form->id && $sync->file_hash === $form->file_hash))
-                ->count();
-
-            return ['vessel' => $vessel, 'procedures' => $procedures, 'forms' => $formsPending];
-        });
-    }
-
-    public function table(TableQuery $query): LengthAwarePaginator
-    {
-        $rows = $this->summaries();
-
-        if ($query->search !== null) {
-            $term = mb_strtolower($query->search);
-            $rows = $rows->filter(fn (array $row) => str_contains(mb_strtolower($row['vessel']->display_name), $term));
-        }
-
-        $sortable = [
-            'vessel' => fn (array $row) => mb_strtolower($row['vessel']->display_name),
-            'procedures' => fn (array $row) => $row['procedures'],
-            'forms' => fn (array $row) => $row['forms'],
-        ];
-        $sortKey = $sortable[$query->sort ?? 'vessel'] ?? $sortable['vessel'];
-
-        $sorted = $rows->sortBy($sortKey, SORT_REGULAR, $query->direction === 'desc')->values();
-
-        $total = $sorted->count();
-        $items = $sorted->slice(($query->page - 1) * $query->perPage, $query->perPage)->values();
-
-        return new LengthAwarePaginator(
-            $items,
-            $total,
-            $query->perPage,
-            $query->page,
-            ['path' => LengthAwarePaginator::resolveCurrentPath()],
-        );
-    }
-
     /**
      * Ported from Controllers/Dashboard_sms_version_monitoring.php's
      * count_sms_version_procedure()/count_sms_version_forms(). Same
      * vessel list scoping as DrillRepository::legacyTable() (assigned
      * AND active vessel AND active principal), then per-vessel counts
-     * using the same "applies to vessel, and vessel's last synced hash
-     * doesn't match" logic as the local `summaries()` — see this class's
-     * docblock. tb_manual_vessel_access's `manualID` column is reused
-     * for chapters, documents, and forms alike (no type discriminator);
-     * ported as-is, relying on the same ID-prefix uniqueness convention
-     * the rest of this schema depends on.
+     * using the "applies to vessel, and vessel's last synced hash
+     * doesn't match" logic — see this class's docblock. tb_manual_vessel_access's
+     * `manualID` column is reused for chapters, documents, and forms
+     * alike (no type discriminator); ported as-is, relying on the same
+     * ID-prefix uniqueness convention the rest of this schema depends on.
      */
     public function legacyTable(TableQuery $query, ?string $legacyUserId): array
     {

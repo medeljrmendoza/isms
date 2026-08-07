@@ -2,7 +2,6 @@
 
 namespace App\Repositories\Pms;
 
-use App\Models\Pms\PmsTicket;
 use App\Support\LegacyDb;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
